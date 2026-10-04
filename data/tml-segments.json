@@ -1,0 +1,166 @@
+{
+ "line": "TML",
+ "order": "TML-UT (Wu Kai Sha -> Tuen Mun)",
+ "note": "minutes is the estimator's running-time model (no station dwell). Straight-line distance, not track length.",
+ "totalMetres": 53690,
+ "totalKm": 53.7,
+ "totalMinutes": 57.3,
+ "hops": [
+  {
+   "from": "WKS",
+   "to": "MOS",
+   "metres": 1369,
+   "minutes": 1.901
+  },
+  {
+   "from": "MOS",
+   "to": "HEO",
+   "metres": 1005,
+   "minutes": 1.396
+  },
+  {
+   "from": "HEO",
+   "to": "TSH",
+   "metres": 1108,
+   "minutes": 1.539
+  },
+  {
+   "from": "TSH",
+   "to": "SHM",
+   "metres": 2697,
+   "minutes": 2.498
+  },
+  {
+   "from": "SHM",
+   "to": "CIO",
+   "metres": 701,
+   "minutes": 0.973
+  },
+  {
+   "from": "CIO",
+   "to": "STW",
+   "metres": 1143,
+   "minutes": 1.588
+  },
+  {
+   "from": "STW",
+   "to": "CKT",
+   "metres": 898,
+   "minutes": 1.247
+  },
+  {
+   "from": "CKT",
+   "to": "TAW",
+   "metres": 820,
+   "minutes": 1.139
+  },
+  {
+   "from": "TAW",
+   "to": "HIK",
+   "metres": 1308,
+   "minutes": 1.817
+  },
+  {
+   "from": "HIK",
+   "to": "DIH",
+   "metres": 4144,
+   "minutes": 3.837
+  },
+  {
+   "from": "DIH",
+   "to": "KAT",
+   "metres": 1017,
+   "minutes": 1.413
+  },
+  {
+   "from": "KAT",
+   "to": "SUW",
+   "metres": 1035,
+   "minutes": 1.437
+  },
+  {
+   "from": "SUW",
+   "to": "TKW",
+   "metres": 1169,
+   "minutes": 1.624
+  },
+  {
+   "from": "TKW",
+   "to": "HOM",
+   "metres": 926,
+   "minutes": 1.286
+  },
+  {
+   "from": "HOM",
+   "to": "HUH",
+   "metres": 882,
+   "minutes": 1.225
+  },
+  {
+   "from": "HUH",
+   "to": "ETS",
+   "metres": 1093,
+   "minutes": 1.517
+  },
+  {
+   "from": "ETS",
+   "to": "AUS",
+   "metres": 1230,
+   "minutes": 1.708
+  },
+  {
+   "from": "AUS",
+   "to": "NAC",
+   "metres": 2724,
+   "minutes": 2.523
+  },
+  {
+   "from": "NAC",
+   "to": "MEF",
+   "metres": 2105,
+   "minutes": 1.949
+  },
+  {
+   "from": "MEF",
+   "to": "TWW",
+   "metres": 4369,
+   "minutes": 4.045
+  },
+  {
+   "from": "TWW",
+   "to": "KSR",
+   "metres": 8807,
+   "minutes": 8
+  },
+  {
+   "from": "KSR",
+   "to": "YUL",
+   "metres": 3150,
+   "minutes": 2.916
+  },
+  {
+   "from": "YUL",
+   "to": "LOP",
+   "metres": 1032,
+   "minutes": 1.433
+  },
+  {
+   "from": "LOP",
+   "to": "TIS",
+   "metres": 2127,
+   "minutes": 1.97
+  },
+  {
+   "from": "TIS",
+   "to": "SIH",
+   "metres": 4822,
+   "minutes": 4.465
+  },
+  {
+   "from": "SIH",
+   "to": "TUM",
+   "metres": 2009,
+   "minutes": 1.86
+  }
+ ]
+}

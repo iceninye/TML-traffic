@@ -1,0 +1,245 @@
+{
+ "line": "TML",
+ "meta": {
+  "en": "Tuen Ma Line",
+  "tc": "屯馬綫",
+  "color": "#9A3B26"
+ },
+ "source": {
+  "repo": "https://github.com/keithligh/hk-traffic-intelligence",
+  "file": "data/mtr-network.json",
+  "license": "MIT (c) 2026 Keith Li"
+ },
+ "stations": {
+  "TUM": {
+   "en": "Tuen Mun",
+   "tc": "屯門",
+   "lng": 113.973197,
+   "lat": 22.394883
+  },
+  "SIH": {
+   "en": "Siu Hong",
+   "tc": "兆康",
+   "lng": 113.978771,
+   "lat": 22.412198
+  },
+  "TIS": {
+   "en": "Tin Shui Wai",
+   "tc": "天水圍",
+   "lng": 114.004861,
+   "lat": 22.44824
+  },
+  "LOP": {
+   "en": "Long Ping",
+   "tc": "朗屏",
+   "lng": 114.025554,
+   "lat": 22.447744
+  },
+  "YUL": {
+   "en": "Yuen Long",
+   "tc": "元朗",
+   "lng": 114.035459,
+   "lat": 22.446219
+  },
+  "KSR": {
+   "en": "Kam Sheung Road",
+   "tc": "錦上路",
+   "lng": 114.063426,
+   "lat": 22.434633
+  },
+  "TWW": {
+   "en": "Tsuen Wan West",
+   "tc": "荃灣西",
+   "lng": 114.11017,
+   "lat": 22.368257
+  },
+  "MEF": {
+   "en": "Mei Foo",
+   "tc": "美孚",
+   "lng": 114.137481,
+   "lat": 22.338159
+  },
+  "NAC": {
+   "en": "Nam Cheong",
+   "tc": "南昌",
+   "lng": 114.153593,
+   "lat": 22.326488
+  },
+  "AUS": {
+   "en": "Austin",
+   "tc": "柯士甸",
+   "lng": 114.166345,
+   "lat": 22.305014
+  },
+  "ETS": {
+   "en": "East Tsim Sha Tsui",
+   "tc": "尖東",
+   "lng": 114.173652,
+   "lat": 22.29626
+  },
+  "HUH": {
+   "en": "Hung Hom",
+   "tc": "紅磡",
+   "lng": 114.182355,
+   "lat": 22.30189
+  },
+  "HOM": {
+   "en": "Ho Man Tin",
+   "tc": "何文田",
+   "lng": 114.182821,
+   "lat": 22.309808
+  },
+  "TKW": {
+   "en": "To Kwa Wan",
+   "tc": "土瓜灣",
+   "lng": 114.187613,
+   "lat": 22.316855
+  },
+  "SUW": {
+   "en": "Sung Wong Toi",
+   "tc": "宋皇臺",
+   "lng": 114.190598,
+   "lat": 22.327003
+  },
+  "KAT": {
+   "en": "Kai Tak",
+   "tc": "啟德",
+   "lng": 114.199803,
+   "lat": 22.330752
+  },
+  "DIH": {
+   "en": "Diamond Hill",
+   "tc": "鑽石山",
+   "lng": 114.201572,
+   "lat": 22.339751
+  },
+  "HIK": {
+   "en": "Hin Keng",
+   "tc": "顯徑",
+   "lng": 114.170811,
+   "lat": 22.363817
+  },
+  "TAW": {
+   "en": "Tai Wai",
+   "tc": "大圍",
+   "lng": 114.178633,
+   "lat": 22.373093
+  },
+  "CKT": {
+   "en": "Che Kung Temple",
+   "tc": "車公廟",
+   "lng": 114.186399,
+   "lat": 22.374773
+  },
+  "STW": {
+   "en": "Sha Tin Wai",
+   "tc": "沙田圍",
+   "lng": 114.194813,
+   "lat": 22.376931
+  },
+  "CIO": {
+   "en": "City One",
+   "tc": "第一城",
+   "lng": 114.203721,
+   "lat": 22.383082
+  },
+  "SHM": {
+   "en": "Shek Mun",
+   "tc": "石門",
+   "lng": 114.208318,
+   "lat": 22.387735
+  },
+  "TSH": {
+   "en": "Tai Shui Hang",
+   "tc": "大水坑",
+   "lng": 114.222604,
+   "lat": 22.408082
+  },
+  "HEO": {
+   "en": "Heng On",
+   "tc": "恆安",
+   "lng": 114.225765,
+   "lat": 22.417609
+  },
+  "MOS": {
+   "en": "Ma On Shan",
+   "tc": "馬鞍山",
+   "lng": 114.231539,
+   "lat": 22.424901
+  },
+  "WKS": {
+   "en": "Wu Kai Sha",
+   "tc": "烏溪沙",
+   "lng": 114.244001,
+   "lat": 22.429236
+  }
+ },
+ "routes": [
+  {
+   "id": "TML-DT",
+   "line": "TML",
+   "stations": [
+    "TUM",
+    "SIH",
+    "TIS",
+    "LOP",
+    "YUL",
+    "KSR",
+    "TWW",
+    "MEF",
+    "NAC",
+    "AUS",
+    "ETS",
+    "HUH",
+    "HOM",
+    "TKW",
+    "SUW",
+    "KAT",
+    "DIH",
+    "HIK",
+    "TAW",
+    "CKT",
+    "STW",
+    "CIO",
+    "SHM",
+    "TSH",
+    "HEO",
+    "MOS",
+    "WKS"
+   ]
+  },
+  {
+   "id": "TML-UT",
+   "line": "TML",
+   "stations": [
+    "WKS",
+    "MOS",
+    "HEO",
+    "TSH",
+    "SHM",
+    "CIO",
+    "STW",
+    "CKT",
+    "TAW",
+    "HIK",
+    "DIH",
+    "KAT",
+    "SUW",
+    "TKW",
+    "HOM",
+    "HUH",
+    "ETS",
+    "AUS",
+    "NAC",
+    "MEF",
+    "TWW",
+    "KSR",
+    "YUL",
+    "LOP",
+    "TIS",
+    "SIH",
+    "TUM"
+   ]
+  }
+ ]
+}

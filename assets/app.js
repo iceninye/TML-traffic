@@ -44,7 +44,7 @@ const TRAIN_SPACING = 21
 const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
-const BUILD = { version: "0.3.1", commit: "dev" }
+const BUILD = { version: "0.3.1", commit: "d45ac3d" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.

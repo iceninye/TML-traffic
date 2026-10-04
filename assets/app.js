@@ -48,11 +48,11 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.2", commit: "b7160b1" }
+const BUILD = { version: "0.4.3", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
-const MAP_COLORS = { alarm: "#ff1238", UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
+const MAP_COLORS = { UP_LINE: "#ffb17d", DOWN_LINE: "#79c3ff", alarm: "#ff1238", UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
 
 // Interchanges, coloured as on the MTR system map.
 const INTERCHANGE = {
@@ -995,7 +995,8 @@ function installMapLayers() {
       id: `tml-track-${id}`,
       type: "line",
       source: "tml-track",
-      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 2, 12, 3, 15, 5, 17, 7), "line-offset": offset },
+      // 30% lighter and 30% thinner than the base line, so trains stand out.
+      paint: { "line-color": MAP_COLORS[`${dir}_LINE`], "line-width": z(9, 1.4, 12, 2.1, 15, 3.5, 17, 4.9), "line-offset": offset },
       layout,
     })
   }
@@ -1027,13 +1028,13 @@ function installMapLayers() {
   })
   map.addSource("tml-cars", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
   map.addSource("tml-lights", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
-  // Cars are grey-white with a grey edge, like real stock; lateness shows in
+  // Cars are grey-white (30% darker) with a grey edge, like real stock; lateness shows in
   // the edge: red when 60 s+ late, flashing red when 180 s+.
   map.addLayer({
     id: "tml-cars",
     type: "fill",
     source: "tml-cars",
-    paint: { "fill-color": "#e6e8eb", "fill-opacity": 1 },
+    paint: { "fill-color": "#a1a2a5", "fill-opacity": 1 },
   })
   map.addLayer({
     id: "tml-cars-edge",
@@ -1044,14 +1045,14 @@ function installMapLayers() {
       "line-width": ["match", ["get", "level"], 0, 0.8, 1.6],
     },
   })
-  // Headlights white at the front, tail lights red at the back.
+  // Two small white lamps at the front and two at the back.
   map.addLayer({
     id: "tml-lights-glow",
     type: "circle",
     source: "tml-lights",
     paint: {
       "circle-radius": ["*", ["get", "r"], 3],
-      "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff2a2a"],
+      "circle-color": "#ffffff",
       "circle-blur": 1,
       "circle-opacity": 0.8,
     },
@@ -1060,7 +1061,7 @@ function installMapLayers() {
     id: "tml-lights",
     type: "circle",
     source: "tml-lights",
-    paint: { "circle-radius": ["get", "r"], "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff3b3b"] },
+    paint: { "circle-radius": ["get", "r"], "circle-color": "#ffffff" },
   })
   map.addLayer({
     id: "tml-train-late",
@@ -1185,10 +1186,11 @@ function trainShape(run, zoom) {
   }
   return {
     cars,
-    head: trackPoint(run, head, 0, 0, zoom),
-    tail: trackPoint(run, head, length, 0, zoom),
+    // Two small lamps at each end, set in from the car sides.
+    heads: [trackPoint(run, head, 0.4 * scale, -half * 0.55, zoom), trackPoint(run, head, 0.4 * scale, half * 0.55, zoom)],
+    tails: [trackPoint(run, head, length - 0.4 * scale, -half * 0.55, zoom), trackPoint(run, head, length - 0.4 * scale, half * 0.55, zoom)],
     middle: trackPoint(run, head, length / 2, 0, zoom),
-    lightR: Math.max(1.6, Math.min(5, (half * 0.9) / mpp)),
+    lightR: Math.max(1.4, Math.min(3, (half * 0.35) / mpp)),
     glow: Math.max(7, Math.min(40, (length / mpp) * 0.42)),
   }
 }
@@ -1215,8 +1217,8 @@ function paintMap() {
     }
     points.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: shape.middle } })
     for (const ring of shape.cars) cars.push({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [ring] } })
-    if (shape.head) lights.push({ type: "Feature", properties: { kind: "head", r: shape.lightR }, geometry: { type: "Point", coordinates: shape.head } })
-    if (shape.tail) lights.push({ type: "Feature", properties: { kind: "tail", r: shape.lightR * 0.8 }, geometry: { type: "Point", coordinates: shape.tail } })
+    for (const at of shape.heads) if (at) lights.push({ type: "Feature", properties: { kind: "head", r: shape.lightR }, geometry: { type: "Point", coordinates: at } })
+    for (const at of shape.tails) if (at) lights.push({ type: "Feature", properties: { kind: "tail", r: shape.lightR }, geometry: { type: "Point", coordinates: at } })
   }
   mapInstance.getSource("tml-trains").setData({ type: "FeatureCollection", features: points })
   mapInstance.getSource("tml-cars").setData({ type: "FeatureCollection", features: cars })

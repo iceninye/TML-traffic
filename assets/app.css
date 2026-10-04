@@ -9,6 +9,7 @@
   --up-hot: #ffe2c7;
   --down-hot: #d6edff;
   --late: #e5484d;
+  --alarm: #ff1238;
   --bg: #070b14;
   --panel: #0e1526;
   --panel-2: #131c31;
@@ -343,17 +344,11 @@ svg.diagram {
 .dg-col.up { fill: var(--up); }
 .dg-col.down { fill: var(--down); }
 
-/* Neon tracks: blurred glow, dark casing, colour, pale hot core. */
-.dg-track-glow { stroke-width: 12; fill: none; opacity: 0.55; stroke-linecap: round; }
-.dg-track-glow.up { stroke: var(--up); }
-.dg-track-glow.down { stroke: var(--down); }
+/* Plain tracks: dark casing under the colour. Only trains glow. */
 .dg-track-casing { stroke: #020611; stroke-width: 7; stroke-linecap: round; fill: none; opacity: 0.6; }
 .dg-track { stroke-width: 4; stroke-linecap: round; fill: none; }
 .dg-track.up { stroke: var(--up); }
 .dg-track.down { stroke: var(--down); }
-.dg-track-core { stroke-width: 1.2; fill: none; opacity: 0.9; stroke-linecap: round; }
-.dg-track-core.up { stroke: var(--up-hot); }
-.dg-track-core.down { stroke: var(--down-hot); }
 .dg-chev { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.75; pointer-events: none; }
 
 .dg-tunnel { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.55; }
@@ -428,6 +423,21 @@ svg.diagram {
 .dg-train[data-dir="DOWN"] .dg-train-glow { fill: var(--down); }
 .dg-late { pointer-events: none; }
 .dg-late-bg { fill: var(--late); stroke: #fff; stroke-width: 1; }
+
+/* Late: red body and glow. Very late (180 s+): brighter red, white rim,
+   flashing glow; a steady thick rim instead when motion is reduced. */
+.dg-train[data-level="1"] .dg-train-body,
+.dg-train[data-level="1"] .dg-train-glow { fill: var(--late); }
+.dg-train[data-level="2"] .dg-train-body,
+.dg-train[data-level="2"] .dg-train-glow { fill: var(--alarm); }
+.dg-train[data-level="2"] .dg-train-body { stroke: #fff; stroke-width: 2.5; }
+.dg-train[data-level="2"] .dg-train-glow { animation: alarm 1s ease-in-out infinite; }
+.dg-train[data-level="2"] .dg-late-bg { fill: var(--alarm); }
+@keyframes alarm { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dg-train[data-level="2"] .dg-train-glow { animation: none; }
+  .dg-train[data-level="2"] .dg-train-body { stroke-width: 4; }
+}
 .dg-late-text { font-size: 9.5px; font-weight: 700; fill: #fff; text-anchor: middle; dominant-baseline: middle; font-variant-numeric: tabular-nums; }
 .dg-train[data-dir="UP"] .dg-train-halo { fill: var(--up); }
 .dg-train[data-dir="DOWN"] .dg-train-halo { fill: var(--down); }

@@ -47,11 +47,12 @@ const TRAIN_SPACING = 21
 const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
-const BUILD = { version: "0.4.0", commit: "ef4187b" }
+const LATE_ALARM_SEC = 180
+const BUILD = { version: "0.4.1", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
-const MAP_COLORS = { UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
+const MAP_COLORS = { alarm: "#ff1238", UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
 
 // Interchanges, coloured as on the MTR system map.
 const INTERCHANGE = {
@@ -113,7 +114,7 @@ const STRINGS = {
     source: "資料來源：港鐵 Next Train API（data.gov.hk）",
     engine: "列車位置由到站倒數配合時間表行車及停站時間推算，並非港鐵官方列車位置",
     engineRef: "Engine參考",
-    lateTag: (sec) => `Delay ${sec}s`,
+    lateTag: (sec) => `- ${sec}s`,
     lateLabel: "慢於時間表",
     lateSec: (sec) => `${sec} 秒`,
     lateSource: { timetable: "比時間表班次遲", run: "行車／停站比時間表慢", feed: "港鐵前方各站預報偏慢", headway: "與前車間距超出班距" },
@@ -124,7 +125,7 @@ const STRINGS = {
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
-    basis: { sched: (tt, n) => `按 ${tt} 時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
+    basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
     offService: "非服務時間",
@@ -182,7 +183,7 @@ const STRINGS = {
     source: "Source: MTR Next Train API (data.gov.hk)",
     engine: "Positions are estimated from arrival countdowns plus timetable run and dwell times, not official MTR train locations",
     engineRef: "Engine reference",
-    lateTag: (sec) => `Delay ${sec}s`,
+    lateTag: (sec) => `- ${sec}s`,
     lateLabel: "Behind timetable",
     lateSec: (sec) => `${sec} s`,
     lateSource: { timetable: "behind its timetabled trip", run: "running slower than timetable", feed: "MTR boards ahead predict it slower", headway: "gap to the train ahead exceeds headway" },
@@ -193,7 +194,7 @@ const STRINGS = {
     offPeak: "off-peak",
     matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
     tripId: (run, trip) => `Trip ${trip} (run ${run})`,
-    basis: { sched: (tt, n) => `${tt} timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
+    basis: { sched: (n) => `Timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
     band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
     headway: (m) => `every ~${m} min`,
     offService: "Out of service hours",
@@ -510,12 +511,12 @@ function paintClock() {
     const tau = serviceSeconds(now)
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
     if (!headway) {
-      els.period.textContent = `${book.timetable} · ${s.offService}`
+      els.period.textContent = s.offService
       els.period.dataset.peak = "0"
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${s.dayType[state.day]} ${book.timetable} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      els.period.textContent = `${s.dayType[state.day]} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
@@ -611,13 +612,11 @@ function buildDiagram() {
   }
 
   // Two tracks, casing under colour.
-  // Glow under each, then the line, then a pale core: the railisland look.
+  // Plain coloured tracks; only the trains glow.
   for (const [x, dir] of [[TRACK_UP_X, "up"], [TRACK_DN_X, "down"]]) {
     base.append(
-      make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track-glow ${dir}`, filter: "url(#dg-glow)" }),
       make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: "dg-track-casing" }),
       make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track ${dir}` }),
-      make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track-core ${dir}` }),
     )
   }
   // Direction chevrons along each track, a few per screen.
@@ -785,6 +784,7 @@ function syncTrains() {
       node.dataset.short = isShortTrip(run) ? "1" : "0"
       node.dataset.selected = state.selected === run.id ? "1" : "0"
       node.dataset.phase = run.pos.phase
+      node.dataset.level = String(lateLevel(run))
       paintLateTag(node, run)
       node.setAttribute("aria-label", `${network.name(run.dest, state.lang)} · ${positionText(run)}`)
     }
@@ -800,6 +800,12 @@ function syncTrains() {
 
 function isLate(run) {
   return (run.late?.sec ?? 0) >= LATE_SHOW_SEC
+}
+
+// 0 on time, 1 late (red), 2 very late (red, flashing glow).
+function lateLevel(run) {
+  const sec = run.late?.sec ?? 0
+  return sec >= LATE_ALARM_SEC ? 2 : sec >= LATE_SHOW_SEC ? 1 : 0
 }
 
 // A small red tag above a train running 60 s or more behind the timetable.
@@ -828,7 +834,10 @@ function loop(stamp) {
       lastFollow = stamp
       followInDiagram()
     }
-  } else if (stamp - lastMapPaint > 250) {
+  } else {
+    flashMap(stamp)
+  }
+  if (state.view === "map" && stamp - lastMapPaint > 250) {
     lastMapPaint = stamp
     paintMap()
   }
@@ -983,31 +992,10 @@ function installMapLayers() {
     const offset = offsetExpr(sign)
     const layout = { "line-cap": "round", "line-join": "round" }
     map.addLayer({
-      id: `tml-glow-wide-${id}`,
-      type: "line",
-      source: "tml-track",
-      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 14, 12, 22, 15, 34, 17, 46), "line-blur": z(9, 10, 15, 22), "line-opacity": 0.5, "line-offset": offset },
-      layout,
-    })
-    map.addLayer({
-      id: `tml-glow-${id}`,
-      type: "line",
-      source: "tml-track",
-      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 5, 12, 8, 15, 12, 17, 16), "line-blur": z(9, 3, 15, 6), "line-opacity": 0.9, "line-offset": offset },
-      layout,
-    })
-    map.addLayer({
       id: `tml-track-${id}`,
       type: "line",
       source: "tml-track",
       paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 2, 12, 3, 15, 5, 17, 7), "line-offset": offset },
-      layout,
-    })
-    map.addLayer({
-      id: `tml-core-${id}`,
-      type: "line",
-      source: "tml-track",
-      paint: { "line-color": MAP_COLORS[`${dir}_HOT`], "line-width": z(9, 0.6, 12, 1, 15, 1.8, 17, 2.5), "line-opacity": 0.85, "line-offset": offset },
       layout,
     })
   }
@@ -1037,47 +1025,72 @@ function installMapLayers() {
     },
     paint: { "text-color": "#f7fbff", "text-halo-color": MAP_COLORS.casing, "text-halo-width": 1.6 },
   })
+  map.addSource("tml-cars", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
+  map.addSource("tml-lights", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
+  const trainColor = ["match", ["get", "level"], 2, MAP_COLORS.alarm, 1, MAP_COLORS.late, ["get", "color"]]
+  // Glow around the whole train; very late trains get a second, flashing one.
   map.addLayer({
     id: "tml-trains-glow",
     type: "circle",
     source: "tml-trains",
     paint: {
-      "circle-radius": ["*", ["case", ["==", ["get", "selected"], 1], 1.6, 1], z(9, 14, 12, 20, 15, 28, 17, 34)],
-      "circle-color": ["get", "color"],
+      "circle-radius": ["*", ["get", "glow"], ["case", ["==", ["get", "selected"], 1], 1.4, 1]],
+      "circle-color": trainColor,
       "circle-blur": 1,
-      "circle-opacity": 0.95,
+      "circle-opacity": 0.7,
     },
   })
   map.addLayer({
-    id: "tml-trains",
+    id: "tml-trains-flash",
     type: "circle",
     source: "tml-trains",
+    filter: ["==", ["get", "level"], 2],
+    paint: { "circle-radius": ["*", ["get", "glow"], 1.6], "circle-color": MAP_COLORS.alarm, "circle-blur": 1, "circle-opacity": 0.9 },
+  })
+  map.addLayer({
+    id: "tml-cars",
+    type: "fill",
+    source: "tml-cars",
+    paint: { "fill-color": trainColor, "fill-opacity": 1 },
+  })
+  map.addLayer({
+    id: "tml-cars-edge",
+    type: "line",
+    source: "tml-cars",
     paint: {
-      "circle-radius": z(9, 4.5, 12, 6, 15, 9, 17, 11),
-      "circle-color": ["get", "color"],
-      "circle-stroke-color": ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#ffffff"],
-      "circle-stroke-width": ["case", ["==", ["get", "delay"], 1], 2.5, 1.6],
-      "circle-stroke-opacity": ["case", ["==", ["get", "short"], 1], 0.55, 1],
+      "line-color": ["case", ["==", ["get", "level"], 2], "#ffffff", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "rgba(255,255,255,0.75)"],
+      "line-width": ["case", ["==", ["get", "level"], 2], 1.4, 0.7],
     },
   })
-  // White-hot centre so the dot reads as a light, not a disc.
+  // Headlights white at the front, tail lights red at the back.
   map.addLayer({
-    id: "tml-trains-core",
+    id: "tml-lights-glow",
     type: "circle",
-    source: "tml-trains",
-    paint: { "circle-radius": z(9, 1.6, 12, 2.2, 15, 3.4, 17, 4), "circle-color": "#ffffff", "circle-blur": 0.6, "circle-opacity": 0.95 },
+    source: "tml-lights",
+    paint: {
+      "circle-radius": ["*", ["get", "r"], 3],
+      "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff2a2a"],
+      "circle-blur": 1,
+      "circle-opacity": 0.8,
+    },
+  })
+  map.addLayer({
+    id: "tml-lights",
+    type: "circle",
+    source: "tml-lights",
+    paint: { "circle-radius": ["get", "r"], "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff3b3b"] },
   })
   map.addLayer({
     id: "tml-train-late",
     type: "symbol",
     source: "tml-trains",
-    filter: ["==", ["get", "late"], 1],
+    filter: [">=", ["get", "level"], 1],
     minzoom: 10.5,
     layout: {
       "text-field": ["get", "lateText"],
       "text-size": 10.5,
       "text-font": ["Noto Sans Bold"],
-      "text-offset": [0, -1.5],
+      "text-offset": [0, -1.6],
       "text-anchor": "bottom",
       "text-allow-overlap": true,
       "text-ignore-placement": true,
@@ -1085,16 +1098,18 @@ function installMapLayers() {
     paint: { "text-color": "#ffffff", "text-halo-color": MAP_COLORS.late, "text-halo-width": 2.2 },
   })
 
-  map.on("click", "tml-trains", (event) => {
-    const id = event.features?.[0]?.properties?.id
-    if (id) openTrain(id)
-  })
+  for (const layer of ["tml-cars", "tml-trains-glow"]) {
+    map.on("click", layer, (event) => {
+      const id = event.features?.[0]?.properties?.id
+      if (id) openTrain(id)
+    })
+  }
   map.on("click", "tml-stations", (event) => {
-    if (map.queryRenderedFeatures(event.point, { layers: ["tml-trains"] }).length) return
+    if (map.queryRenderedFeatures(event.point, { layers: ["tml-cars", "tml-trains-glow"] }).length) return
     const code = event.features?.[0]?.properties?.code
     if (code) openStation(code)
   })
-  for (const layer of ["tml-stations", "tml-trains"]) {
+  for (const layer of ["tml-stations", "tml-cars", "tml-trains-glow"]) {
     map.on("mouseenter", layer, () => {
       map.getCanvas().style.cursor = "pointer"
     })
@@ -1133,48 +1148,109 @@ function offsetPx(zoom) {
   return OFFSET_STOPS.at(-1)[1]
 }
 
-function trainLngLat(run, zoom) {
-  const p = model.pointAtKm(run.km)
-  if (!p) {
-    return null
-  }
-  // Same side as the drawn line for this direction (see installMapLayers).
-  const metresPerPx = (40_075_016.686 * Math.cos((p.lat * Math.PI) / 180)) / (512 * 2 ** zoom)
-  const m = offsetPx(zoom) * metresPerPx
+// Tuen Ma Line 8-car set: end cars 25,280 mm, six middle cars 24,136 mm,
+// 3,100 mm wide; 195.376 m over all eight.
+const CAR_M = [25.28, 24.136, 24.136, 24.136, 24.136, 24.136, 24.136, 25.28]
+const TRAIN_M = CAR_M.reduce((a, b) => a + b, 0)
+const CAR_WIDTH_M = 3.1
+const CAR_GAP_M = 0.8
+// True scale vanishes when zoomed out (a train is under 1 px across the
+// whole line), so below about zoom 13 the set is stretched to stay visible.
+const MIN_TRAIN_PX = 26
+const MIN_WIDTH_PX = 3.5
+
+function metresPerPx(lat, zoom) {
+  return (40_075_016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** zoom)
+}
+
+// A point `along` metres behind the head (toward the tail), pushed sideways
+// onto this direction's track and then `side` metres off its centreline.
+function trackPoint(run, headKm, along, sideM, zoom) {
+  const travel = run.dir === "DOWN" ? 1 : -1
+  const p = model.pointAtKm(headKm - (travel * along) / 1000)
+  if (!p) return null
+  const mpp = metresPerPx(p.lat, zoom)
+  // Down keeps left of the TUM -> WKS line direction, up keeps right.
   const [nx, ny] = run.dir === "DOWN" ? [-p.uy, p.ux] : [p.uy, -p.ux]
-  const lng = p.lng + (m * nx) / (111_320 * Math.cos((p.lat * Math.PI) / 180))
-  const lat = p.lat + (m * ny) / 110_540
-  return [lng, lat]
+  const m = offsetPx(zoom) * mpp + sideM
+  const k = Math.cos((p.lat * Math.PI) / 180)
+  return [p.lng + (m * nx) / (111_320 * k), p.lat + (m * ny) / 110_540]
+}
+
+function trainShape(run, zoom) {
+  const centre = model.pointAtKm(run.km)
+  if (!centre) return null
+  const mpp = metresPerPx(centre.lat, zoom)
+  const scale = Math.max(1, (MIN_TRAIN_PX * mpp) / TRAIN_M)
+  const length = TRAIN_M * scale
+  const half = Math.max(CAR_WIDTH_M * scale, MIN_WIDTH_PX * mpp) / 2
+  // Keep the whole set on the line at a terminus.
+  const travel = run.dir === "DOWN" ? 1 : -1
+  let head = run.km
+  if (travel > 0) head = Math.max(head, length / 1000)
+  else head = Math.min(head, model.totalKm - length / 1000)
+  const cars = []
+  let from = 0
+  for (const carM of CAR_M) {
+    const a = from + (CAR_GAP_M * scale) / 2
+    const b = from + carM * scale - (CAR_GAP_M * scale) / 2
+    from += carM * scale
+    const steps = [a, (a + b) / 2, b]
+    const left = steps.map((d) => trackPoint(run, head, d, -half, zoom))
+    const right = steps.map((d) => trackPoint(run, head, d, half, zoom))
+    if ([...left, ...right].some((x) => !x)) continue
+    cars.push([...left, ...right.reverse(), left[0]])
+  }
+  return {
+    cars,
+    head: trackPoint(run, head, 0, 0, zoom),
+    tail: trackPoint(run, head, length, 0, zoom),
+    middle: trackPoint(run, head, length / 2, 0, zoom),
+    lightR: Math.max(1.6, Math.min(5, (half * 0.9) / mpp)),
+    glow: Math.max(7, Math.min(40, (length / mpp) * 0.42)),
+  }
 }
 
 function paintMap() {
   if (!mapInstance || !mapInstance.getSource("tml-trains")) return
   const zoom = mapInstance.getZoom()
-  const features = []
+  const points = []
+  const cars = []
+  const lights = []
   let followed = null
   for (const run of state.runs) {
-    const at = trainLngLat(run, zoom)
-    if (!at) continue
-    if (run.id === state.selected) followed = at
-    features.push({
-      type: "Feature",
-      properties: {
-        id: run.id,
-        color: MAP_COLORS[run.dir],
-        delay: run.delay ? 1 : 0,
-        short: isShortTrip(run) ? 1 : 0,
-        selected: run.id === state.selected ? 1 : 0,
-        late: isLate(run) ? 1 : 0,
-        lateText: isLate(run) ? t().lateTag(run.late.sec) : "",
-      },
-      geometry: { type: "Point", coordinates: at },
-    })
+    const shape = trainShape(run, zoom)
+    if (!shape || !shape.middle) continue
+    if (run.id === state.selected) followed = shape.middle
+    const props = {
+      id: run.id,
+      color: MAP_COLORS[run.dir],
+      level: lateLevel(run),
+      delay: run.delay ? 1 : 0,
+      selected: run.id === state.selected ? 1 : 0,
+      lateText: isLate(run) ? t().lateTag(run.late.sec) : "",
+      glow: shape.glow,
+    }
+    points.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: shape.middle } })
+    for (const ring of shape.cars) cars.push({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [ring] } })
+    if (shape.head) lights.push({ type: "Feature", properties: { kind: "head", r: shape.lightR }, geometry: { type: "Point", coordinates: shape.head } })
+    if (shape.tail) lights.push({ type: "Feature", properties: { kind: "tail", r: shape.lightR * 0.8 }, geometry: { type: "Point", coordinates: shape.tail } })
   }
-  mapInstance.getSource("tml-trains").setData({ type: "FeatureCollection", features })
+  mapInstance.getSource("tml-trains").setData({ type: "FeatureCollection", features: points })
+  mapInstance.getSource("tml-cars").setData({ type: "FeatureCollection", features: cars })
+  mapInstance.getSource("tml-lights").setData({ type: "FeatureCollection", features: lights })
   mapInstance.getLayer("tml-station-labels") && mapInstance.setLayoutProperty("tml-station-labels", "text-field", labelField())
   if (state.follow && followed && !mapInstance.isMoving()) {
     mapInstance.easeTo({ center: followed, zoom: Math.max(zoom, 13), duration: 600 })
   }
+}
+
+// Flash the glow of very late trains (steady when reduced motion is asked for).
+function flashMap(stamp) {
+  if (!mapInstance?.getLayer("tml-trains-flash")) return
+  const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  const opacity = still ? 0.6 : 0.15 + 0.85 * Math.abs(Math.sin((stamp / 1000) * Math.PI))
+  mapInstance.setPaintProperty("tml-trains-flash", "circle-opacity", opacity)
 }
 
 async function showView(view) {
@@ -1327,7 +1403,7 @@ function paintTrainSheet(first = false) {
     `<dt>${s.platform}</dt><dd>${escapeHtml(run.plat || "—")}</dd>` +
     `</dl>` +
     `<p class="fine">${run.kind === "sched"
-      ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(timetables.books[state.day]?.timetable ?? "", run.readings)}`
+      ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`
       : s.basis.model(run.readings)}</p>` +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")

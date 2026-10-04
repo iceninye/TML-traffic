@@ -56,6 +56,13 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 ## 3. 路綫圖 (diagram)
 
+> **v0.2 更新（2026-10-04）**：改為雙軌。左軌 = 上行往屯門（橙 `--up`），右軌 = 下行往烏溪沙（藍 `--down`），
+> 每個站係橫跨兩軌嘅月台膠囊。站距 = `max(62 px, 24 px × 軌道 km)`，全圖約 1.9k px；
+> 每段中間標「距離 · 行車時間」，大欖隧道加虛框。列車只喺自己方向嗰條軌上移動，疊埋時沿軌錯開 21 px。
+> 短程車用虛線圈；延誤用黃框；候發（未開出）半透明。點列車開「列車卡」（唔遮擋路綫圖），
+> 列出前方各站推算到站時間，可「跟隨」自動捲動。位置模型見 [`MODEL.md`](MODEL.md)。
+> 以下係 v0.1 原文，保留作記錄。
+
 屯馬綫係一條直綫、冇分叉，所以示意圖最清楚。27 站由上（屯門）到下（烏溪沙），每行：
 
 ```
@@ -82,6 +89,11 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 ---
 
 ## 4. 地圖 (map)
+
+> **v0.2 更新**：走綫改用 OSM relation 6102298 真實路軌（`data/tml-track.json`）。同一條 LineString 畫兩次，
+> 用 `line-offset` 分開：下行（藍）喺行車方向左邊、上行（橙）喺右邊（港鐵靠左行車）。
+> 列車點用同樣嘅像素偏移計返經緯度（隨 zoom 重算），所以永遠貼住自己方向嗰條綫。站點吸附到路軌上。
+> 點列車開列車卡；「跟隨」會 `easeTo` 跟住列車，拖動地圖即取消。
 
 MapLibre GL 由 **本地 `lib/maplibre/`** 載入（唔靠 CDN），底圖用 OpenFreeMap：
 

@@ -20,7 +20,9 @@
 
 上游嘅地圖圖層象徵（`src/components/city-map.tsx`）亦作為 `assets/app.js` 地圖圖層嘅參考，未直接複製程式碼。
 
-改動性質：TypeScript → 零依賴 ES module 移植；網絡資料由全部 10 條綫（98 站）收窄為**只保留屯馬綫**（27 站、2 條方向 route）。邏輯本身保持忠實移植。
+改動性質：TypeScript → 零依賴 ES module 移植；網絡資料由全部 10 條綫（98 站）收窄為**只保留屯馬綫**（27 站、2 條方向 route）。
+
+v0.2.0 起有三處標明 `TML-traffic:` 嘅小改動：`mtr-estimate.js` 加咗 `setHopModel()`（用時間表站間時間串連各站倒數）、`mtr-schedule.js` 用 API 嘅 `time` 欄計秒級 `dueAt`、`mtr-feed.js` 將 `dueAtMs` 傳出。其餘邏輯維持原樣。
 
 MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本 NOTICE。
 
@@ -61,3 +63,12 @@ MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本
 
 列車位置係**由到站倒數推算**，並非港鐵官方列車位置。港鐵並無發佈列車實時位置。
 推算位置可能有 1–2 個站嘅偏差（見 `docs/EXTRACTION.md` §3.3）。請勿用於任何安全關鍵用途。
+
+## 3. 屯馬綫走綫（`data/tml-track.json`）
+
+`data/tml-track.json` 嘅路軌座標由 `tools/build_data.py` 從 **OpenStreetMap** relation
+[6102298](https://www.openstreetmap.org/relation/6102298)（港鐵屯馬綫，下行）抽取、串接並簡化（Douglas–Peucker 6 m）。
+
+- **© OpenStreetMap contributors**
+- **授權**：Open Database License (ODbL) 1.0 — https://www.openstreetmap.org/copyright
+- 地圖上已顯示署名。再分發此檔案須保留署名及 ODbL。

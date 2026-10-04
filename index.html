@@ -31,6 +31,7 @@
       <span class="sep" aria-hidden="true">·</span>
       <span id="status-counts"></span>
     </div>
+    <div class="period" id="period" data-peak="0"></div>
 
     <div class="controls">
       <div class="seg" id="view-seg" role="group" aria-label="視圖 / View">
@@ -45,10 +46,7 @@
       <button type="button" class="btn" id="pause-btn" aria-pressed="false">暫停</button>
     </div>
 
-    <div class="col-legend" id="col-legend">
-      <span id="legend-tum">← 往屯門</span>
-      <span id="legend-wks">往烏溪沙 →</span>
-    </div>
+    <div class="col-legend" id="col-legend" data-show="1"></div>
   </header>
 
   <div class="alert" id="alert" role="status"></div>
@@ -56,13 +54,14 @@
   <main class="stage" id="stage">
     <section class="pane" id="pane-diagram" data-active="1">
       <div class="diagram-wrap" id="diagram-wrap">
-        <svg class="diagram" id="diagram" viewBox="0 0 360 1200" role="list" aria-label="屯馬綫 27 站動態路綫圖"></svg>
+        <svg class="diagram" id="diagram" viewBox="0 0 360 2000" role="group" aria-label="屯馬綫 27 站雙軌動態路綫圖"></svg>
       </div>
     </section>
 
     <section class="pane" id="pane-map" data-active="0">
       <div class="map-wrap">
         <div id="map"></div>
+        <div class="map-legend" id="map-legend"></div>
         <div class="map-note" id="map-note">載入地圖…</div>
       </div>
     </section>

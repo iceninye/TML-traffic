@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.1", commit: "23fb85d" }
+const BUILD = { version: "0.4.2", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1027,39 +1027,21 @@ function installMapLayers() {
   })
   map.addSource("tml-cars", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
   map.addSource("tml-lights", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
-  const trainColor = ["match", ["get", "level"], 2, MAP_COLORS.alarm, 1, MAP_COLORS.late, ["get", "color"]]
-  // Glow around the whole train; very late trains get a second, flashing one.
-  map.addLayer({
-    id: "tml-trains-glow",
-    type: "circle",
-    source: "tml-trains",
-    paint: {
-      "circle-radius": ["*", ["get", "glow"], ["case", ["==", ["get", "selected"], 1], 1.4, 1]],
-      "circle-color": trainColor,
-      "circle-blur": 1,
-      "circle-opacity": 0.7,
-    },
-  })
-  map.addLayer({
-    id: "tml-trains-flash",
-    type: "circle",
-    source: "tml-trains",
-    filter: ["==", ["get", "level"], 2],
-    paint: { "circle-radius": ["*", ["get", "glow"], 1.6], "circle-color": MAP_COLORS.alarm, "circle-blur": 1, "circle-opacity": 0.9 },
-  })
+  // Cars are grey-white with a grey edge, like real stock; lateness shows in
+  // the edge: red when 60 s+ late, flashing red when 180 s+.
   map.addLayer({
     id: "tml-cars",
     type: "fill",
     source: "tml-cars",
-    paint: { "fill-color": trainColor, "fill-opacity": 1 },
+    paint: { "fill-color": "#e6e8eb", "fill-opacity": 1 },
   })
   map.addLayer({
     id: "tml-cars-edge",
     type: "line",
     source: "tml-cars",
     paint: {
-      "line-color": ["case", ["==", ["get", "level"], 2], "#ffffff", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "rgba(255,255,255,0.75)"],
-      "line-width": ["case", ["==", ["get", "level"], 2], 1.4, 0.7],
+      "line-color": ["match", ["get", "level"], 2, MAP_COLORS.alarm, 1, MAP_COLORS.late, ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#8a9099"]],
+      "line-width": ["match", ["get", "level"], 0, 0.8, 1.6],
     },
   })
   // Headlights white at the front, tail lights red at the back.
@@ -1098,18 +1080,18 @@ function installMapLayers() {
     paint: { "text-color": "#ffffff", "text-halo-color": MAP_COLORS.late, "text-halo-width": 2.2 },
   })
 
-  for (const layer of ["tml-cars", "tml-trains-glow"]) {
+  for (const layer of ["tml-cars"]) {
     map.on("click", layer, (event) => {
       const id = event.features?.[0]?.properties?.id
       if (id) openTrain(id)
     })
   }
   map.on("click", "tml-stations", (event) => {
-    if (map.queryRenderedFeatures(event.point, { layers: ["tml-cars", "tml-trains-glow"] }).length) return
+    if (map.queryRenderedFeatures(event.point, { layers: ["tml-cars"] }).length) return
     const code = event.features?.[0]?.properties?.code
     if (code) openStation(code)
   })
-  for (const layer of ["tml-stations", "tml-cars", "tml-trains-glow"]) {
+  for (const layer of ["tml-stations", "tml-cars"]) {
     map.on("mouseenter", layer, () => {
       map.getCanvas().style.cursor = "pointer"
     })
@@ -1245,12 +1227,21 @@ function paintMap() {
   }
 }
 
-// Flash the glow of very late trains (steady when reduced motion is asked for).
+let flashOn = null
+
+// Flash the edge of very late trains (steady when reduced motion is asked for).
 function flashMap(stamp) {
-  if (!mapInstance?.getLayer("tml-trains-flash")) return
+  if (!mapInstance?.getLayer("tml-cars-edge")) return
   const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-  const opacity = still ? 0.6 : 0.15 + 0.85 * Math.abs(Math.sin((stamp / 1000) * Math.PI))
-  mapInstance.setPaintProperty("tml-trains-flash", "circle-opacity", opacity)
+  const on = still || Math.sin((stamp / 1000) * Math.PI * 2) > 0
+  if (on === flashOn) return
+  flashOn = on
+  mapInstance.setPaintProperty("tml-cars-edge", "line-color", [
+    "match", ["get", "level"],
+    2, on ? MAP_COLORS.alarm : "#8a9099",
+    1, MAP_COLORS.late,
+    ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#8a9099"],
+  ])
 }
 
 async function showView(view) {

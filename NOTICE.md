@@ -11,6 +11,7 @@
 | 上游檔案 | 本專案檔案 |
 |---|---|
 | `src/lib/mtr-estimate.ts` | `lib/mtr-estimate.js` |
+| `src/lib/mtr-run.ts` | `lib/mtr-run.js` |
 | `src/lib/mtr-schedule.ts` | `lib/mtr-schedule.js` |
 | `src/lib/mtr-network.ts` + `data/mtr-network.json` | `lib/mtr-network.js` + `data/tml-network.json` |
 | `src/lib/mtr-feed.ts` / `pool.ts` / `refresh-slice.ts` | `lib/mtr-feed.js` |

@@ -13,16 +13,21 @@
 ## 驗證
 
 ```bash
-node tools/probe-tml.mjs
+node tools/probe-tml.mjs     # 列車位置
+node tools/probe-runs.mjs    # 動畫層平滑度
 ```
 
 實測輸出（2026-10-04）：
 
 ```
-Tuen Ma Line probe · 1 pass · 27 station reads · 2848 ms
-boards received: 27 / 27
-trains estimated: 38
-off-line projection detected: no
+probe-tml : 27 station reads · 2848 ms
+            boards 27/27 · trains 38 · off-line projection: no
+
+probe-runs: snapshot 1/2 -> 37 runs each, tracked 37, dropped 0
+            dot jump on new snapshot:
+              no animation layer : median 20 m · max 216 m
+              mergeRuns          : median 0 m · max 0 m
+            advanceRuns travel over 12 s: 216 m (model says ~216 m at 18 m/s)
 ```
 
 ## 結構
@@ -30,10 +35,12 @@ off-line projection detected: no
 - `data/tml-network.json` — 27 站座標 + 雙向站序
 - `data/tml-segments.json` — 26 段站距 + 行車時間（衍生）
 - `lib/mtr-estimate.js` — 位置推算引擎
+- `lib/mtr-run.js` — 動畫層（時間軸平滑 + 防重疊）
 - `lib/mtr-schedule.js` — API 解析
 - `lib/mtr-network.js` — TML 網絡存取
 - `lib/mtr-feed.js` — 輪詢 / 記憶 / 冷卻
-- `tools/probe-tml.mjs` — 實時端對端驗證
+- `tools/probe-tml.mjs` — 實時位置驗證
+- `tools/probe-runs.mjs` — 動畫層驗證
 
 ## 授權
 

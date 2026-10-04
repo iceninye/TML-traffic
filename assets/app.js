@@ -24,9 +24,9 @@ const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
 // Hop-time calibration learned from the feed, kept so a reload starts warm.
 const LEARN_KEY = "tml-traffic-learned-v1"
-// The feed marks a station stale after 20 s. Refreshing a little sooner than
-// that keeps every station inside its window without re-reading them all.
-const REFRESH_EVERY_MS = 18_000
+// The feed only re-reads a station once it is 20 s old, so refresh just after
+// that: every pass then reads all 27 (at 18 s each station was read every 36 s).
+const REFRESH_EVERY_MS = 20_500
 
 // Diagram geometry. Spacing between stations follows track distance, with a
 // floor so the shortest hops (0.75 km) still leave room for two-line labels.
@@ -44,7 +44,7 @@ const TRAIN_SPACING = 21
 const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
-const BUILD = { version: "0.3.0", commit: "96f74c4" }
+const BUILD = { version: "0.3.1", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -80,7 +80,9 @@ const STRINGS = {
     stations: (n) => `${n}/27 站`,
     updated: (s) => (s < 60 ? `${s} 秒前更新` : `${Math.floor(s / 60)} 分鐘前更新`),
     loading: "讀取中…",
-    feedDown: "攞唔到班次資料",
+    feedDown: (r) => `暫時連唔到港鐵班次資料，${r} 秒後自動重試`,
+    stale: (a, r) => `資料延遲（${a < 60 ? `${a} 秒` : `${Math.floor(a / 60)} 分鐘`}前），列車按時間表推算・${r} 秒後重試`,
+    offline: "網絡離線，恢復後自動更新",
     paused: "已暫停更新",
     min: "分",
     due: "即將",
@@ -142,7 +144,9 @@ const STRINGS = {
     stations: (n) => `${n}/27 stations`,
     updated: (s) => (s < 60 ? `updated ${s}s ago` : `updated ${Math.floor(s / 60)}m ago`),
     loading: "Loading…",
-    feedDown: "Next-train feed unavailable",
+    feedDown: (r) => `Can't reach the MTR feed, retrying in ${r}s`,
+    stale: (a, r) => `Data ${a < 60 ? `${a}s` : `${Math.floor(a / 60)}m`} old, trains estimated from timetable · retry in ${r}s`,
+    offline: "Offline, will update when back online",
     paused: "Updates paused",
     min: "min",
     due: "now",
@@ -274,9 +278,6 @@ async function boot() {
   await refresh(true)
   requestAnimationFrame(loop)
   showView(state.view).catch(() => {})
-  setInterval(() => {
-    if (!state.paused) refresh(false)
-  }, REFRESH_EVERY_MS)
   setInterval(paintClock, 250)
 }
 
@@ -290,38 +291,71 @@ async function fetchJson(url) {
   return response.json()
 }
 
-async function refresh(first) {
-  if (state.paused) return
+// One refresh chain, never overlapping. After a failure it retries sooner
+// and backs off (5, 10, 20, 30 s) instead of waiting out the normal 18 s.
+const RETRY_MS = [5_000, 10_000, 20_000, 30_000]
+// Boards older than this mean the latest reads failed; the trains keep
+// moving on the timetable model, but the status says the data is behind.
+const STALE_AFTER_MS = 45_000
+let refreshTimer = 0
+let inFlight = null
+let failStreak = 0
+
+function scheduleRefresh(delay) {
+  clearTimeout(refreshTimer)
+  state.nextRefreshAt = Date.now() + delay
+  refreshTimer = setTimeout(() => refresh(false), delay)
+}
+
+function refresh(first) {
+  if (state.paused) return Promise.resolve()
+  if (inFlight) return inFlight
+  inFlight = runRefresh(first).finally(() => {
+    inFlight = null
+    if (state.paused) return
+    if (state.status === "ok") {
+      failStreak = 0
+      scheduleRefresh(REFRESH_EVERY_MS)
+    } else {
+      scheduleRefresh(RETRY_MS[Math.min(failStreak, RETRY_MS.length - 1)])
+      failStreak += 1
+    }
+  })
+  return inFlight
+}
+
+async function runRefresh(first) {
   if (first) setStatus("loading")
   const at = Date.now()
   try {
     await feed.refresh(at)
     const snapshot = feed.snapshot(at)
     if (!snapshot.ok) {
-      setStatus("error")
+      // Nothing usable at all. Keep whatever was on screen.
+      setStatus(state.data ? "stale" : "error")
       return
     }
     state.data = snapshot
-    state.loadedAtMs = Date.now()
+    state.loadedAtMs = feed.newestAt || Date.now()
     state.stationCount = feed.stationCount
     // Learn per-direction hop times from the feed, then place the trains.
     model.learn(snapshot.trains, Date.now())
     writePref(LEARN_KEY, JSON.stringify(model.exportLearned()))
     tracker.update(snapshot.trains, Date.now())
     state.runs = tracker.frame(Date.now())
-    setStatus("ok")
+    setStatus(Date.now() - state.loadedAtMs > STALE_AFTER_MS ? "stale" : "ok")
     render()
     // Draw now as well: animation frames do not run in a background tab.
     if (state.view === "diagram") syncTrains()
   } catch (error) {
     console.warn("refresh failed", error)
-    setStatus("error")
+    setStatus(state.data ? "stale" : "error")
   }
 }
 
 function setStatus(kind) {
   state.status = kind
-  els.pulse.dataset.state = kind === "ok" ? "live" : kind
+  els.pulse.dataset.state = kind === "ok" ? "live" : kind === "stale" ? "loading" : kind
 }
 
 /* ---------------------------------------------------------------- strings */
@@ -363,13 +397,20 @@ function paintClock() {
   let down = 0
   for (const run of state.runs) run.dir === "UP" ? (up += 1) : (down += 1)
   const counts = state.data ? [s.trainsDir(up, down), s.stations(state.stationCount)] : []
+  const age = Math.max(0, Math.round((now - state.loadedAtMs) / 1000))
+  const retryIn = Math.max(0, Math.ceil(((state.nextRefreshAt ?? now) - now) / 1000))
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false
+  // Turn "updated Ns ago" into the stale warning as soon as it is, not at the next refresh.
+  if (state.status === "ok" && age * 1000 > STALE_AFTER_MS) setStatus("stale")
   els.statusText.textContent = state.paused
     ? s.paused
     : state.status === "loading"
       ? s.loading
       : state.status === "error"
-        ? s.feedDown
-        : s.updated(Math.max(0, Math.round((now - state.loadedAtMs) / 1000)))
+        ? (offline ? s.offline : s.feedDown(retryIn))
+        : state.status === "stale"
+          ? (offline ? s.offline : s.stale(age, retryIn))
+          : s.updated(age)
   els.statusCounts.textContent = counts.join(" · ")
   if (model) {
     const p = model.period(now)
@@ -1244,17 +1285,30 @@ function wireControls() {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refresh(false)
   })
+  window.addEventListener("online", () => refresh(false))
   // A manual scroll in the diagram ends following.
   for (const type of ["wheel", "touchmove"]) {
     window.addEventListener(type, () => {
       if (state.follow && state.view === "diagram") setFollow(false)
     }, { passive: true })
   }
+  // Rebuild when the diagram's width changes, including the first time it
+  // gets one: a pane that was hidden at load measures 0 and builds nothing.
   let resizeTimer = 0
-  window.addEventListener("resize", () => {
+  let builtWidth = 0
+  const onWidth = (width) => {
+    if (width === 0 || Math.abs(width - builtWidth) < 1) return
     clearTimeout(resizeTimer)
-    resizeTimer = setTimeout(() => buildDiagram(), 180)
-  })
+    resizeTimer = setTimeout(() => {
+      builtWidth = width
+      buildDiagram()
+    }, builtWidth === 0 ? 0 : 180)
+  }
+  if ("ResizeObserver" in window) {
+    new ResizeObserver((entries) => onWidth(Math.round(entries[0].contentRect.width))).observe(els.svg)
+  } else {
+    window.addEventListener("resize", () => onWidth(Math.round(els.svg.getBoundingClientRect().width)))
+  }
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {})
   }

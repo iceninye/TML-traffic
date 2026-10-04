@@ -259,7 +259,7 @@ function applyStrings() {
     `<p>${s.source}</p><p>${s.engine}</p>` +
     `<p><a href="https://github.com/iceninye/TML-traffic">github.com/iceninye/TML-traffic</a> · ` +
     `<a href="https://github.com/keithligh/hk-traffic-intelligence">engine: hk-traffic-intelligence</a></p>` +
-    `<p id="build">v0.1.0</p>`
+    `<p id="build">v0.1.0 · commit 56079b9</p>`
   paintClock()
 }
 

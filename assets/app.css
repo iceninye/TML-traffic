@@ -426,7 +426,6 @@ svg.diagram {
 .dg-train-glow { opacity: 0.85; pointer-events: none; }
 .dg-train[data-dir="UP"] .dg-train-glow { fill: var(--up); }
 .dg-train[data-dir="DOWN"] .dg-train-glow { fill: var(--down); }
-.dg-train[data-phase="wait"] .dg-train-glow { opacity: 0.3; }
 .dg-late { pointer-events: none; }
 .dg-late-bg { fill: var(--late); stroke: #fff; stroke-width: 1; }
 .dg-late-text { font-size: 9.5px; font-weight: 700; fill: #fff; text-anchor: middle; dominant-baseline: middle; font-variant-numeric: tabular-nums; }
@@ -437,7 +436,6 @@ svg.diagram {
 .dg-train:focus-visible .dg-train-halo { opacity: 0.35; }
 .dg-train[data-short="1"] .dg-train-body { stroke-dasharray: 3 2.2; }
 .dg-train[data-delay="1"] .dg-train-body { stroke: var(--warn); stroke-width: 3; }
-.dg-train[data-phase="wait"] { opacity: 0.6; }
 
 @keyframes halo { 50% { opacity: 0.12; } }
 

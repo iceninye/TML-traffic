@@ -18,12 +18,15 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
+import { DAY_TYPES, calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, serviceSeconds } from "../lib/tml-timetable.js"
 
 const LOCALE_KEY = "tml-traffic-locale"
 const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
 // Hop-time calibration learned from the feed, kept so a reload starts warm.
-const LEARN_KEY = "tml-traffic-learned-v1"
+// v2: corrections are now relative to the working timetable's own hop
+// times; v1 values were relative to the old single-table model.
+const LEARN_KEY = "tml-traffic-learned-v2"
 // The feed only re-reads a station once it is 20 s old, so refresh just after
 // that: every pass then reads all 27 (at 18 s each station was read every 36 s).
 const REFRESH_EVERY_MS = 20_500
@@ -44,7 +47,7 @@ const TRAIN_SPACING = 21
 const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
-const BUILD = { version: "0.3.1", commit: "d45ac3d" }
+const BUILD = { version: "0.4.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -94,7 +97,7 @@ const STRINGS = {
     position: "現時位置",
     running: (a, b) => `行駛中 ${a} → ${b}`,
     dwelling: (a) => `${a} 停站中`,
-    waiting: (a) => `${a} 候發`,
+    waiting: (a) => `${a} 即將開出`,
     arrived: (a) => `已抵達 ${a}`,
     dest: "目的地",
     nextStops: "前方各站（推算）",
@@ -113,16 +116,21 @@ const STRINGS = {
     lateTag: (sec) => `Delay ${sec}s`,
     lateLabel: "慢於時間表",
     lateSec: (sec) => `${sec} 秒`,
-    lateSource: { run: "行車／停站比時間表慢", feed: "港鐵前方各站預報偏慢", headway: "與前車間距超出班距" },
+    lateSource: { timetable: "比時間表班次遲", run: "行車／停站比時間表慢", feed: "港鐵前方各站預報偏慢", headway: "與前車間距超出班距" },
     onTime: "準時（相差少於 60 秒）",
     readings: (n) => `綜合 ${n} 個車站倒數`,
-    dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日" },
+    dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日／假期" },
+    peak: "繁忙",
+    offPeak: "非繁忙",
+    matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
+    tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
+    basis: { sched: (tt, n) => `按 ${tt} 時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
     offService: "非服務時間",
     peakRun: "繁忙時段行車時間",
     offRun: "非繁忙行車時間",
-    hopLabel: (km, sec) => `${km.toFixed(2)} km · ${clockSpan(sec)}`,
+    hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
     shortLegend: "虛線圈＝短程車",
     colUp: "往屯門",
     colDown: "往烏溪沙",
@@ -158,7 +166,7 @@ const STRINGS = {
     position: "Position",
     running: (a, b) => `Running ${a} → ${b}`,
     dwelling: (a) => `Stopped at ${a}`,
-    waiting: (a) => `Waiting at ${a}`,
+    waiting: (a) => `About to leave ${a}`,
     arrived: (a) => `Arrived at ${a}`,
     dest: "Destination",
     nextStops: "Next stops (estimated)",
@@ -177,16 +185,21 @@ const STRINGS = {
     lateTag: (sec) => `Delay ${sec}s`,
     lateLabel: "Behind timetable",
     lateSec: (sec) => `${sec} s`,
-    lateSource: { run: "running slower than timetable", feed: "MTR boards ahead predict it slower", headway: "gap to the train ahead exceeds headway" },
+    lateSource: { timetable: "behind its timetabled trip", run: "running slower than timetable", feed: "MTR boards ahead predict it slower", headway: "gap to the train ahead exceeds headway" },
     onTime: "On time (within 60 s)",
     readings: (n) => `fused from ${n} station countdowns`,
-    dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday" },
+    dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday/PH" },
+    peak: "peak",
+    offPeak: "off-peak",
+    matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
+    tripId: (run, trip) => `Trip ${trip} (run ${run})`,
+    basis: { sched: (tt, n) => `${tt} timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
     band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
     headway: (m) => `every ~${m} min`,
     offService: "Out of service hours",
     peakRun: "peak run times",
     offRun: "off-peak run times",
-    hopLabel: (km, sec) => `${km.toFixed(2)} km · ${clockSpan(sec)}`,
+    hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
     shortLegend: "dashed ring = short trip",
     colUp: "Tuen Mun",
     colDown: "Wu Kai Sha",
@@ -235,6 +248,11 @@ const state = {
 
 let network = null
 let model = null
+let timetables = null
+// Readings per scheduled trip from recent snapshots (they keep narrowing
+// that trip's delay while they are fresh).
+let tripHistory = new Map()
+let hopTimesKey = ""
 let tracker = null
 let feed = null
 let order = []
@@ -252,13 +270,24 @@ const t = () => STRINGS[state.lang]
 /* ------------------------------------------------------------------ data */
 
 async function boot() {
-  const [netJson, timetable, track] = await Promise.all([
+  const [netJson, timetable, track, ...books] = await Promise.all([
     fetchJson("data/tml-network.json"),
     fetchJson("data/tml-timetable.json"),
     fetchJson("data/tml-track.json").catch(() => null),
+    // The three working timetables. Without them the app falls back to the
+    // running-time model alone.
+    ...DAY_TYPES.map((day) => fetchJson(`data/tml-schedule-${day}.json`).catch(() => null)),
   ])
   network = createNetwork(netJson)
   model = createModel(timetable, track)
+  timetables = createTimetables(Object.fromEntries(DAY_TYPES.map((day, i) => [day, books[i]])), model)
+  state.day = calendarDay(Date.now())
+  // Section labels and the fallback model use this period's timetable times.
+  if (timetables.books[state.day]) {
+    const tau = serviceSeconds(Date.now())
+    hopTimesKey = `${state.day}|${Math.floor(tau / 600)}`
+    model.setScheduleTimes(hopTimesAround(timetables.books[state.day], tau))
+  }
   try {
     model.importLearned(JSON.parse(readPref(LEARN_KEY) ?? "null"))
   } catch {
@@ -338,10 +367,7 @@ async function runRefresh(first) {
     state.data = snapshot
     state.loadedAtMs = feed.newestAt || Date.now()
     state.stationCount = feed.stationCount
-    // Learn per-direction hop times from the feed, then place the trains.
-    model.learn(snapshot.trains, Date.now())
-    writePref(LEARN_KEY, JSON.stringify(model.exportLearned()))
-    tracker.update(snapshot.trains, Date.now())
+    placeTrains(snapshot, Date.now())
     state.runs = tracker.frame(Date.now())
     setStatus(Date.now() - state.loadedAtMs > STALE_AFTER_MS ? "stale" : "ok")
     render()
@@ -351,6 +377,73 @@ async function runRefresh(first) {
     console.warn("refresh failed", error)
     setStatus(state.data ? "stale" : "error")
   }
+}
+
+// Match the boards to the working timetable and hand the result to the
+// tracker; anything no scheduled trip claims goes through the model.
+function placeTrains(snapshot, now) {
+  const readings = []
+  for (const o of snapshot.observations ?? []) {
+    const ks = model.km(o.station)
+    const kd = model.km(o.dest)
+    if (ks == null || kd == null || ks === kd) continue
+    readings.push({
+      station: o.station,
+      dest: o.dest,
+      dir: kd > ks ? "DOWN" : "UP",
+      ttnt: o.ttnt,
+      dueAt: o.dueAt,
+      plat: o.plat,
+      delay: o.delay,
+      timeType: o.timeType,
+      seenAt: now,
+      obs: o,
+    })
+  }
+
+  // Which timetable is actually running: the calendar's guess, unless the
+  // boards clearly fit another one better (public holidays run Sunday's).
+  const pick = timetables.pickDay(readings, now)
+  const mine = pick.scores[state.day]
+  const theirs = pick.day && pick.scores[pick.day]
+  if (theirs && pick.day !== state.day && theirs.n >= 10 && theirs.close - (mine?.close ?? 0) > 0.25) {
+    state.day = pick.day
+    tripHistory = new Map()
+  }
+  state.dayScores = pick.scores
+  const book = timetables.books[state.day]
+
+  let matched = new Map()
+  let leftover = readings
+  if (book) {
+    const tau = serviceSeconds(now)
+    const key = `${state.day}|${Math.floor(tau / 600)}`
+    if (key !== hopTimesKey) {
+      hopTimesKey = key
+      model.setScheduleTimes(hopTimesAround(book, tau))
+    }
+    const result = matchReadings(book, readings, now, tripHistory)
+    matched = result.trips
+    leftover = result.leftover
+    state.lineDelay = result.lineDelay
+    tripHistory = new Map([...matched].map(([id, entry]) => [id, entry.history]))
+  }
+
+  const fallback = leftover.length
+    ? estimateTrains(network.routes_(), leftover.map((r) => r.obs), network.point.bind(network)).map((train) => ({
+      ...train,
+      observedAtMs: train.observedAt,
+      dueAtMs: train.dueAt,
+    }))
+    : []
+  // The model learns per-direction corrections from the unmatched chains.
+  if (fallback.length) {
+    model.learn(fallback, now)
+    writePref(LEARN_KEY, JSON.stringify(model.exportLearned()))
+  }
+  state.matchedCount = matched.size
+  state.fallbackCount = fallback.length
+  tracker.update({ matched, fallback, headwayOf: (dir, t0) => (book ? headwayAt(book, dir, serviceSeconds(t0)) : null) }, now)
 }
 
 function setStatus(kind) {
@@ -412,16 +505,19 @@ function paintClock() {
           ? (offline ? s.offline : s.stale(age, retryIn))
           : s.updated(age)
   els.statusCounts.textContent = counts.join(" · ")
-  if (model) {
-    const p = model.period(now)
-    if (!p.inService) {
-      els.period.textContent = s.offService
+  const book = timetables?.books[state.day]
+  if (book) {
+    const tau = serviceSeconds(now)
+    const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
+    if (!headway) {
+      els.period.textContent = `${book.timetable} · ${s.offService}`
       els.period.dataset.peak = "0"
     } else {
-      const mins = Math.round((p.band.headway / 60) * 10) / 10
-      els.period.textContent = `${s.dayType[p.dayType]} · ${s.band[p.band.tag]} · ${s.headway(mins)}`
-      els.period.dataset.peak = p.band.peak ? "1" : "0"
-      els.period.title = `${p.timetable} · ${p.band.peak ? s.peakRun : s.offRun}`
+      const peak = headway <= 210
+      const mins = Math.round((headway / 60) * 10) / 10
+      els.period.textContent = `${s.dayType[state.day]} ${book.timetable} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      els.period.dataset.peak = peak ? "1" : "0"
+      els.period.title = s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
   }
 }
@@ -494,7 +590,6 @@ function buildDiagram() {
   )
 
   // Hop annotations: distance and run time, tunnel name on the long one.
-  const peak = model.isPeak(Date.now())
   for (let i = 0; i < order.length - 1; i += 1) {
     const a = order[i]
     const b = order[i + 1]
@@ -502,7 +597,10 @@ function buildDiagram() {
     const ya = stationY.get(a)
     const yb = stationY.get(b)
     const mid = (ya + yb) / 2
-    const label = make("text", { x: NAME_X, y: mid, class: "dg-hop" }, s.hopLabel(hop.km, peak ? hop.peak : hop.off))
+    // Run times per direction from the working timetable for this period.
+    const down = model.timetableRunSec(a, b, Date.now())
+    const up = model.timetableRunSec(b, a, Date.now())
+    const label = make("text", { x: NAME_X, y: mid, class: "dg-hop" }, s.hopLabel(hop.km, down, up))
     base.append(label)
     if (a === TUNNEL.from && b === TUNNEL.to) {
       base.append(
@@ -640,7 +738,7 @@ function render() {
 /* ------------------------------------------------------------- animation */
 
 function isShortTrip(run) {
-  return run.train.dest !== "TUM" && run.train.dest !== "WKS"
+  return run.dest !== "TUM" && run.dest !== "WKS"
 }
 
 function syncTrains() {
@@ -688,7 +786,7 @@ function syncTrains() {
       node.dataset.selected = state.selected === run.id ? "1" : "0"
       node.dataset.phase = run.pos.phase
       paintLateTag(node, run)
-      node.setAttribute("aria-label", `${network.name(run.train.dest, state.lang)} · ${positionText(run)}`)
+      node.setAttribute("aria-label", `${network.name(run.dest, state.lang)} · ${positionText(run)}`)
     }
   }
 
@@ -1202,9 +1300,9 @@ function paintTrainSheet(first = false) {
     return
   }
   const now = Date.now()
-  const stops = model.upcoming(run.train, run.pos, now).slice(0, 8)
+  const stops = tracker.upcoming(run, now).slice(0, 8)
   const dirClass = run.dir === "UP" ? "up" : "down"
-  const destName = network.name(run.train.dest, state.lang)
+  const destName = network.name(run.dest, state.lang)
   const stopRows = stops
     .map((stop) => {
       const mins = Math.max(0, Math.round((stop.at - now) / 60_000))
@@ -1226,9 +1324,11 @@ function paintTrainSheet(first = false) {
     `<dt>${s.lateLabel}</dt><dd>${isLate(run)
       ? `<span class="badge late">${s.lateTag(run.late.sec)}</span> ${s.lateSource[run.late.source]}`
       : s.onTime}</dd>` +
-    `<dt>${s.platform}</dt><dd>${escapeHtml(run.train.plat || "—")}</dd>` +
+    `<dt>${s.platform}</dt><dd>${escapeHtml(run.plat || "—")}</dd>` +
     `</dl>` +
-    (run.readings ? `<p class="fine">${s.readings(run.readings)}</p>` : "") +
+    `<p class="fine">${run.kind === "sched"
+      ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(timetables.books[state.day]?.timetable ?? "", run.readings)}`
+      : s.basis.model(run.readings)}</p>` +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
   else els.sheetBody.innerHTML = html

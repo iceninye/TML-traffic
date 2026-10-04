@@ -17,11 +17,13 @@
 
 功能（v0.3）：霓虹發光路綫（參考 railisland.tw）· **慢 ≥ 60 秒列車標示「Delay 75s」** · 每站雙向倒數 · 點站睇詳情 · 點列車睇列車卡（前方各站推算到站時間）· **跟隨列車** · 時段／班距標示 · 轉綫站標示 · 延誤提示 · 繁／英切換 · 暫停。
 
-## 位置演算法（v0.3）
+## 位置演算法（v0.4）
 
-完整流程見 [`docs/ALGORITHM.md`](docs/ALGORITHM.md)。v0.3 根據港鐵 API 提升準確度：
-用每班車喺 6–10 個站嘅倒數一齊擬合位置（唔再只靠最近一個站），並由 API 即時學習每段、每個方向嘅實際行車時間。
-實測 40–130 秒預測：中位誤差 21.0 → 17.3 秒、p90 45 → 37 秒。
+完整流程同實測見 [`docs/ALGORITHM.md`](docs/ALGORITHM.md)。每個 API 讀數對應官方工作時間表
+（TML1100B / TML6090A / TML7090）上嘅一班車，由該班車所有讀數求出延誤，位置 = 該班車時間表 + 延誤。
+實測發現 API 嘅「N 分鐘」係向上取整（即 N−1 至 N 分鐘內到站），修正後預測中位誤差由 39 秒降到 16 秒，
+同 API 一致性由 57% 升到 90%；由車廠開出、短程車、總站折返亦按時間表處理。
+今日行邊份時間表由 API 讀數自動判斷（公眾假期會自動用星期日時間表）。
 
 ## 位置模型（v0.2）
 
@@ -40,11 +42,13 @@ assets/icon.svg
 sw.js                 offline app shell
 lib/mtr-*.js          抽取返嚟嘅估算引擎（串連各站倒數 → 列車）
 lib/tml-model.js      時間表位置模型（行車 + 停站 + S 曲線 + 時段）
-lib/tml-motion.js     動畫層（身份追蹤 + 軟性糾偏）
+lib/tml-timetable.js  時間表對應：讀數 → 班次 → 延誤 → 位置
+lib/tml-motion.js     追蹤 + 列車時鐘平滑
 lib/maplibre/*.mjs    vendored MapLibre GL 6.12.0（1.2 MB，lazy load）
 data/tml-network.json 27 站
 data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 生成）
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
+data/tml-schedule-*.json 三份工作時間表逐班車時間（tools/parse_timetables.py 由 PDF 生成）
 ```
 
 ## 本地跑

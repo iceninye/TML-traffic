@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.3", commit: "71b2f13" }
+const BUILD = { version: "0.4.4", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1036,6 +1036,13 @@ function installMapLayers() {
     source: "tml-cars",
     paint: { "fill-color": "#a1a2a5", "fill-opacity": 1 },
   })
+  // White outline around every car so the train stands out on the map.
+  map.addLayer({
+    id: "tml-cars-outline",
+    type: "line",
+    source: "tml-cars",
+    paint: { "line-color": "#ffffff", "line-width": 2.6, "line-opacity": 0.95 },
+  }, "tml-cars")
   map.addLayer({
     id: "tml-cars-edge",
     type: "line",
@@ -1045,14 +1052,14 @@ function installMapLayers() {
       "line-width": ["match", ["get", "level"], 0, 0.8, 1.6],
     },
   })
-  // Two small white lamps at the front and two at the back.
+  // Two small white lamps at the front, two small red ones at the back.
   map.addLayer({
     id: "tml-lights-glow",
     type: "circle",
     source: "tml-lights",
     paint: {
       "circle-radius": ["*", ["get", "r"], 3],
-      "circle-color": "#ffffff",
+      "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff2a2a"],
       "circle-blur": 1,
       "circle-opacity": 0.8,
     },
@@ -1061,7 +1068,7 @@ function installMapLayers() {
     id: "tml-lights",
     type: "circle",
     source: "tml-lights",
-    paint: { "circle-radius": ["get", "r"], "circle-color": "#ffffff" },
+    paint: { "circle-radius": ["get", "r"], "circle-color": ["match", ["get", "kind"], "head", "#ffffff", "#ff3b3b"] },
   })
   map.addLayer({
     id: "tml-train-late",

@@ -22,7 +22,7 @@
 
 改動性質：TypeScript → 零依賴 ES module 移植；網絡資料由全部 10 條綫（98 站）收窄為**只保留屯馬綫**（27 站、2 條方向 route）。
 
-v0.2.0 起有三處標明 `TML-traffic:` 嘅小改動：`mtr-estimate.js` 加咗 `setHopModel()`（用時間表站間時間串連各站倒數）、`mtr-schedule.js` 用 API 嘅 `time` 欄計秒級 `dueAt`、`mtr-feed.js` 將 `dueAtMs` 傳出。其餘邏輯維持原樣。
+v0.2.0 起有三處標明 `TML-traffic:` 嘅小改動：`mtr-estimate.js` 加咗 `setHopModel()`（用時間表站間時間串連各站倒數）、`mtr-schedule.js` 用 API 嘅 `time` 欄計秒級 `dueAt`、`mtr-feed.js` 將 `dueAtMs` 傳出。v0.3.0 再加：`mtr-estimate.js` / `mtr-feed.js` 將每班車串連到嘅所有讀數（`obs`）傳出。其餘邏輯維持原樣。
 
 MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本 NOTICE。
 

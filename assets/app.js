@@ -22,6 +22,8 @@ import { createTracker } from "../lib/tml-motion.js"
 const LOCALE_KEY = "tml-traffic-locale"
 const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
+// Hop-time calibration learned from the feed, kept so a reload starts warm.
+const LEARN_KEY = "tml-traffic-learned-v1"
 // The feed marks a station stale after 20 s. Refreshing a little sooner than
 // that keeps every station inside its window without re-reading them all.
 const REFRESH_EVERY_MS = 18_000
@@ -40,10 +42,13 @@ const COL_GAP = 4
 const TRAIN_R = 9
 const TRAIN_SPACING = 21
 const MAX_TTNT = 3
+// Only trains at least this far behind the timetable get a delay tag.
+const LATE_SHOW_SEC = 60
+const BUILD = { version: "0.3.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
-const MAP_COLORS = { UP: "#f0883e", DOWN: "#3b9eea", casing: "#041018", warn: "#d29922" }
+const MAP_COLORS = { UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
 
 // Interchanges, coloured as on the MTR system map.
 const INTERCHANGE = {
@@ -100,8 +105,15 @@ const STRINGS = {
     mapUnavailable: "地圖開唔到（瀏覽器唔支援 WebGL 或網絡問題），已自動轉回路綫圖。",
     mapLoading: "載入地圖…",
     attribution: "路軌 © OpenStreetMap 貢獻者 (ODbL) · 底圖 OpenFreeMap",
-    source: "資料來源：港鐵 Next Train API（data.gov.hk）· 行車時間參考 TML1100B / TML6090A / TML7090 時間表",
+    source: "資料來源：港鐵 Next Train API（data.gov.hk）",
     engine: "列車位置由到站倒數配合時間表行車及停站時間推算，並非港鐵官方列車位置",
+    engineRef: "Engine參考",
+    lateTag: (sec) => `Delay ${sec}s`,
+    lateLabel: "慢於時間表",
+    lateSec: (sec) => `${sec} 秒`,
+    lateSource: { run: "行車／停站比時間表慢", feed: "港鐵前方各站預報偏慢", headway: "與前車間距超出班距" },
+    onTime: "準時（相差少於 60 秒）",
+    readings: (n) => `綜合 ${n} 個車站倒數`,
     dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日" },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
@@ -155,8 +167,15 @@ const STRINGS = {
     mapUnavailable: "The map could not start (no WebGL, or the tiles would not load). Switched back to the diagram.",
     mapLoading: "Loading map…",
     attribution: "Track © OpenStreetMap contributors (ODbL) · basemap OpenFreeMap",
-    source: "Source: MTR Next Train API (data.gov.hk) · run times from timetables TML1100B / TML6090A / TML7090",
+    source: "Source: MTR Next Train API (data.gov.hk)",
     engine: "Positions are estimated from arrival countdowns plus timetable run and dwell times, not official MTR train locations",
+    engineRef: "Engine reference",
+    lateTag: (sec) => `Delay ${sec}s`,
+    lateLabel: "Behind timetable",
+    lateSec: (sec) => `${sec} s`,
+    lateSource: { run: "running slower than timetable", feed: "MTR boards ahead predict it slower", headway: "gap to the train ahead exceeds headway" },
+    onTime: "On time (within 60 s)",
+    readings: (n) => `fused from ${n} station countdowns`,
     dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday" },
     band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
     headway: (m) => `every ~${m} min`,
@@ -236,6 +255,11 @@ async function boot() {
   ])
   network = createNetwork(netJson)
   model = createModel(timetable, track)
+  try {
+    model.importLearned(JSON.parse(readPref(LEARN_KEY) ?? "null"))
+  } catch {
+    // A corrupt saved calibration is simply ignored; it relearns in minutes.
+  }
   tracker = createTracker(model)
   order = model.order
   // Chain board readings with the timetable gap (dwell + run) per hop.
@@ -280,6 +304,9 @@ async function refresh(first) {
     state.data = snapshot
     state.loadedAtMs = Date.now()
     state.stationCount = feed.stationCount
+    // Learn per-direction hop times from the feed, then place the trains.
+    model.learn(snapshot.trains, Date.now())
+    writePref(LEARN_KEY, JSON.stringify(model.exportLearned()))
     tracker.update(snapshot.trains, Date.now())
     state.runs = tracker.frame(Date.now())
     setStatus("ok")
@@ -318,11 +345,13 @@ function applyStrings() {
     `<span class="lg-col up" title="${s.toTum}">${s.colUp}</span><span class="lg-col down" title="${s.toWks}">${s.colDown}</span>`
   els.mapLegend.innerHTML =
     `<span><i class="sw up"></i>${s.up} · ${s.toTum}</span><span><i class="sw down"></i>${s.down} · ${s.toWks}</span>`
+  const commitLink = BUILD.commit === "dev"
+    ? "dev"
+    : `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}">${BUILD.commit}</a>`
   els.foot.innerHTML =
     `<p>${s.source}</p><p>${s.engine}</p>` +
-    `<p><a href="https://github.com/iceninye/TML-traffic">github.com/iceninye/TML-traffic</a> · ` +
-    `<a href="https://github.com/keithligh/hk-traffic-intelligence">engine: hk-traffic-intelligence</a></p>` +
-    `<p id="build">v0.2.0</p>`
+    `<p>${s.engineRef}: <a href="https://github.com/keithligh/hk-traffic-intelligence">hk-traffic-intelligence</a></p>` +
+    `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
 }
 
@@ -408,6 +437,14 @@ function buildDiagram() {
   const dnColX = width - 4 - COL_W
   const upColX = dnColX - COL_GAP - COL_W
 
+  const defs = make("defs")
+  // User-space region: a vertical line has a zero-width bounding box, so the
+  // default percentage region would clip its glow to nothing.
+  const filter = make("filter", { id: "dg-glow", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: width + 120, height: height + 120 })
+  filter.append(make("feGaussianBlur", { stdDeviation: 4 }))
+  defs.append(filter)
+  els.svg.append(defs)
+
   const base = make("g")
   // Column panels behind the countdowns.
   base.append(
@@ -435,10 +472,13 @@ function buildDiagram() {
   }
 
   // Two tracks, casing under colour.
+  // Glow under each, then the line, then a pale core: the railisland look.
   for (const [x, dir] of [[TRACK_UP_X, "up"], [TRACK_DN_X, "down"]]) {
     base.append(
+      make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track-glow ${dir}`, filter: "url(#dg-glow)" }),
       make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: "dg-track-casing" }),
       make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track ${dir}` }),
+      make("line", { x1: x, y1: firstY, x2: x, y2: lastY, class: `dg-track-core ${dir}` }),
     )
   }
   // Direction chevrons along each track, a few per screen.
@@ -584,10 +624,12 @@ function syncTrains() {
       if (!node) {
         node = make("g", { class: "dg-train", role: "button", tabindex: 0, "data-dir": dir })
         node.append(
+          make("circle", { r: TRAIN_R + 7, class: "dg-train-glow", filter: "url(#dg-glow)" }),
           make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
           make("circle", { r: TRAIN_R, class: "dg-train-body", fill: COLORS[dir] }),
           make("path", { d: dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
           make("circle", { r: 15, fill: "transparent" }),
+          make("g", { class: "dg-late" }),
         )
         node.addEventListener("click", () => openTrain(run.id))
         node.addEventListener("keydown", (event) => {
@@ -604,6 +646,7 @@ function syncTrains() {
       node.dataset.short = isShortTrip(run) ? "1" : "0"
       node.dataset.selected = state.selected === run.id ? "1" : "0"
       node.dataset.phase = run.pos.phase
+      paintLateTag(node, run)
       node.setAttribute("aria-label", `${network.name(run.train.dest, state.lang)} · ${positionText(run)}`)
     }
   }
@@ -614,6 +657,26 @@ function syncTrains() {
       trainNodes.delete(id)
     }
   }
+}
+
+function isLate(run) {
+  return (run.late?.sec ?? 0) >= LATE_SHOW_SEC
+}
+
+// A small red tag above a train running 60 s or more behind the timetable.
+function paintLateTag(node, run) {
+  const tag = node.querySelector(".dg-late")
+  const text = isLate(run) ? t().lateTag(run.late.sec) : ""
+  if (tag.dataset.text === text) return
+  tag.dataset.text = text
+  tag.replaceChildren()
+  if (!text) return
+  const w = text.length * 5.4 + 10
+  const y = -TRAIN_R - 10
+  tag.append(
+    make("rect", { x: -w / 2, y: y - 7, width: w, height: 14, rx: 7, class: "dg-late-bg" }),
+    make("text", { x: 0, y: y + 0.5, class: "dg-late-text" }, text),
+  )
 }
 
 function loop(stamp) {
@@ -752,30 +815,63 @@ function installMapLayers() {
   map.addSource("tml-stations", { type: "geojson", data: stationCollection() })
   map.addSource("tml-trains", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
 
-  const width = ["interpolate", ["linear"], ["zoom"], 9, 2, 12, 3, 15, 5, 17, 7]
+  // Neon look, after railisland.tw: each direction is a wide soft glow, a
+  // narrower bright glow, the coloured line, then a pale hot core.
+  const z = (...stops) => ["interpolate", ["linear"], ["zoom"], ...stops]
+  // Dim the basemap so the lines read as light, as railisland.tw does.
+  const dark = !window.matchMedia?.("(prefers-color-scheme: light)").matches
+  map.addSource("tml-veil", {
+    type: "geojson",
+    data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } },
+  })
+  map.addLayer({
+    id: "tml-veil",
+    type: "fill",
+    source: "tml-veil",
+    paint: { "fill-color": dark ? "#030712" : "#0b1220", "fill-opacity": dark ? 0.55 : 0.12 },
+  })
   map.addLayer({
     id: "tml-track-casing",
     type: "line",
     source: "tml-track",
-    paint: { "line-color": MAP_COLORS.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 9, 7, 12, 10, 15, 16, 17, 24], "line-opacity": 0.5 },
+    paint: { "line-color": MAP_COLORS.casing, "line-width": z(9, 8, 12, 12, 15, 18, 17, 26), "line-opacity": 0.55, "line-blur": 2 },
     layout: { "line-cap": "round", "line-join": "round" },
   })
   // The OSM line runs Tuen Mun -> Wu Kai Sha. Trains keep left, so down
   // (to Wu Kai Sha) sits left of the line direction and up sits right.
-  map.addLayer({
-    id: "tml-track-down",
-    type: "line",
-    source: "tml-track",
-    paint: { "line-color": MAP_COLORS.DOWN, "line-width": width, "line-offset": offsetExpr(-1), "line-opacity": 0.95 },
-    layout: { "line-cap": "round", "line-join": "round" },
-  })
-  map.addLayer({
-    id: "tml-track-up",
-    type: "line",
-    source: "tml-track",
-    paint: { "line-color": MAP_COLORS.UP, "line-width": width, "line-offset": offsetExpr(1), "line-opacity": 0.95 },
-    layout: { "line-cap": "round", "line-join": "round" },
-  })
+  for (const [dir, sign] of [["DOWN", -1], ["UP", 1]]) {
+    const id = dir.toLowerCase()
+    const offset = offsetExpr(sign)
+    const layout = { "line-cap": "round", "line-join": "round" }
+    map.addLayer({
+      id: `tml-glow-wide-${id}`,
+      type: "line",
+      source: "tml-track",
+      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 14, 12, 22, 15, 34, 17, 46), "line-blur": z(9, 10, 15, 22), "line-opacity": 0.5, "line-offset": offset },
+      layout,
+    })
+    map.addLayer({
+      id: `tml-glow-${id}`,
+      type: "line",
+      source: "tml-track",
+      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 5, 12, 8, 15, 12, 17, 16), "line-blur": z(9, 3, 15, 6), "line-opacity": 0.9, "line-offset": offset },
+      layout,
+    })
+    map.addLayer({
+      id: `tml-track-${id}`,
+      type: "line",
+      source: "tml-track",
+      paint: { "line-color": MAP_COLORS[dir], "line-width": z(9, 2, 12, 3, 15, 5, 17, 7), "line-offset": offset },
+      layout,
+    })
+    map.addLayer({
+      id: `tml-core-${id}`,
+      type: "line",
+      source: "tml-track",
+      paint: { "line-color": MAP_COLORS[`${dir}_HOT`], "line-width": z(9, 0.6, 12, 1, 15, 1.8, 17, 2.5), "line-opacity": 0.85, "line-offset": offset },
+      layout,
+    })
+  }
   map.addLayer({
     id: "tml-stations",
     type: "circle",
@@ -803,14 +899,14 @@ function installMapLayers() {
     paint: { "text-color": "#f7fbff", "text-halo-color": MAP_COLORS.casing, "text-halo-width": 1.6 },
   })
   map.addLayer({
-    id: "tml-trains-halo",
+    id: "tml-trains-glow",
     type: "circle",
     source: "tml-trains",
-    filter: ["==", ["get", "selected"], 1],
     paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 11, 15, 18],
+      "circle-radius": ["*", ["case", ["==", ["get", "selected"], 1], 1.6, 1], z(9, 14, 12, 20, 15, 28, 17, 34)],
       "circle-color": ["get", "color"],
-      "circle-opacity": 0.3,
+      "circle-blur": 1,
+      "circle-opacity": 0.95,
     },
   })
   map.addLayer({
@@ -818,26 +914,36 @@ function installMapLayers() {
     type: "circle",
     source: "tml-trains",
     paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4.5, 12, 6, 15, 9, 17, 11],
+      "circle-radius": z(9, 4.5, 12, 6, 15, 9, 17, 11),
       "circle-color": ["get", "color"],
-      "circle-stroke-color": ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#f7fbff"],
+      "circle-stroke-color": ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#ffffff"],
       "circle-stroke-width": ["case", ["==", ["get", "delay"], 1], 2.5, 1.6],
       "circle-stroke-opacity": ["case", ["==", ["get", "short"], 1], 0.55, 1],
     },
   })
+  // White-hot centre so the dot reads as a light, not a disc.
   map.addLayer({
-    id: "tml-train-arrows",
+    id: "tml-trains-core",
+    type: "circle",
+    source: "tml-trains",
+    paint: { "circle-radius": z(9, 1.6, 12, 2.2, 15, 3.4, 17, 4), "circle-color": "#ffffff", "circle-blur": 0.6, "circle-opacity": 0.95 },
+  })
+  map.addLayer({
+    id: "tml-train-late",
     type: "symbol",
     source: "tml-trains",
-    minzoom: 11.5,
+    filter: ["==", ["get", "late"], 1],
+    minzoom: 10.5,
     layout: {
-      "text-field": ["get", "arrow"],
-      "text-size": 9,
-      "text-font": ["Noto Sans Regular"],
+      "text-field": ["get", "lateText"],
+      "text-size": 10.5,
+      "text-font": ["Noto Sans Bold"],
+      "text-offset": [0, -1.5],
+      "text-anchor": "bottom",
       "text-allow-overlap": true,
       "text-ignore-placement": true,
     },
-    paint: { "text-color": "#ffffff" },
+    paint: { "text-color": "#ffffff", "text-halo-color": MAP_COLORS.late, "text-halo-width": 2.2 },
   })
 
   map.on("click", "tml-trains", (event) => {
@@ -919,7 +1025,8 @@ function paintMap() {
         delay: run.delay ? 1 : 0,
         short: isShortTrip(run) ? 1 : 0,
         selected: run.id === state.selected ? 1 : 0,
-        arrow: run.dir === "UP" ? "▲" : "▼",
+        late: isLate(run) ? 1 : 0,
+        lateText: isLate(run) ? t().lateTag(run.late.sec) : "",
       },
       geometry: { type: "Point", coordinates: at },
     })
@@ -1075,8 +1182,12 @@ function paintTrainSheet(first = false) {
     `<dl class="kv">` +
     `<dt>${s.position}</dt><dd>${positionText(run)}</dd>` +
     `<dt>${s.speed}</dt><dd>${Math.round(run.pos.speedKmh)} km/h</dd>` +
+    `<dt>${s.lateLabel}</dt><dd>${isLate(run)
+      ? `<span class="badge late">${s.lateTag(run.late.sec)}</span> ${s.lateSource[run.late.source]}`
+      : s.onTime}</dd>` +
     `<dt>${s.platform}</dt><dd>${escapeHtml(run.train.plat || "—")}</dd>` +
     `</dl>` +
+    (run.readings ? `<p class="fine">${s.readings(run.readings)}</p>` : "") +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
   else els.sheetBody.innerHTML = html

@@ -4,12 +4,15 @@
   --tml: #9a3b26;
   --tml-lite: #d4664a;
   /* Direction colours, shared by the diagram, the map and the sheets. */
-  --up: #f0883e;
-  --down: #3b9eea;
-  --bg: #0b0f14;
-  --panel: #121821;
-  --panel-2: #172030;
-  --edge: #1f2a38;
+  --up: #ff8f45;
+  --down: #3fa9ff;
+  --up-hot: #ffe2c7;
+  --down-hot: #d6edff;
+  --late: #e5484d;
+  --bg: #070b14;
+  --panel: #0e1526;
+  --panel-2: #131c31;
+  --edge: #1c2740;
   --text: #e6edf5;
   --muted: #8b9bad;
   --good: #3fb950;
@@ -30,8 +33,10 @@
     --edge: #dde4ec;
     --text: #16202c;
     --muted: #5d6b7c;
-    --up: #d9681c;
-    --down: #1f78c8;
+    --up: #e0701f;
+    --down: #1f7fd6;
+    --up-hot: #fff3e6;
+    --down-hot: #eef7ff;
   }
 }
 
@@ -330,6 +335,7 @@ button {
 svg.diagram {
   display: block;
   width: 100%;
+  overflow: visible;
   touch-action: manipulation;
 }
 
@@ -337,10 +343,17 @@ svg.diagram {
 .dg-col.up { fill: var(--up); }
 .dg-col.down { fill: var(--down); }
 
-.dg-track-casing { stroke: #041018; stroke-width: 7; stroke-linecap: round; fill: none; opacity: 0.45; }
+/* Neon tracks: blurred glow, dark casing, colour, pale hot core. */
+.dg-track-glow { stroke-width: 12; fill: none; opacity: 0.55; stroke-linecap: round; }
+.dg-track-glow.up { stroke: var(--up); }
+.dg-track-glow.down { stroke: var(--down); }
+.dg-track-casing { stroke: #020611; stroke-width: 7; stroke-linecap: round; fill: none; opacity: 0.6; }
 .dg-track { stroke-width: 4; stroke-linecap: round; fill: none; }
 .dg-track.up { stroke: var(--up); }
 .dg-track.down { stroke: var(--down); }
+.dg-track-core { stroke-width: 1.2; fill: none; opacity: 0.9; stroke-linecap: round; }
+.dg-track-core.up { stroke: var(--up-hot); }
+.dg-track-core.down { stroke: var(--down-hot); }
 .dg-chev { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.75; pointer-events: none; }
 
 .dg-tunnel { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.55; }
@@ -410,6 +423,13 @@ svg.diagram {
 .dg-train-body { stroke: #f7fbff; stroke-width: 2; }
 .dg-train-arrow { fill: #fff; pointer-events: none; }
 .dg-train-halo { fill: transparent; }
+.dg-train-glow { opacity: 0.85; pointer-events: none; }
+.dg-train[data-dir="UP"] .dg-train-glow { fill: var(--up); }
+.dg-train[data-dir="DOWN"] .dg-train-glow { fill: var(--down); }
+.dg-train[data-phase="wait"] .dg-train-glow { opacity: 0.3; }
+.dg-late { pointer-events: none; }
+.dg-late-bg { fill: var(--late); stroke: #fff; stroke-width: 1; }
+.dg-late-text { font-size: 9.5px; font-weight: 700; fill: #fff; text-anchor: middle; dominant-baseline: middle; font-variant-numeric: tabular-nums; }
 .dg-train[data-dir="UP"] .dg-train-halo { fill: var(--up); }
 .dg-train[data-dir="DOWN"] .dg-train-halo { fill: var(--down); }
 .dg-train .dg-train-halo { opacity: 0; }
@@ -639,6 +659,8 @@ svg.diagram {
 .stop-clock { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .badge.plain { background: var(--panel-2); color: var(--muted); }
+.badge.late { background: var(--late); color: #fff; }
+.sheet .fine { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
 
 .train-list { display: flex; flex-direction: column; gap: 6px; }
 

@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.4", commit: "6b6a900" }
+const BUILD = { version: "0.4.5", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -427,7 +427,7 @@ function placeTrains(snapshot, now) {
     matched = result.trips
     leftover = result.leftover
     state.lineDelay = result.lineDelay
-    tripHistory = new Map([...matched].map(([id, entry]) => [id, entry.history]))
+    tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
   }
 
   const fallback = leftover.length

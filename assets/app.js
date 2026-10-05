@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.6", commit: "d46a9d9" }
+const BUILD = { version: "0.4.7", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -112,8 +112,7 @@ const STRINGS = {
     mapLoading: "載入地圖…",
     attribution: "路軌 © OpenStreetMap 貢獻者 (ODbL) · 底圖 OpenFreeMap",
     source: "資料來源：港鐵 Next Train API（data.gov.hk）",
-    engine: "列車位置由到站倒數配合時間表行車及停站時間推算，並非港鐵官方列車位置",
-    engineRef: "Engine參考",
+    engine: "列車位置由到站時間推算模擬，非港鐵官方列車位置",
     lateTag: (sec) => `- ${sec}s`,
     lateLabel: "慢於時間表",
     lateSec: (sec) => `${sec} 秒`,
@@ -182,8 +181,7 @@ const STRINGS = {
     mapLoading: "Loading map…",
     attribution: "Track © OpenStreetMap contributors (ODbL) · basemap OpenFreeMap",
     source: "Source: MTR Next Train API (data.gov.hk)",
-    engine: "Positions are estimated from arrival countdowns plus timetable run and dwell times, not official MTR train locations",
-    engineRef: "Engine reference",
+    engine: "Train positions are simulated from arrival times, not official MTR train locations",
     lateTag: (sec) => `- ${sec}s`,
     lateLabel: "Behind timetable",
     lateSec: (sec) => `${sec} s`,
@@ -491,7 +489,6 @@ function applyStrings() {
     : `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}">${BUILD.commit}</a>`
   els.foot.innerHTML =
     `<p>${s.source}</p><p>${s.engine}</p>` +
-    `<p>${s.engineRef}: <a href="https://github.com/keithligh/hk-traffic-intelligence">hk-traffic-intelligence</a></p>` +
     `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
 }

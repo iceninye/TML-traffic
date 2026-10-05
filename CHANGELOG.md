@@ -3,6 +3,9 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.4.7 — 2026-10-05
+- Footer: "列車位置由到站時間推算模擬，非港鐵官方列車位置"; engine reference line removed (the engine has been largely rewritten).
+
 ## v0.4.6 — 2026-10-05 (`d46a9d9`)
 - Physics speed profile between stations (1.0 m/s² accel/brake, cruise solved from distance and timetabled run time) replaces the fixed 22% ramps; up to 525 m difference on the long KSR–TWW hop.
 - Evidence-based de-duplication: a fallback train or coasting trip is a duplicate only if a placed train's predicted arrivals explain all its readings (±75 s); distance alone only below 0.25 km.

@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.5.1", commit: "de51834" }
+const BUILD = { version: "0.5.2", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -134,6 +134,7 @@ const STRINGS = {
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
     offService: "非服務時間",
+    lastTrains: "尾班車時段",
     peakRun: "繁忙時段行車時間",
     offRun: "非繁忙行車時間",
     hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
@@ -208,6 +209,7 @@ const STRINGS = {
     band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
     headway: (m) => `every ~${m} min`,
     offService: "Out of service hours",
+    lastTrains: "Last trains",
     peakRun: "peak run times",
     offRun: "off-peak run times",
     hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
@@ -593,7 +595,8 @@ function paintClock() {
     const tau = serviceSeconds(now)
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
     if (!headway) {
-      els.period.textContent = s.offService
+      // Past the last headway band, the last trains may still be running.
+      els.period.textContent = state.runs.length ? s.lastTrains : s.offService
       els.period.dataset.peak = "0"
     } else {
       const peak = headway <= 210

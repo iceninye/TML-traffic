@@ -91,6 +91,64 @@ def validate(data):
     if arrivals and share < 0.9:
         errors.append(f"only {share:.0%} of terminus arrivals continue as the same Run")
 
+    # Section F: first/last departure from each station toward each other
+    # station must match the passenger trips (to the minute).
+    fl = data.get("firstLast")
+    if fl:
+        first, last = {}, {}
+        for t in trips:
+            stops = [st for st in t["stops"] if len(st) < 4]  # passenger stops only
+            for i, a in enumerate(stops):
+                dep = a[2]
+                if dep is None:
+                    continue
+                for b in stops[i + 1:]:
+                    key = (a[0], b[0])
+                    first[key] = min(first.get(key, dep), dep)
+                    last[key] = max(last.get(key, dep), dep)
+        checked = mismatched = 0
+        examples = []
+        for table, mine, pick in (("first", first, min), ("last", last, max)):
+            for origin, row in fl.get(table, {}).items():
+                for target, hhmm_ in row.items():
+                    sec = mine.get((origin, target))
+                    if sec is None:
+                        continue
+                    checked += 1
+                    want = int(hhmm_[:2]) * 60 + int(hhmm_[2:])
+                    got = (int(sec) // 60) % 1440
+                    if min(abs(got - want), 1440 - abs(got - want)) > 1:
+                        mismatched += 1
+                        if len(examples) < 5:
+                            examples.append(f"{table} {origin}->{target}: section F {hhmm_}, trips {hm(sec)}")
+        notes.append(f"section F first/last trains: {checked - mismatched}/{checked} agree")
+        if checked and mismatched / checked > 0.02:
+            errors.append(f"section F disagrees on {mismatched}/{checked} first/last trains: " + "; ".join(examples))
+        elif mismatched:
+            notes.append("section F differences: " + "; ".join(examples))
+    else:
+        notes.append("no section F to check against")
+
+    # Section A: trains in use. Far more trips running at once than the
+    # timetable's train count means trips were split or duplicated.
+    used = ((data.get("sectionA") or {}).get("summary") or {}).get("trainsUsed")
+    if used:
+        # Peak concurrency over trips (not whole Run spans, which include
+        # mid-day stabling).
+        events = []
+        for t in trips:
+            times = [x for st in t["stops"] for x in (st[1], st[2]) if x is not None]
+            events += [(min(times), 1), (max(times), -1)]
+        cur = peak = 0
+        for _, d in sorted(events):
+            cur += d
+            peak = max(peak, cur)
+        notes.append(f"trains in use per section A: {used}; most trips running at once: {peak}")
+        if peak > max(used) + 2:
+            errors.append(f"{peak} trips run at once, section A says at most {max(used)} trains")
+
+    np_stops = sum(1 for t in trips for st in t["stops"] if len(st) > 3)
+    notes.append(f"stops run empty (non-passenger): {np_stops}")
     notes.append(f"{len(trips)} trips (up {sum(t['dir'] == 'UP' for t in trips)}, down {sum(t['dir'] == 'DOWN' for t in trips)})")
     return errors, notes
 

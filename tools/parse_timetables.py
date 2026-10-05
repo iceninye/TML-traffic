@@ -62,8 +62,11 @@ def rows_by_y(words, tol=2.5):
 # ------------------------------------------------------------- section A
 
 def parse_section_a(pdf):
-    """Run and dwell seconds per hop, per direction, per period column."""
+    """Run and dwell seconds per hop, per direction, per period column, plus
+    the period names (and clock ranges where the timetable gives them) and
+    the summary rows: turnaround at each terminus, round trip, trains used."""
     out = {}
+    summary = {}
     for page in pdf.pages[:8]:
         text = page.extract_text() or ""
         if "Inter-station Run Times" not in text:
@@ -72,18 +75,71 @@ def parse_section_a(pdf):
         if not direction:
             continue
         hops = []
-        for line in text.splitlines():
+        # Underlined rows come out with "_" glyphs mixed into the text.
+        lines = [l.replace("_", "") for l in text.splitlines()]
+        for line in lines:
             m = re.match(r"^([A-Z]{3}) - ([A-Z]{3}) ([\d.]+) (.+)$", line)
+            if m:
+                vals = [None if v == "-" else int(v) for v in m.group(4).split()]
+                hops.append({"from": m.group(1), "to": m.group(2), "km": float(m.group(3)), "cols": vals})
+                continue
+            for label, key in (("TUM Turnaround Time", "turnaroundTUM"), ("WKS Turnaround Time", "turnaroundWKS"),
+                               ("Round Trip Time", "roundTrip"), ("Number of Trains Used", "trainsUsed")):
+                if line.startswith(label):
+                    rest = re.sub(r"^\s*\([a-z]\)", "", line[len(label):])
+                    summary[key] = [int(v) for v in re.findall(r"\d+", rest)]
+        # Period headers: "Morning-peak (sec.) Non-peak (sec.)" or, with no
+        # space, "Morning-Afternoon(sec.)"; drop the column words in front.
+        header = next((l for l in lines if "(sec.)" in l), "")
+        names = [re.sub(r"^(Distance|Station)\s+", "", n).strip() for n in re.findall(r"([A-Za-z][A-Za-z -]*?)\s*\(sec\.\)", header)]
+        ranges = re.findall(r"\((\d{2}:\d{2}) - (\d{2}:\d{2})\)", text)
+        ncols = max((len(h["cols"]) for h in hops), default=0) // 2
+        # An underlined summary row can lose its spaces ("33263326"): split
+        # it evenly by the number of period columns.
+        for key, vals in summary.items():
+            if len(vals) == 1 and ncols > 1 and len(str(vals[0])) % ncols == 0:
+                text_v = str(vals[0])
+                w = len(text_v) // ncols
+                summary[key] = [int(text_v[i:i + w]) for i in range(0, len(text_v), w)]
+        periods = []
+        for i in range(ncols):
+            entry = {"name": names[i] if i < len(names) else f"period {i + 1}"}
+            if i < len(ranges):
+                entry["from"], entry["to"] = ranges[i]
+            periods.append(entry)
+        out[direction] = {"periods": periods, "hops": hops}
+    if summary:
+        out["summary"] = summary
+    return out
+
+
+# ------------------------------------------------------------- section F
+
+def parse_section_f(pdf):
+    """First and last departure (hhmm) from each station toward each other
+    station: {"first": {from: {to: "0545"}}, "last": {...}}."""
+    out = {"first": {}, "last": {}}
+    for page in pdf.pages[:20]:
+        text = page.extract_text() or ""
+        if "First Trains and Last Trains" not in text:
+            continue
+        part = "first"
+        for line in text.splitlines():
+            line = line.replace("_", "").strip()
+            if line.startswith("Last Trains"):
+                part = "last"
+            # 26 times of 4 digits; spacing is unreliable in the text layer.
+            m = re.match(r"^([A-Z]{3})\s*([\d\s]+)$", line)
             if not m:
                 continue
-            nums = m.group(4).split()
-            vals = [None if v == "-" else int(v) for v in nums]
-            hops.append({"from": m.group(1), "to": m.group(2), "km": float(m.group(3)), "cols": vals})
-        # Period headers, e.g. "Morning-peak (sec.) Non-peak (sec.) ..."
-        header = next((l for l in text.splitlines() if "(sec.)" in l), "")
-        periods = re.findall(r"([A-Za-z-]+(?: [A-Za-z-]+)*) \(sec\.\)", header)
-        out[direction] = {"periods": periods, "hops": hops}
-    return out
+            digits = re.sub(r"\D", "", m.group(2))
+            if len(digits) != 104:
+                continue
+            origin = m.group(1)
+            times = [digits[i:i + 4] for i in range(0, 104, 4)]
+            targets = [c for c in STATIONS if c != origin]
+            out[part][origin] = dict(zip(targets, times))
+    return out if out["first"] else None
 
 
 # ------------------------------------------------------------- section C
@@ -186,39 +242,163 @@ def unwrap(stops):
     return out
 
 
-def parse_section_h(pdf):
+# Depot and siding points: a public stop met before one of these, in a trip
+# that carries a non-passenger trip number, is run empty.
+DEPOT = {"PCKTD", "PCKTB", "W1A", "W1C", "W1F", "E3A", "E3C", "ENT", "EXT"}
+
+
+def passenger_number(n):
+    return n[:1] in ("1", "2")
+
+
+def parse_section_h(pdf, section_a=None):
     trips = []
-    notes = {}
+    positioning = []
     for page in pdf.pages:
         text = page.extract_text() or ""
-        for m in re.finditer(r"^\((\d+)\) (.+)$", text, re.M):
-            notes[m.group(1)] = m.group(2).strip()
         if "LINE TML" not in text:
             continue
+        # Footnote numbers are reused on every page: resolve them per page.
+        page_notes = {m.group(1): m.group(2).strip() for m in re.finditer(r"^\(([^)]+)\) (.+)$", text, re.M)}
         direction, page_trips = parse_service_page(page)
         for t in page_trips:
             t["dir"] = direction
+            tokens = re.findall(r"\(([^)]+)\)", "".join(t["notes"]))
+            t["notes"] = [page_notes.get(k, f"({k})") for k in tokens]
             trips.append(t)
+
     out = []
     for t in trips:
-        stops = unwrap(t["stops"])
-        public = {}
-        for point, kind, sec in stops:
-            if point not in PUBLIC:
-                continue
-            entry = public.setdefault(point, {})
-            entry[kind] = sec
-        if len(public) < 2:
+        raw = unwrap(t["stops"])
+        public_codes = {p for p, _, _ in raw if p in PUBLIC}
+        if len(public_codes) < 2:
+            # Empty move to a platform (depot -> TUM, siding -> TWW ...): keep
+            # when the train arrives at a public platform, so the app knows
+            # from when it stands there before its first trip.
+            arr = [(p, sec) for p, kind, sec in raw if p in PUBLIC and kind == "arr"]
+            if arr and t["run"] is not None:
+                positioning.append({"run": t["run"], "station": arr[-1][0], "at": arr[-1][1]})
             continue
-        seq = sorted(public.items(), key=lambda kv: min(kv[1].values()))
+
+        # Which public stops are run empty.
+        numbers = t["trip"]
+        whole_np = not any(passenger_number(n) for n in numbers) or any(
+            re.fullmatch(r"NON-PASSENGER TRAIN.*", n) for n in t["notes"])
+        np_until = None  # first public stop where passenger service begins
+        for n in t["notes"]:
+            m = re.match(r"NON[ -]PASSENGER SERVICE FROM (\w+) TO (\w+)", n)
+            if m:
+                np_until = m.group(2)
+        # Empty leg first (e.g. 40023/20044: depot -> ... -> passenger): public
+        # stops before the depot point are empty. When the passenger leg comes
+        # first (20204/40239), the empty tail is found by "END SERVICE AT".
+        if np_until is None and numbers and not passenger_number(numbers[0]):
+            seen_public = False
+            for p, _, _ in raw:
+                if p in PUBLIC:
+                    seen_public = True
+                elif p in DEPOT and seen_public:
+                    np_until = "__after_depot__"
+                    break
+
+        # "END SERVICE AT X": the train runs empty after X (to a depot or
+        # siding), so public stops after X carry no passengers.
+        end_at = None
+        for n in t["notes"]:
+            m = re.match(r"END SERVICE AT (\w+)", n)
+            if m:
+                end_at = m.group(1)
+        public = {}
+        order = []
+        empty = set()
+        ended = False
+        passing_depot = False
+        reached = False
+        for p, kind, sec in raw:
+            if p in DEPOT:
+                passing_depot = True
+                continue
+            if p not in PUBLIC:
+                continue
+            if p not in public:
+                order.append(p)
+                if ended:
+                    empty.add(p)
+                elif whole_np:
+                    empty.add(p)
+                elif np_until == "__after_depot__":
+                    if not passing_depot:
+                        empty.add(p)
+                elif np_until and not reached:
+                    if p == np_until:
+                        reached = True
+                    else:
+                        empty.add(p)
+            public.setdefault(p, {})[kind] = sec
+            if end_at and p == end_at:
+                ended = True
+        seq = sorted(order, key=lambda c: min(public[c].values()))
+        stops = []
+        for code in seq:
+            v = public[code]
+            row = [code, v.get("arr"), v.get("dep")]
+            if code in empty:
+                row.append(1)
+            stops.append(row)
         out.append({
             "dir": t["dir"],
             "run": t["run"],
-            "trip": "/".join(t["trip"]),
-            "notes": [notes.get(n.strip("()"), n) for n in t["notes"]],
-            "stops": [[code, v.get("arr"), v.get("dep")] for code, v in seq],
+            "trip": "/".join(numbers),
+            "notes": t["notes"],
+            "stops": stops,
         })
+
+    fill_arrivals(out, section_a or {})
+    attach_platform_arrivals(out, positioning)
     return out
+
+
+def fill_arrivals(trips, section_a):
+    """Most stations list only a departure. Arrival = previous departure +
+    the run time of the section A period whose run + dwell best explains
+    the timetabled gap; a stop the train is held at keeps its on-time
+    arrival and simply dwells longer."""
+    table = {}
+    for d in ("DOWN", "UP"):
+        for h in section_a.get(d, {}).get("hops", []):
+            cols = h["cols"]
+            pairs = [(cols[i], cols[i + 1] or 0) for i in range(0, len(cols) - 1, 2) if cols[i]]
+            table[(d, h["from"], h["to"])] = pairs
+    for t in trips:
+        st = t["stops"]
+        for k in range(1, len(st)):
+            if st[k][1] is not None:
+                continue
+            prev_dep = st[k - 1][2] if st[k - 1][2] is not None else st[k - 1][1]
+            dep = st[k][2]
+            if prev_dep is None or dep is None:
+                continue
+            pairs = table.get((t["dir"], st[k - 1][0], st[k][0]))
+            if not pairs:
+                continue
+            gap = dep - prev_dep
+            run, _ = min(pairs, key=lambda rd: abs(rd[0] + rd[1] - gap))
+            st[k][1] = max(prev_dep, min(dep, prev_dep + run))
+
+
+def attach_platform_arrivals(trips, positioning):
+    """An empty move that ends at a platform tells when the train is there
+    before its first passenger trip from that station."""
+    by_run = {}
+    for t in trips:
+        by_run.setdefault(t["run"], []).append(t)
+    for move in positioning:
+        candidates = [t for t in by_run.get(move["run"], [])
+                      if t["stops"][0][0] == move["station"] and t["stops"][0][2] is not None
+                      and 0 <= t["stops"][0][2] - move["at"] <= 3600]
+        if candidates:
+            first = min(candidates, key=lambda t: t["stops"][0][2])
+            first["platformFrom"] = move["at"]
 
 
 def iso_date(text):
@@ -256,12 +436,14 @@ def main(paths):
         type_digit = code[3] if len(code) > 3 else ""
         day = DAY_BY_TYPE.get(type_digit, "special")
         eff = re.search(r"Effective:\s*(\d{1,2} \w+ \d{4})", first)
-        trips = parse_section_h(pdf)
+        section_a = parse_section_a(pdf)
+        trips = parse_section_h(pdf, section_a)
         out = {
             "timetable": code,
             "day": day,
-            "sectionA": parse_section_a(pdf),
+            "sectionA": section_a,
             "headways": parse_section_c(pdf),
+            "firstLast": parse_section_f(pdf),
             "trips": trips,
         }
         errors, notes = validate(out)

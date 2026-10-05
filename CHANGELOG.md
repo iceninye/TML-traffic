@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.5.0 — 2026-10-05
+## v0.5.0 — 2026-10-05 (`fb3568d`)
 - Timetables live in `data/timetables/` with an `index.json` manifest; the app loads the calendar's one first and the rest in the background. `tools/parse_timetables.py` validates (`tools/validate_timetable.py`) before registering a new timetable — no code change needed to add one.
 - Detects when the running service does not match the timetable (fit < 50%, or two of: >20% of trips >120 s off, measured headway >30% off, special-arrangement notice) and switches to countdown-only mode; switches back when it fits again.
 - Countdown-only mode: positions from MTR countdowns only; header shows up/down train counts and measured headway; trip, Run and timetable delay show N/A; long gaps to the train ahead shown as yellow "班距 +Xs".

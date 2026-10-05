@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.4.8 — 2026-10-05
+## v0.4.8 — 2026-10-05 (`d09eb2a`)
 - Terminus turnaround: an arriving train stays at the Tuen Mun / Wu Kai Sha platform and hands over to the same Run's departing trip (linked by Run number; departure timed by the terminus board). No more trains vanishing on arrival; up to two trains wait per terminus.
 - "0 min" readings count from the first time 0 was seen, fixing delays that inflated on the approach to a terminus.
 

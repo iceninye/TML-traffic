@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.5.1 — 2026-10-05
+## v0.5.1 — 2026-10-05 (`de51834`)
 - Hidden feature: tap the orange-red dot at the top left; it glows and every train on the route diagram shows its Run number in place of its arrow for 15 seconds (trains without a timetabled trip show "–").
 
 ## v0.5.0 — 2026-10-05 (`fb3568d`)

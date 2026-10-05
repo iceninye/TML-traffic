@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.4.6 — 2026-10-05
+- Physics speed profile between stations (1.0 m/s² accel/brake, cruise solved from distance and timetabled run time) replaces the fixed 22% ramps; up to 525 m difference on the long KSR–TWW hop.
+- Evidence-based de-duplication: a fallback train or coasting trip is a duplicate only if a placed train's predicted arrivals explain all its readings (±75 s); distance alone only below 0.25 km.
+- Countdown-only mode when under 50% of readings fit any timetabled trip for two snapshots (overnight/special service), shown in the header badge.
+- Smoother catch-up (critically damped), capped at 0.7×–1.3× pace (no on-screen speed above ~130 km/h).
+
 ## v0.4.5 — 2026-10-05 (`3e7cdcf`)
 - Matching survives disruptions: per-trip tracking and ordered (non-crossing) alignment per station board; a held, extra or withdrawn train no longer shifts other trains (tests in `docs/ALGORITHM.md` §3b).
 - Peak bunching: near-miss readings join the train they fit instead of spawning a duplicate; fallback needs two agreeing readings; trains closer than 0.85 km on one track are merged. Weekday AM peak: 56 shown (6 duplicates) → 48–50 (timetable 50–51).

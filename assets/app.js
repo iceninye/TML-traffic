@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.5", commit: "3e7cdcf" }
+const BUILD = { version: "0.4.6", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -122,6 +122,7 @@ const STRINGS = {
     readings: (n) => `綜合 ${n} 個車站倒數`,
     dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日／假期" },
     peak: "繁忙",
+    offTimetable: "特別車務：按到站倒數推算",
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
@@ -191,6 +192,7 @@ const STRINGS = {
     readings: (n) => `fused from ${n} station countdowns`,
     dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday/PH" },
     peak: "peak",
+    offTimetable: "Special service: placed from countdowns",
     offPeak: "off-peak",
     matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
     tripId: (run, trip) => `Trip ${trip} (run ${run})`,
@@ -254,6 +256,7 @@ let timetables = null
 // that trip's delay while they are fresh).
 let tripHistory = new Map()
 let hopTimesKey = ""
+let offTimetableStreak = 0
 let tracker = null
 let feed = null
 let order = []
@@ -424,10 +427,20 @@ function placeTrains(snapshot, now) {
       model.setScheduleTimes(hopTimesAround(book, tau))
     }
     const result = matchReadings(book, readings, now, tripHistory)
-    matched = result.trips
-    leftover = result.leftover
-    state.lineDelay = result.lineDelay
-    tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
+    // When most boards fit no timetabled trip (overnight service on a
+    // festival, a special arrangement, a timetable this app does not have),
+    // place every train from the boards alone rather than force a match.
+    const fit = readings.length ? 1 - result.leftover.length / readings.length : 1
+    offTimetableStreak = readings.length >= 20 && fit < 0.5 ? offTimetableStreak + 1 : 0
+    state.offTimetable = offTimetableStreak >= 2
+    if (!state.offTimetable) {
+      matched = result.trips
+      leftover = result.leftover
+      state.lineDelay = result.lineDelay
+      tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
+    } else {
+      tripHistory = new Map()
+    }
   }
 
   const fallback = leftover.length
@@ -507,7 +520,10 @@ function paintClock() {
           : s.updated(age)
   els.statusCounts.textContent = counts.join(" · ")
   const book = timetables?.books[state.day]
-  if (book) {
+  if (state.offTimetable) {
+    els.period.textContent = s.offTimetable
+    els.period.dataset.peak = "0"
+  } else if (book) {
     const tau = serviceSeconds(now)
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
     if (!headway) {

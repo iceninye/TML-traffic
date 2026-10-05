@@ -48,7 +48,7 @@ lib/maplibre/*.mjs    vendored MapLibre GL 6.12.0（1.2 MB，lazy load）
 data/tml-network.json 27 站
 data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 生成）
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
-data/tml-schedule-*.json 三份工作時間表逐班車時間（tools/parse_timetables.py 由 PDF 生成）
+data/timetables/       工作時間表（index.json 清單 + 每份一個 <代號>.json）
 ```
 
 ## 本地跑
@@ -57,6 +57,19 @@ data/tml-schedule-*.json 三份工作時間表逐班車時間（tools/parse_time
 python3 -m http.server 8790 --bind 127.0.0.1
 # 開 http://127.0.0.1:8790/
 ```
+
+## 新增／更新時間表
+
+港鐵出新版或特別時間表（PDF）時：
+
+```bash
+pip install pdfplumber
+python3 tools/parse_timetables.py 新時間表.pdf
+```
+
+工具會解析 PDF → 執行 `tools/validate_timetable.py`（站序、時間唔倒退、首尾班車、總站 Run 接續、A 部 26 段、班距表）→
+**通過先**寫入 `data/timetables/<代號>.json` 同登記喺 `data/timetables/index.json`；唔通過唔會加入。
+App 會自動讀清單，唔使改程式。檔案格式見 `tools/parse_timetables.py` 開頭說明同 `docs/ALGORITHM.md` §3e。
 
 ## 重建資料
 

@@ -10,6 +10,8 @@
   --down-hot: #d6edff;
   --late: #e5484d;
   --alarm: #ff1238;
+  /* Spacing warning for fallback trains (no timetable to be late against). */
+  --gap: #e3b341;
   --bg: #070b14;
   --panel: #0e1526;
   --panel-2: #131c31;
@@ -433,6 +435,10 @@ svg.diagram {
 .dg-train[data-level="2"] .dg-train-body { stroke: #fff; stroke-width: 2.5; }
 .dg-train[data-level="2"] .dg-train-glow { animation: alarm 1s ease-in-out infinite; }
 .dg-train[data-level="2"] .dg-late-bg { fill: var(--alarm); }
+.dg-train[data-level="3"] .dg-train-body,
+.dg-train[data-level="3"] .dg-train-glow { fill: var(--gap); }
+.dg-train[data-level="3"] .dg-late-bg { fill: var(--gap); stroke: #1d1600; }
+.dg-train[data-level="3"] .dg-late-text { fill: #1d1600; }
 @keyframes alarm { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
 @media (prefers-reduced-motion: reduce) {
   .dg-train[data-level="2"] .dg-train-glow { animation: none; }
@@ -668,6 +674,7 @@ svg.diagram {
 
 .badge.plain { background: var(--panel-2); color: var(--muted); }
 .badge.late { background: var(--late); color: #fff; }
+.badge.gap { background: var(--gap); color: #1d1600; }
 .sheet .fine { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
 
 .train-list { display: flex; flex-direction: column; gap: 6px; }

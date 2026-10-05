@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.5.0 — 2026-10-05
+- Timetables live in `data/timetables/` with an `index.json` manifest; the app loads the calendar's one first and the rest in the background. `tools/parse_timetables.py` validates (`tools/validate_timetable.py`) before registering a new timetable — no code change needed to add one.
+- Detects when the running service does not match the timetable (fit < 50%, or two of: >20% of trips >120 s off, measured headway >30% off, special-arrangement notice) and switches to countdown-only mode; switches back when it fits again.
+- Countdown-only mode: positions from MTR countdowns only; header shows up/down train counts and measured headway; trip, Run and timetable delay show N/A; long gaps to the train ahead shown as yellow "班距 +Xs".
+- Delay tag format `+ 60s`.
+
 ## v0.4.8 — 2026-10-05 (`d09eb2a`)
 - Terminus turnaround: an arriving train stays at the Tuen Mun / Wu Kai Sha platform and hands over to the same Run's departing trip (linked by Run number; departure timed by the terminus board). No more trains vanishing on arrival; up to two trains wait per terminus.
 - "0 min" readings count from the first time 0 was seen, fixing delays that inflated on the approach to a terminus.

@@ -18,7 +18,7 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
-import { DAY_TYPES, calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, serviceSeconds } from "../lib/tml-timetable.js"
+import { calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, measuredHeadways, serviceSeconds } from "../lib/tml-timetable.js"
 
 const LOCALE_KEY = "tml-traffic-locale"
 const VIEW_KEY = "tml-traffic-view"
@@ -48,11 +48,11 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.4.8", commit: "d09eb2a" }
+const BUILD = { version: "0.5.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
-const MAP_COLORS = { UP_LINE: "#ffb17d", DOWN_LINE: "#79c3ff", alarm: "#ff1238", UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
+const MAP_COLORS = { gap: "#e3b341", UP_LINE: "#ffb17d", DOWN_LINE: "#79c3ff", alarm: "#ff1238", UP: "#ff8f45", DOWN: "#3fa9ff", UP_HOT: "#ffe2c7", DOWN_HOT: "#d6edff", casing: "#020611", warn: "#d29922", late: "#e5484d" }
 
 // Interchanges, coloured as on the MTR system map.
 const INTERCHANGE = {
@@ -113,15 +113,20 @@ const STRINGS = {
     attribution: "路軌 © OpenStreetMap 貢獻者 (ODbL) · 底圖 OpenFreeMap",
     source: "資料來源：港鐵 Next Train API（data.gov.hk）",
     engine: "列車位置由到站時間推算模擬，非港鐵官方列車位置",
-    lateTag: (sec) => `- ${sec}s`,
+    lateTag: (sec) => `+ ${sec}s`,
     lateLabel: "慢於時間表",
     lateSec: (sec) => `${sec} 秒`,
-    lateSource: { timetable: "比時間表班次遲", run: "行車／停站比時間表慢", feed: "港鐵前方各站預報偏慢", headway: "與前車間距超出班距" },
+    lateSource: { timetable: "比時間表班次遲", spacing: "與前車距離比實測班距長" },
+    gapTag: (sec) => `班距 +${sec}s`,
+    spacing: "班距",
+    spacingOk: "正常",
+    na: "N/A",
     onTime: "準時（相差少於 60 秒）",
     readings: (n) => `綜合 ${n} 個車站倒數`,
-    dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日／假期" },
+    dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日／假期", special: "特別時間表" },
     peak: "繁忙",
-    offTimetable: "特別車務：按到站倒數推算",
+    offTimetable: (u, d, mu, md) => `特別車務：按到站倒數推算 · 上行 ${u} 班 / 下行 ${d} 班 · 實測班距 上行 ${mu} 分 / 下行 ${md} 分`,
+    offTimetableNote: "時間表同實際車務唔吻合，列車位置只按港鐵到站倒數推算；車次、Run 編號及時間表延誤不適用",
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
@@ -182,15 +187,20 @@ const STRINGS = {
     attribution: "Track © OpenStreetMap contributors (ODbL) · basemap OpenFreeMap",
     source: "Source: MTR Next Train API (data.gov.hk)",
     engine: "Train positions are simulated from arrival times, not official MTR train locations",
-    lateTag: (sec) => `- ${sec}s`,
+    lateTag: (sec) => `+ ${sec}s`,
     lateLabel: "Behind timetable",
     lateSec: (sec) => `${sec} s`,
-    lateSource: { timetable: "behind its timetabled trip", run: "running slower than timetable", feed: "MTR boards ahead predict it slower", headway: "gap to the train ahead exceeds headway" },
+    lateSource: { timetable: "behind its timetabled trip", spacing: "gap to the train ahead is longer than the measured headway" },
+    gapTag: (sec) => `Gap +${sec}s`,
+    spacing: "Spacing",
+    spacingOk: "Normal",
+    na: "N/A",
     onTime: "On time (within 60 s)",
     readings: (n) => `fused from ${n} station countdowns`,
-    dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday/PH" },
+    dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday/PH", special: "Special timetable" },
     peak: "peak",
-    offTimetable: "Special service: placed from countdowns",
+    offTimetable: (u, d, mu, md) => `Special service: placed from countdowns · up ${u} / down ${d} trains · measured headway up ${mu} / down ${md} min`,
+    offTimetableNote: "The service does not match any timetable; trains are placed from MTR countdowns only. Trip, run and timetable delay do not apply",
     offPeak: "off-peak",
     matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
     tripId: (run, trip) => `Trip ${trip} (run ${run})`,
@@ -255,6 +265,7 @@ let timetables = null
 let tripHistory = new Map()
 let hopTimesKey = ""
 let offTimetableStreak = 0
+let onTimetableStreak = 0
 let tracker = null
 let feed = null
 let order = []
@@ -272,23 +283,35 @@ const t = () => STRINGS[state.lang]
 /* ------------------------------------------------------------------ data */
 
 async function boot() {
-  const [netJson, timetable, track, ...books] = await Promise.all([
+  const [netJson, timetable, track, manifest] = await Promise.all([
     fetchJson("data/tml-network.json"),
     fetchJson("data/tml-timetable.json"),
     fetchJson("data/tml-track.json").catch(() => null),
-    // The three working timetables. Without them the app falls back to the
-    // running-time model alone.
-    ...DAY_TYPES.map((day) => fetchJson(`data/tml-schedule-${day}.json`).catch(() => null)),
+    // Working timetables are listed in data/timetables/index.json; new ones
+    // are added there by tools/parse_timetables.py, no code change needed.
+    fetchJson("data/timetables/index.json").catch(() => ({ timetables: [] })),
   ])
   network = createNetwork(netJson)
   model = createModel(timetable, track)
-  timetables = createTimetables(Object.fromEntries(DAY_TYPES.map((day, i) => [day, books[i]])), model)
-  state.day = calendarDay(Date.now())
+  timetables = createTimetables({}, model)
+  // The calendar's timetable first, so the first trains appear quickly; the
+  // rest load in the background and become candidates when they arrive.
+  const entries = manifest.timetables ?? []
+  const today = calendarDay(Date.now())
+  const first = entries.find((e) => e.day === today && e.kind === "normal") ?? entries[0]
+  if (first) {
+    timetables.add(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
+    state.book = first.code
+  }
+  for (const e of entries) {
+    if (e === first) continue
+    fetchJson(`data/timetables/${e.file}`).then((data) => timetables.add(data)).catch(() => {})
+  }
   // Section labels and the fallback model use this period's timetable times.
-  if (timetables.books[state.day]) {
+  if (timetables.books[state.book]) {
     const tau = serviceSeconds(Date.now())
-    hopTimesKey = `${state.day}|${Math.floor(tau / 600)}`
-    model.setScheduleTimes(hopTimesAround(timetables.books[state.day], tau))
+    hopTimesKey = `${state.book}|${Math.floor(tau / 600)}`
+    model.setScheduleTimes(hopTimesAround(timetables.books[state.book], tau))
   }
   try {
     model.importLearned(JSON.parse(readPref(LEARN_KEY) ?? "null"))
@@ -406,39 +429,75 @@ function placeTrains(snapshot, now) {
   // Which timetable is actually running: the calendar's guess, unless the
   // boards clearly fit another one better (public holidays run Sunday's).
   const pick = timetables.pickDay(readings, now)
-  const mine = pick.scores[state.day]
+  const mine = pick.scores[state.book]
   const theirs = pick.day && pick.scores[pick.day]
-  if (theirs && pick.day !== state.day && theirs.n >= 10 && theirs.close - (mine?.close ?? 0) > 0.25) {
-    state.day = pick.day
+  if (theirs && pick.day !== state.book && theirs.n >= 10 && theirs.close - (mine?.close ?? 0) > 0.25) {
+    state.book = pick.day
     tripHistory = new Map()
   }
   state.dayScores = pick.scores
-  const book = timetables.books[state.day]
+  const book = timetables.books[state.book]
+  const measured = measuredHeadways(readings)
+  state.measured = measured
 
   let matched = new Map()
   let leftover = readings
+  let result = null
   if (book) {
     const tau = serviceSeconds(now)
-    const key = `${state.day}|${Math.floor(tau / 600)}`
+    result = matchReadings(book, readings, now, tripHistory)
+    // Does the running service match this timetable at all? A special
+    // timetable this app does not have, overnight service, or an incident
+    // timetable shows up as some of: readings that fit no trip, many trips
+    // far off their times, a measured headway unlike the timetable's, or
+    // the boards announcing special arrangements.
+    const fit = readings.length ? 1 - result.leftover.length / readings.length : 1
+    const delays = [...result.trips.values()].map((e) => Math.abs(e.delay))
+    const scattered = delays.length ? delays.filter((d) => d > 120).length / delays.length : 0
+    const headwayOff = ["UP", "DOWN"].some((dir) => {
+      const planned = headwayAt(book, dir, tau)
+      return planned && measured[dir] && Math.abs(measured[dir] - planned) / planned > 0.3
+    })
+    const notice = (snapshot.boards ?? []).some((b) => /special|特別|arrangement|安排/i.test(b.message ?? ""))
+    const signals = [scattered > 0.2, headwayOff, notice].filter(Boolean).length
+    const offNow = readings.length >= 20 && (fit < 0.5 || signals >= 2)
+    state.timetableSignals = { fit, scattered, headwayOff, notice }
+    if (offNow) {
+      offTimetableStreak += 1
+      onTimetableStreak = 0
+    } else {
+      onTimetableStreak += 1
+      offTimetableStreak = 0
+    }
+    // Two snapshots to leave the timetable, three to come back.
+    if (!state.offTimetable && offTimetableStreak >= 2) {
+      state.offTimetable = true
+      tracker.dropScheduled()
+    }
+    else if (state.offTimetable && onTimetableStreak >= 3) state.offTimetable = false
+  } else {
+    state.offTimetable = true
+  }
+
+  if (book && !state.offTimetable) {
+    const tau = serviceSeconds(now)
+    const key = `${state.book}|${Math.floor(tau / 600)}`
     if (key !== hopTimesKey) {
       hopTimesKey = key
       model.setScheduleTimes(hopTimesAround(book, tau))
     }
-    const result = matchReadings(book, readings, now, tripHistory)
-    // When most boards fit no timetabled trip (overnight service on a
-    // festival, a special arrangement, a timetable this app does not have),
-    // place every train from the boards alone rather than force a match.
-    const fit = readings.length ? 1 - result.leftover.length / readings.length : 1
-    offTimetableStreak = readings.length >= 20 && fit < 0.5 ? offTimetableStreak + 1 : 0
-    state.offTimetable = offTimetableStreak >= 2
-    if (!state.offTimetable) {
-      matched = result.trips
-      leftover = result.leftover
-      state.lineDelay = result.lineDelay
-      tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
-    } else {
-      tripHistory = new Map()
+    matched = result.trips
+    leftover = result.leftover
+    state.lineDelay = result.lineDelay
+    tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
+  } else {
+    // Countdown-only: no timetable times either; running times come from
+    // the base model plus what it has learned from the boards.
+    if (hopTimesKey !== "off") {
+      hopTimesKey = "off"
+      model.setScheduleTimes(null)
     }
+    tripHistory = new Map()
   }
 
   const fallback = leftover.length
@@ -455,7 +514,9 @@ function placeTrains(snapshot, now) {
   }
   state.matchedCount = matched.size
   state.fallbackCount = fallback.length
-  tracker.update({ matched, fallback, headwayOf: (dir, t0) => (book ? headwayAt(book, dir, serviceSeconds(t0)) : null) }, now)
+  // Fallback trains report spacing against the headway measured from the
+  // boards, never against a timetable.
+  tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
 }
 
 function setStatus(kind) {
@@ -516,10 +577,16 @@ function paintClock() {
           ? (offline ? s.offline : s.stale(age, retryIn))
           : s.updated(age)
   els.statusCounts.textContent = counts.join(" · ")
-  const book = timetables?.books[state.day]
+  const book = timetables?.books[state.book]
   if (state.offTimetable) {
-    els.period.textContent = s.offTimetable
+    let up = 0
+    let down = 0
+    for (const run of state.runs) run.dir === "UP" ? (up += 1) : (down += 1)
+    const m = state.measured ?? {}
+    const mins = (sec) => (sec ? Math.round((sec / 60) * 10) / 10 : "—")
+    els.period.textContent = s.offTimetable(up, down, mins(m.UP), mins(m.DOWN))
     els.period.dataset.peak = "0"
+    els.period.title = s.offTimetableNote
   } else if (book) {
     const tau = serviceSeconds(now)
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
@@ -529,7 +596,7 @@ function paintClock() {
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${s.dayType[state.day]} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      els.period.textContent = `${s.dayType[book.day] ?? s.dayType.special} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
@@ -815,16 +882,24 @@ function isLate(run) {
   return (run.late?.sec ?? 0) >= LATE_SHOW_SEC
 }
 
-// 0 on time, 1 late (red), 2 very late (red, flashing glow).
+// 0 on time, 1 late (red), 2 very late (red, flashing glow), 3 a fallback
+// train whose gap to the one in front is long (yellow; no timetable to be
+// late against).
 function lateLevel(run) {
   const sec = run.late?.sec ?? 0
+  if (run.kind === "model") return sec >= LATE_SHOW_SEC ? 3 : 0
   return sec >= LATE_ALARM_SEC ? 2 : sec >= LATE_SHOW_SEC ? 1 : 0
+}
+
+function lateText(run) {
+  if (!isLate(run)) return ""
+  return run.kind === "model" ? t().gapTag(run.late.sec) : t().lateTag(run.late.sec)
 }
 
 // A small red tag above a train running 60 s or more behind the timetable.
 function paintLateTag(node, run) {
   const tag = node.querySelector(".dg-late")
-  const text = isLate(run) ? t().lateTag(run.late.sec) : ""
+  const text = lateText(run)
   if (tag.dataset.text === text) return
   tag.dataset.text = text
   tag.replaceChildren()
@@ -1061,7 +1136,7 @@ function installMapLayers() {
     type: "line",
     source: "tml-cars",
     paint: {
-      "line-color": ["match", ["get", "level"], 2, MAP_COLORS.alarm, 1, MAP_COLORS.late, ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#8a9099"]],
+      "line-color": ["match", ["get", "level"], 2, MAP_COLORS.alarm, 1, MAP_COLORS.late, 3, MAP_COLORS.gap, ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#8a9099"]],
       "line-width": ["match", ["get", "level"], 0, 0.8, 1.6],
     },
   })
@@ -1098,7 +1173,11 @@ function installMapLayers() {
       "text-allow-overlap": true,
       "text-ignore-placement": true,
     },
-    paint: { "text-color": "#ffffff", "text-halo-color": MAP_COLORS.late, "text-halo-width": 2.2 },
+    paint: {
+      "text-color": ["match", ["get", "level"], 3, "#1d1600", "#ffffff"],
+      "text-halo-color": ["match", ["get", "level"], 3, MAP_COLORS.gap, MAP_COLORS.late],
+      "text-halo-width": 2.2,
+    },
   })
 
   for (const layer of ["tml-cars"]) {
@@ -1232,7 +1311,7 @@ function paintMap() {
       level: lateLevel(run),
       delay: run.delay ? 1 : 0,
       selected: run.id === state.selected ? 1 : 0,
-      lateText: isLate(run) ? t().lateTag(run.late.sec) : "",
+      lateText: lateText(run),
       glow: shape.glow,
     }
     points.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: shape.middle } })
@@ -1262,6 +1341,7 @@ function flashMap(stamp) {
     "match", ["get", "level"],
     2, on ? MAP_COLORS.alarm : "#8a9099",
     1, MAP_COLORS.late,
+    3, MAP_COLORS.gap,
     ["case", ["==", ["get", "delay"], 1], MAP_COLORS.warn, "#8a9099"],
   ])
 }
@@ -1410,14 +1490,19 @@ function paintTrainSheet(first = false) {
     `<dl class="kv">` +
     `<dt>${s.position}</dt><dd>${positionText(run)}</dd>` +
     `<dt>${s.speed}</dt><dd>${Math.round(run.pos.speedKmh)} km/h</dd>` +
-    `<dt>${s.lateLabel}</dt><dd>${isLate(run)
-      ? `<span class="badge late">${s.lateTag(run.late.sec)}</span> ${s.lateSource[run.late.source]}`
-      : s.onTime}</dd>` +
+    (run.kind === "sched"
+      ? `<dt>${s.lateLabel}</dt><dd>${isLate(run)
+        ? `<span class="badge late">${s.lateTag(run.late.sec)}</span> ${s.lateSource[run.late.source]}`
+        : s.onTime}</dd>`
+      : `<dt>${s.lateLabel}</dt><dd>${s.na}</dd>` +
+        `<dt>${s.spacing}</dt><dd>${isLate(run)
+          ? `<span class="badge gap">${s.gapTag(run.late.sec)}</span> ${s.lateSource.spacing}`
+          : s.spacingOk}</dd>`) +
     `<dt>${s.platform}</dt><dd>${escapeHtml(run.plat || "—")}</dd>` +
     `</dl>` +
     `<p class="fine">${run.kind === "sched"
       ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`
-      : s.basis.model(run.readings)}</p>` +
+      : `${s.tripId(s.na, s.na)} · ${s.basis.model(run.readings)}`}</p>` +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
   else els.sheetBody.innerHTML = html

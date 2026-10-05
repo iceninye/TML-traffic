@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v13"
+const CACHE = "tml-traffic-shell-v14"
 const SHELL = [
   "./",
   "index.html",
@@ -20,9 +20,10 @@ const SHELL = [
   "data/tml-network.json",
   "data/tml-timetable.json",
   "data/tml-track.json",
-  "data/tml-schedule-weekday.json",
-  "data/tml-schedule-saturday.json",
-  "data/tml-schedule-sunday.json",
+  "data/timetables/index.json",
+  "data/timetables/TML1100B.json",
+  "data/timetables/TML6090A.json",
+  "data/timetables/TML7090.json",
 ]
 
 self.addEventListener("install", (event) => {

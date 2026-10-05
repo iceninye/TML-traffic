@@ -1,0 +1,26 @@
+{
+ "note": "Working timetables the app can match against. Add one with tools/parse_timetables.py (validates, then registers here).",
+ "timetables": [
+  {
+   "code": "TML1100B",
+   "file": "TML1100B.json",
+   "day": "weekday",
+   "kind": "normal",
+   "effective": "2026-09-14"
+  },
+  {
+   "code": "TML6090A",
+   "file": "TML6090A.json",
+   "day": "saturday",
+   "kind": "normal",
+   "effective": "2026-05-02"
+  },
+  {
+   "code": "TML7090",
+   "file": "TML7090.json",
+   "day": "sunday",
+   "kind": "normal",
+   "effective": "2025-03-23"
+  }
+ ]
+}

@@ -3,9 +3,13 @@
 files the app loads.
 
     pip install pdfplumber
-    python3 tools/parse_timetables.py WEEKDAY.pdf SATURDAY.pdf SUNDAY.pdf
+    python3 tools/parse_timetables.py TIMETABLE.pdf [TIMETABLE.pdf ...]
 
-Writes data/tml-schedule-weekday.json, -saturday.json, -sunday.json.
+For each PDF: parses it to data/timetables/<CODE>.json, runs
+tools/validate_timetable.py on the result, and only if it passes adds or
+updates its entry in data/timetables/index.json (the list the app loads).
+The day type comes from the timetable code (MTR format, digit IV):
+1/5 weekday, 6 saturday, 7 sunday/PH, anything else "special".
 
 Each PDF has:
   A. per-direction run and dwell times for four periods (AM peak, non-peak,
@@ -217,35 +221,72 @@ def parse_section_h(pdf):
     return out
 
 
-def summarise(name, trips):
-    by_dir = {"UP": 0, "DOWN": 0}
-    for t in trips:
-        by_dir[t["dir"]] += 1
-    first = min(t["stops"][0][2] or t["stops"][0][1] for t in trips)
-    last = max(t["stops"][-1][1] or t["stops"][-1][2] for t in trips)
-    print(f"{name}: {len(trips)} trips (up {by_dir['UP']}, down {by_dir['DOWN']}) "
-          f"{first // 3600:02d}:{first % 3600 // 60:02d} -> {last // 3600 % 24:02d}:{last % 3600 // 60:02d}")
+def iso_date(text):
+    from datetime import datetime
+    try:
+        return datetime.strptime(text, "%d %B %Y").date().isoformat()
+    except ValueError:
+        return text
+
+
+DAY_BY_TYPE = {"1": "weekday", "5": "weekday", "6": "saturday", "7": "sunday"}
 
 
 def main(paths):
-    for path, day in zip(paths, ["weekday", "saturday", "sunday"]):
+    sys.path.insert(0, HERE)
+    from validate_timetable import validate
+
+    folder = os.path.join(DATA, "timetables")
+    os.makedirs(folder, exist_ok=True)
+    index_path = os.path.join(folder, "index.json")
+    index = {"timetables": []}
+    if os.path.exists(index_path):
+        with open(index_path, encoding="utf8") as fh:
+            index = json.load(fh)
+    failed = False
+    for path in paths:
         pdf = pdfplumber.open(path)
-        code = re.search(r"\((TML\w+)\)", pdf.pages[0].extract_text() or "")
+        first = pdf.pages[0].extract_text() or ""
+        code_m = re.search(r"\((TML\w+)\)", first)
+        if not code_m:
+            print(f"{path}: no timetable code on page 1, skipped")
+            failed = True
+            continue
+        code = code_m.group(1)
+        type_digit = code[3] if len(code) > 3 else ""
+        day = DAY_BY_TYPE.get(type_digit, "special")
+        eff = re.search(r"Effective:\s*(\d{1,2} \w+ \d{4})", first)
         trips = parse_section_h(pdf)
         out = {
-            "timetable": code.group(1) if code else None,
+            "timetable": code,
             "day": day,
             "sectionA": parse_section_a(pdf),
             "headways": parse_section_c(pdf),
             "trips": trips,
         }
-        with open(os.path.join(DATA, f"tml-schedule-{day}.json"), "w", encoding="utf8") as fh:
+        errors, notes = validate(out)
+        if errors:
+            print(f"{code}: FAIL, not registered")
+            for e in errors[:10]:
+                print(f"  ✗ {e}")
+            failed = True
+            continue
+        with open(os.path.join(folder, f"{code}.json"), "w", encoding="utf8") as fh:
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
             fh.write("\n")
-        summarise(f"{day} {out['timetable']}", trips)
+        entry = {"code": code, "file": f"{code}.json", "day": day,
+                 "kind": "normal" if day != "special" else "special",
+                 "effective": iso_date(eff.group(1)) if eff else None}
+        index["timetables"] = [e for e in index["timetables"] if e["code"] != code] + [entry]
+        print(f"{code}: PASS, registered as {day}")
+        for n in notes:
+            print(f"  · {n}")
+    with open(index_path, "w", encoding="utf8") as fh:
+        json.dump(index, fh, ensure_ascii=False, indent=1)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) < 2:
         raise SystemExit(__doc__)
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

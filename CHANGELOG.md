@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.5.2 — 2026-10-06
+## v0.5.2 — 2026-10-06 (`fe3fd25`)
 - Timetable parser: footnotes resolved per page (they were attached to the wrong trips); empty (non-passenger) running flagged per stop and excluded from matching; depot-to-platform times kept; arrivals derived from section A run times; section A period names, ranges and summary rows (turnaround, round trip, trains used); section F first/last trains parsed.
 - Validator checks section F (1,404/1,404 match in all three timetables) and trains in use.
 - Header shows "尾班車時段" while the last trains are still running.

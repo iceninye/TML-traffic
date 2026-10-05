@@ -109,6 +109,14 @@ button {
   background: var(--tml);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--tml) 26%, transparent);
   flex: none;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease, background 0.25s ease;
+}
+/* Hidden feature active: a soft glow while Run numbers are shown. */
+.brand-dot[data-on="1"] {
+  background: var(--tml-lite);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tml-lite) 35%, transparent),
+    0 0 12px 3px color-mix(in srgb, var(--tml-lite) 70%, transparent);
 }
 
 .brand-text { min-width: 0; }
@@ -419,6 +427,18 @@ svg.diagram {
 .dg-train { cursor: pointer; outline: none; }
 .dg-train-body { stroke: #f7fbff; stroke-width: 2; }
 .dg-train-arrow { fill: #fff; pointer-events: none; }
+.dg-train-run {
+  display: none;
+  font-size: 9.5px;
+  font-weight: 800;
+  fill: #fff;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.dg-train[data-reveal="1"] .dg-train-arrow { display: none; }
+.dg-train[data-reveal="1"] .dg-train-run { display: inline; }
 .dg-train-halo { fill: transparent; }
 .dg-train-glow { opacity: 0.85; pointer-events: none; }
 .dg-train[data-dir="UP"] .dg-train-glow { fill: var(--up); }

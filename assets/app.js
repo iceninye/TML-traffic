@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.5.0", commit: "fb3568d" }
+const BUILD = { version: "0.5.1", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -218,6 +218,7 @@ const STRINGS = {
 }
 
 const els = {
+  brandDot: document.querySelector(".brand-dot"),
   title: document.getElementById("title"),
   sub: document.getElementById("sub"),
   clock: document.getElementById("clock"),
@@ -253,6 +254,7 @@ const state = {
   stationCount: 0,
   status: "loading",
   selected: null,
+  runsUntil: 0,
   follow: false,
   sheetKind: null,
 }
@@ -846,6 +848,7 @@ function syncTrains() {
           make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
           make("circle", { r: TRAIN_R, class: "dg-train-body", fill: COLORS[dir] }),
           make("path", { d: dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
+          make("text", { class: "dg-train-run" }),
           make("circle", { r: 15, fill: "transparent" }),
           make("g", { class: "dg-late" }),
         )
@@ -865,6 +868,15 @@ function syncTrains() {
       node.dataset.selected = state.selected === run.id ? "1" : "0"
       node.dataset.phase = run.pos.phase
       node.dataset.level = String(lateLevel(run))
+      // Hidden feature: tapping the brand dot shows each train's Run number
+      // in place of its arrow for a few seconds (N/A trains show a dash).
+      const reveal = Date.now() < state.runsUntil
+      node.dataset.reveal = reveal ? "1" : "0"
+      if (reveal) {
+        const label = run.kind === "sched" ? String(run.trip.run) : "–"
+        const text = node.querySelector(".dg-train-run")
+        if (text.textContent !== label) text.textContent = label
+      }
       paintLateTag(node, run)
       node.setAttribute("aria-label", `${network.name(run.dest, state.lang)} · ${positionText(run)}`)
     }
@@ -1519,7 +1531,20 @@ function setFollow(on) {
 
 /* -------------------------------------------------------------- controls */
 
+// How long the brand-dot reveal shows Run numbers.
+const RUN_REVEAL_MS = 15_000
+let revealTimer = 0
+
 function wireControls() {
+  els.brandDot.addEventListener("click", () => {
+    state.runsUntil = Date.now() + RUN_REVEAL_MS
+    els.brandDot.dataset.on = "1"
+    clearTimeout(revealTimer)
+    revealTimer = setTimeout(() => {
+      els.brandDot.dataset.on = "0"
+    }, RUN_REVEAL_MS)
+    if (state.view === "diagram") syncTrains()
+  })
   els.viewSeg.addEventListener("click", (event) => {
     const button = event.target.closest("button")
     if (button) showView(button.dataset.view)

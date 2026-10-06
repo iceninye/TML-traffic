@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.6.3 — 2026-10-06 (`dev`)
+## v0.6.3 — 2026-10-06 (`b3d0e2a`)
 - Station countdowns: a reading's minutes now count down from its due time between feed reads (never upwards). Before, a board kept after a failed read (up to 3 min) showed the same "3" for its whole life; now it falls to "即將" and then leaves like any other.
 - Duty Sheet tooltip: states that stop times are the official timetable's with duty numbers added, and only trips the timetable lacks are modelled (it still said every mid-station time was modelled).
 

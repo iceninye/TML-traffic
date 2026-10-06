@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.6.2 — 2026-10-06 (`dev`)
+## v0.6.2 — 2026-10-06 (`9d70e3e`)
 Fixes from a second audit of v0.5.4 to v0.6.1; no change to train matching or positions.
 - Station card: it was a snapshot taken when opened, so its minutes and "即將" never moved until it was closed and reopened. It now follows the feed and the per-second ageing like the diagram rows.
 - Service worker: files are revalidated with the server on every load (`cache: "no-cache"`). GitHub Pages lets browsers reuse a file for 10 minutes, so right after a release a returning visitor could get the new `app.js` with an old `lib/tml-timetable.js` and fail to start on a missing export. Shell cache renamed `v21`.

@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.6.0", commit: "4427014" }
+const BUILD = { version: "0.6.1", commit: "fb98092" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -99,6 +99,11 @@ const STRINGS = {
     running: (a, b) => `行駛中 ${a} → ${b}`,
     dwelling: (a) => `${a} 停站中`,
     waiting: (a) => `${a} 即將開出`,
+    waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
+    duty: "更份",
+    relief: (place, duty) => `（${place}換 ${duty}）`,
+    schedDep: "原定開出",
+    expectedDep: (clock) => `（預計 ${clock}）`,
     arrived: (a) => `已抵達 ${a}`,
     dest: "目的地",
     nextStops: "前方各站（推算）",
@@ -176,6 +181,11 @@ const STRINGS = {
     running: (a, b) => `Running ${a} → ${b}`,
     dwelling: (a) => `Stopped at ${a}`,
     waiting: (a) => `About to leave ${a}`,
+    waitingIn: (a, m) => `Standing at ${a}, leaves in about ${m} min`,
+    duty: "Duty",
+    relief: (place, duty) => `(relief at ${place}: ${duty})`,
+    schedDep: "Scheduled departure",
+    expectedDep: (clock) => ` (expected ${clock})`,
     arrived: (a) => `Arrived at ${a}`,
     dest: "Destination",
     nextStops: "Next stops (estimated)",
@@ -356,6 +366,8 @@ async function boot() {
   requestAnimationFrame(loop)
   showView(state.view).catch(() => {})
   setInterval(paintClock, 250)
+  // Countdowns age between feed reads: a "now" reading clears once its train leaves.
+  setInterval(render, 1000)
 }
 
 function makeFeed() {
@@ -802,8 +814,21 @@ function approxWidth(text, perChar) {
   return [...text].length * perChar
 }
 
-function boardTrains(board, dir) {
-  return (board?.trains ?? []).filter((train) => (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
+// A 0-minute reading ("now") only says the train is due; the board is read every
+// ~20 s and kept up to 3 min when a read fails, so it can outlive the train.
+// Drop it once the train has left, by the same clock the map uses: an arrival
+// reading leaves after the stop (ARRIVAL_STOP_MS, as lib/mtr-estimate.js), a
+// published departure leaves at its time.
+const ARRIVAL_STOP_MS = 30_000
+function hasLeft(train, now) {
+  if (train.ttnt > 0 || !Number.isFinite(train.dueAt)) return false
+  return now > train.dueAt + (train.timeType === "D" ? 0 : ARRIVAL_STOP_MS)
+}
+
+function boardTrains(board, dir, now = Date.now()) {
+  return (board?.trains ?? []).filter(
+    (train) => !hasLeft(train, now) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)),
+  )
 }
 
 function render() {
@@ -1509,8 +1534,48 @@ function positionText(run) {
   const n = (code) => network.name(code, state.lang)
   if (pos.phase === "run") return s.running(n(pos.from), n(pos.to))
   if (pos.phase === "dwell") return s.dwelling(n(pos.from))
-  if (pos.phase === "wait") return s.waiting(n(pos.from))
+  if (pos.phase === "wait") {
+    // Terminus layover: the train is shown up to 5 min before it leaves.
+    const mins = Math.round(pos.secsToNext / 60)
+    return mins >= 2 ? s.waitingIn(n(pos.from), mins) : s.waiting(n(pos.from))
+  }
   return s.arrived(n(pos.from))
+}
+
+function secClock(sec) {
+  const t = ((Math.round(sec) % 86400) + 86400) % 86400
+  const two = (n) => String(n).padStart(2, "0")
+  return `${two(Math.floor(t / 3600))}:${two(Math.floor((t % 3600) / 60))}:${two(t % 60)}`
+}
+
+// Timetabled departure of a train that starts at a terminus, to the second
+// (Duty Sheet times are exact too). Shows the expected time when the train is
+// running a minute or more off it.
+function scheduledDeparture(run) {
+  const s = t()
+  if (run.kind !== "sched" || (run.trip.origin !== "TUM" && run.trip.origin !== "WKS")) return ""
+  const dep = run.trip.stops[0]?.dep
+  if (!Number.isFinite(dep)) return ""
+  const off = Math.abs(run.delayDisp) >= 60 ? s.expectedDep(secClock(dep + run.delayDisp)) : ""
+  return `<dt>${s.schedDep}</dt><dd>${network.name(run.trip.origin, state.lang)} ${secClock(dep)}${off}</dd>`
+}
+
+// Duty number (更份) driving the train now, when the loaded timetable came
+// from a Duty Sheet: duties are [duty, from station] pairs along the trip.
+// A relief still ahead is named after it.
+function dutyRow(run) {
+  const duties = run.kind === "sched" ? run.trip.duties : null
+  if (!duties?.length) return ""
+  const codes = run.trip.stops.map((st) => st.code)
+  const reached = codes.indexOf(run.pos?.from)
+  let current = 0
+  duties.forEach(([, code], i) => {
+    if (reached >= 0 && codes.indexOf(code) <= reached) current = i
+  })
+  const next = duties[current + 1]
+  const s = t()
+  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], state.lang), escapeHtml(next[0]))}</span>` : ""
+  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}</dd>`
 }
 
 function openTrain(runId) {
@@ -1557,6 +1622,8 @@ function paintTrainSheet(first = false) {
           ? `<span class="badge gap">${s.gapTag(run.late.sec)}</span> ${s.lateSource.spacing}`
           : s.spacingOk}</dd>`) +
     `<dt>${s.platform}</dt><dd>${escapeHtml(run.plat || "—")}</dd>` +
+    scheduledDeparture(run) +
+    dutyRow(run) +
     `</dl>` +
     `<p class="fine">${run.kind === "sched"
       ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`

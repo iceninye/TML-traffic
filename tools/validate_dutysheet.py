@@ -21,6 +21,7 @@ Checks:
 """
 
 import json
+import re
 import os
 import sys
 from datetime import date
@@ -47,6 +48,7 @@ def validate(data, base=None, base_entry=None, today=None):
     if src.get("unparsed"):
         errors.append(f"{src['unparsed']} PDF rows were not understood")
 
+    no_duty = []
     for n, t in enumerate(trips):
         label = f"trip {n} (run {t.get('run')} {hm(dep(t))})"
         codes = [s[0] for s in t["stops"]]
@@ -63,7 +65,15 @@ def validate(data, base=None, base_entry=None, today=None):
             errors.append(f"{label}: times go backwards")
         if len(codes) < 2:
             errors.append(f"{label}: fewer than two stops")
+        duties = t.get("duties")
+        if duties is None:
+            no_duty.append(label)
+        elif not duties or any(len(d) != 2 or not re.fullmatch(r"\d{7}", str(d[0])) or d[1] not in codes for d in duties):
+            errors.append(f"{label}: malformed duty numbers {duties}")
 
+    notes.append(f"duty numbers on {len(trips) - len(no_duty)}/{len(trips)} trips")
+    if len(no_duty) > 0.02 * len(trips):
+        errors.append(f"{len(no_duty)} trips have no duty number, first: {no_duty[0]}")
     seen = {}
     for t in trips:
         key = (t["run"], t["dir"], dep(t))
@@ -111,7 +121,10 @@ def validate(data, base=None, base_entry=None, today=None):
             first = t["stops"][0]
             if first[0] in ("TUM", "WKS") and len(first) < 4 and first[2] is not None and len(t["stops"]) > 1:
                 base_deps[(t["run"], t["dir"], dep(t))] = t
-        mine = set(seen)
+        # Terminal departures only, as in the base set; pull-outs and other
+        # trips come from the base itself.
+        mine = {(t["run"], t["dir"], dep(t)) for t in trips
+                if t["stops"][0][0] in ("TUM", "WKS") and len(t["stops"][0]) < 4 and t["stops"][0][2] is not None and len(t["stops"]) > 1}
         same = len(mine & set(base_deps))
         share = same / len(base_deps) if base_deps else 0
         new, gone = len(mine - set(base_deps)), len(set(base_deps) - mine)
@@ -124,9 +137,9 @@ def validate(data, base=None, base_entry=None, today=None):
             notes.append(f"trip count {len(trips)} differs from the base's {len(base['trips'])} by over 15%")
         identical = share >= 0.99 and new == 0
         eff, base_eff = data.get("effective") or "", base_entry.get("effective") or ""
-        primary = not identical and eff >= base_eff
+        primary = eff >= base_eff
         if identical:
-            notes.append("identical to the base timetable (whose times are exact): the app keeps the base as primary")
+            notes.append("same trips as the base timetable (whose times are exact); still primary, for the duty numbers")
         elif eff < base_eff:
             notes.append(f"older than its base ({eff} < {base_eff}): not primary")
 

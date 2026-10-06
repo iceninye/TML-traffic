@@ -3,6 +3,14 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.5.4 — 2026-10-06 (`COMMIT`)
+Reliability fixes from a code audit; no change to train matching or positions.
+- Feed: each station request now times out after 10 s (a stalled connection used to hold the refresh open indefinitely, freezing updates until reload). After 8 consecutive failures the feed pauses requests for 45 s, as documented; before, the counter was reset on every pass so the pause never happened.
+- Language switch: a refresh already in flight on the old feed no longer overwrites the new feed's result with an empty snapshot; a fresh refresh runs right after it.
+- Pause: a refresh that finishes after Pause was pressed no longer turns the status back to "live".
+- Map: a failed load (timeout, no WebGL) is torn down so the next attempt starts clean instead of reusing a map with no layers; concurrent calls share one load.
+- Saved running-time calibration: entries with a negative count are ignored, and an oversized count now scales its sum with it instead of inflating the correction.
+
 ## v0.5.3 — 2026-10-06 (`760d64a`)
 - Special timetables converted and registered: TML110SB (2026 Mid-Autumn, weekday), TML709CA/CB/GA/GC/UF (Sunday events), TML906V/906Y (typhoon, non-peak/peak). Manifest `kind` is now read from the PDF ("Special" on page 1); the validator no longer demands a full-day window for special timetables (typhoon peak pattern runs 09:00-21:00).
 - The app loads normal timetables first and fetches special ones only when the normal ones fit the boards badly (< 70% of near readings within 40 s); `pickDay` then switches to a special timetable that fits clearly better, otherwise countdown-only mode as before. Header shows "特別時間表" for a special one.

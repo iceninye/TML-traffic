@@ -18,7 +18,7 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
-import { calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, measuredHeadways, serviceSeconds } from "../lib/tml-timetable.js"
+import { calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
 
 const LOCALE_KEY = "tml-traffic-locale"
 const VIEW_KEY = "tml-traffic-view"
@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.5.4", commit: "5118645" }
+const BUILD = { version: "0.6.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -129,6 +129,8 @@ const STRINGS = {
     offTimetableNote: "時間表同實際車務唔吻合，列車位置只按港鐵到站倒數推算；車次、Run 編號及時間表延誤不適用",
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
+    dutySource: (code, date) => `班次來源：Duty Sheet ${code}（${date} 起）；開出時間準確，中途各站按時間表模型推算`,
+    dutyTag: "Duty Sheet",
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
@@ -204,6 +206,8 @@ const STRINGS = {
     offTimetableNote: "The service does not match any timetable; trains are placed from MTR countdowns only. Trip, run and timetable delay do not apply",
     offPeak: "off-peak",
     matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
+    dutySource: (code, date) => `Trips from Duty Sheet ${code} (effective ${date}): departures are exact, stops in between are modelled from the timetable`,
+    dutyTag: "Duty Sheet",
     tripId: (run, trip) => `Trip ${trip} (run ${run})`,
     basis: { sched: (n) => `Timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
     band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
@@ -312,9 +316,9 @@ async function boot() {
   timetables = createTimetables({}, model)
   // The calendar's timetable first, so the first trains appear quickly; the
   // rest load in the background and become candidates when they arrive.
-  const entries = manifest.timetables ?? []
+  const entries = (manifest.timetables ?? []).filter((e) => e.source !== "dutysheet" || e.primary)
   const today = calendarDay(Date.now())
-  const first = entries.find((e) => e.day === today && e.kind === "normal") ?? entries[0]
+  const first = pickFirstEntry(entries, today, serviceDate(Date.now()))
   if (first) {
     timetables.add(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
     state.book = first.code
@@ -623,9 +627,10 @@ function paintClock() {
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      const source = book.source === "dutysheet" ? ` · ${s.dutyTag}` : ""
+      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}${source}`
       els.period.dataset.peak = peak ? "1" : "0"
-      els.period.title = s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
+      els.period.title = (book.source === "dutysheet" ? `${s.dutySource(book.dutysheet, book.effective)}\n` : "") + s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
   }
 }

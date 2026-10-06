@@ -74,6 +74,22 @@ App 會自動讀清單，唔使改程式。
 正常班先載入；只有當正常班同月台讀數唔夾（夾度 < 70%）先會載入特別班逐份試，夾得明顯好過（高 25% 以上）就轉用，
 全部都唔夾就轉去「只用倒數」模式。檔案格式見 `tools/parse_timetables.py` 開頭說明同 `docs/ALGORITHM.md` §3e。
 
+### 用 Duty Sheet 更新（時間表 PDF 未出時）
+
+營運端拎到最新 Duty Sheet（司機更表）但官方時間表 PDF 未出時：
+
+```bash
+python3 tools/parse_dutysheet.py DutySheet.pdf            # 自動揀同日類型、日期最近嘅時間表做底
+python3 tools/parse_dutysheet.py DutySheet.pdf --dry-run  # 只檢查，唔寫檔
+```
+
+Duty Sheet 只有每班車嘅 Run、總站開出時間、錦上路／大圍接班時間同到站分鐘，**冇逐站時間、冇車次號**。
+所以解析器用底表最近嘅班次重建中間各站（誤差中位數約 10 秒、P90 約 20–50 秒），開出時間準確。
+通過 `tools/validate_dutysheet.py` 先寫 `data/timetables/DS<代號>.json` 同登記；輸出只有 Run、方向同時間，
+冇更表編號、當值、用膳等人手資料。如果同底表一模一樣（底表時間更準），就唔寫檔。
+App 只會優先用「生效日已到、比底表新而且有差異」嘅 Duty Sheet（`index.json` 入面 `primary: true`），畫面會標示「Duty Sheet」。
+詳見 `docs/DUTYSHEET.md`。
+
 ## 重建資料
 
 ```bash

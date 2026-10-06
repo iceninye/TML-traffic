@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.6.1", commit: "fb98092" }
+const BUILD = { version: "0.6.2", commit: "9d70e3e" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -273,6 +273,7 @@ const state = {
   runsUntil: 0,
   follow: false,
   sheetKind: null,
+  station: null,
 }
 
 let network = null
@@ -868,6 +869,7 @@ function render() {
   } else {
     els.alert.dataset.show = "0"
   }
+  paintStationSheet()
   paintClock()
 }
 
@@ -1478,6 +1480,7 @@ function closeSheet() {
   els.sheetBackdrop.dataset.open = "0"
   state.sheetKind = null
   state.selected = null
+  state.station = null
   setFollow(false)
 }
 
@@ -1498,10 +1501,13 @@ function trainRow(train) {
     `<span class="meta">${meta}</span></div>`
 }
 
-function openStation(code) {
+// The station card is rebuilt from the live boards, so it follows the feed and
+// the per-second "now" ageing like the diagram does; the DOM is only touched
+// when the card's content changes.
+let stationHtmlShown = ""
+
+function stationSheetHtml(code) {
   const s = t()
-  state.selected = null
-  setFollow(false)
   const board = (state.data?.boards ?? []).find((item) => item.station === code)
   const name = network.name(code, state.lang)
   const blocks = []
@@ -1520,12 +1526,27 @@ function openStation(code) {
   }
   const notice = board?.message ? `<p class="sub"><b>${s.notice}</b> ${escapeHtml(board.message)}</p>` : ""
   const lines = (INTERCHANGE[code] ?? []).map(([line, color]) => `<span class="xfer" style="background:${color}">${line}</span>`).join("")
-  openSheet(
+  return (
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
     `<h2>${name} ${lines}</h2><div class="sub">${code} · TML · ${model.km(code).toFixed(2)} km${board ? "" : ` · ${s.noTrains}`}</div>` +
-    notice + blocks.join(""),
-    "station",
+    notice + blocks.join("")
   )
+}
+
+function openStation(code) {
+  state.selected = null
+  state.station = code
+  setFollow(false)
+  stationHtmlShown = stationSheetHtml(code)
+  openSheet(stationHtmlShown, "station")
+}
+
+function paintStationSheet() {
+  if (state.sheetKind !== "station" || !state.station) return
+  const html = stationSheetHtml(state.station)
+  if (html === stationHtmlShown) return
+  stationHtmlShown = html
+  els.sheetBody.innerHTML = html
 }
 
 function positionText(run) {

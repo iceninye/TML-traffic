@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v20"
+const CACHE = "tml-traffic-shell-v21"
 const SHELL = [
   "./",
   "index.html",
@@ -45,8 +45,11 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+  // Revalidate against the server every time (a cheap conditional GET): GitHub
+  // Pages lets browsers reuse a file for 10 minutes, and after a release that
+  // could pair a new app.js with an old lib/*.js whose exports it imports.
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: "no-cache" })
       .then((response) => {
         if (response.ok) {
           const copy = response.clone()

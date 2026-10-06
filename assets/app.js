@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.6.2", commit: "9d70e3e" }
+const BUILD = { version: "0.6.3", commit: "b3d0e2a" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -134,7 +134,7 @@ const STRINGS = {
     offTimetableNote: "時間表同實際車務唔吻合，列車位置只按港鐵到站倒數推算；車次、Run 編號及時間表延誤不適用",
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
-    dutySource: (code, date) => `班次來源：Duty Sheet ${code}（${date} 起）；開出時間準確，中途各站按時間表模型推算`,
+    dutySource: (code, date) => `班次來源：Duty Sheet ${code}（${date} 起）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
     dutyTag: "Duty Sheet",
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
@@ -216,7 +216,7 @@ const STRINGS = {
     offTimetableNote: "The service does not match any timetable; trains are placed from MTR countdowns only. Trip, run and timetable delay do not apply",
     offPeak: "off-peak",
     matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
-    dutySource: (code, date) => `Trips from Duty Sheet ${code} (effective ${date}): departures are exact, stops in between are modelled from the timetable`,
+    dutySource: (code, date) => `Trips from Duty Sheet ${code} (effective ${date}): stop times are the official timetable's, with duty numbers added; only trips the timetable lacks are modelled`,
     dutyTag: "Duty Sheet",
     tripId: (run, trip) => `Trip ${trip} (run ${run})`,
     basis: { sched: (n) => `Timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
@@ -826,10 +826,19 @@ function hasLeft(train, now) {
   return now > train.dueAt + (train.timeType === "D" ? 0 : ARRIVAL_STOP_MS)
 }
 
+// A reading's minutes are those of the moment it was read. Age them to now from
+// the due clock (never upwards), so a board kept after a failed read counts
+// down instead of freezing, and reaches "now" and then leaves on time.
+function agedTrain(train, now) {
+  if (!(train.ttnt > 0) || !Number.isFinite(train.dueAt)) return train
+  const left = Math.max(0, Math.ceil((train.dueAt - now) / 60_000))
+  return left < train.ttnt ? { ...train, ttnt: left } : train
+}
+
 function boardTrains(board, dir, now = Date.now()) {
-  return (board?.trains ?? []).filter(
-    (train) => !hasLeft(train, now) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)),
-  )
+  return (board?.trains ?? [])
+    .map((train) => agedTrain(train, now))
+    .filter((train) => !hasLeft(train, now) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
 }
 
 function render() {

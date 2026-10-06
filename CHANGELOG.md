@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.6.0 — 2026-10-06
+## v0.6.0 — 2026-10-06 (`4427014`)
 Duty Sheet as a schedule source, for when the official working timetable is late.
 - `tools/parse_dutysheet.py` reads a Duty Sheet PDF (run, terminal departure, KSR/TAW relief, arrival), rebuilds the stops between from the nearest trip of a base timetable and writes `data/timetables/DS<code>.json` only after `tools/validate_dutysheet.py` passes. Output holds run, direction and times only: no duty numbers or crew details.
 - On the three sample sheets (6091, 7091, 1101) the parser reproduces every terminal departure of the matching timetable (401, 360, 460 trips, 0 new, 0 missing). Rebuilt stop times against the real ones: median 3-10 s, P90 15-47 s.

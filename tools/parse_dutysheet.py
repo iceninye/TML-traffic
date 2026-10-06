@@ -22,7 +22,7 @@ So the parser:
      data/timetables/DS<code>.json and registers it in data/timetables/index.json
 
 The output holds run, direction, times and the duty numbers (更份, 7 digits:
-sheet code + sequence) that drive each trip, in order of relief at KSR/TAW.
+sheet code + sequence) driving each trip, as [duty, from station] pairs.
 Nothing else about the crew (book on/off, meal breaks, remarks) is written.
 
 Flags in the relief column: N = empty train (no passengers) to the
@@ -164,7 +164,9 @@ def parse_pdf(path):
             t += off
             leg = {"duty": duty, "run": int(run[0]), "place": place[-1].group(1), "t": t,
                    "dm": place_words[0].startswith("DM"),
-                   "flag": flag, "relPlace": rel_place}
+                   "flag": flag, "relPlace": rel_place,
+                   # Only to tell driving from riding; never written out.
+                   "remark": " ".join(texts[pi + 1:ri] if ri else texts[pi + 1:])}
             if rel_t:
                 r = secs(*rel_t.groups()) + off
                 if r < t - 6 * 3600:
@@ -206,20 +208,17 @@ def trips_from_legs(legs):
                 continue
             seen.add(key)
             anchors, cur = [], leg
-            duties = [leg["duty"]]
             while cur["relPlace"][:3] in ("KSR", "TAW"):
                 nxt = next((n for n in ls if n["place"] == cur["relPlace"] and cur["rel"] - 60 <= n["t"] <= cur["rel"] + 150
                             and n is not cur and n.get("rel") is not None), None)
                 if not nxt:
                     break
                 anchors.append((nxt["place"][:3], nxt["t"]))
-                if nxt["duty"] != duties[-1]:
-                    duties.append(nxt["duty"])
                 cur = nxt
             end = cur["relPlace"][:3]
             trips.append({"run": run, "dir": "DOWN" if leg["place"] == "TUM" else "UP", "origin": leg["place"],
                           "dest": end if end in STATIONS and end not in ("KSR", "TAW") else TERMINI[leg["place"]],
-                          "dep": leg["t"], "anchors": anchors, "duties": duties,
+                          "dep": leg["t"], "anchors": anchors,
                           "arrival": cur["rel"] if end not in ("KSR", "TAW") else None,
                           "lastLeg": "L" in cur["flag"]})
     trips.sort(key=lambda t: t["dep"])
@@ -299,35 +298,90 @@ def rebuild(trip, templates):
     return stops, "anchored" if len(points) > 1 else "terminal"
 
 
+def stop_time(stop):
+    return stop[2] if stop[2] is not None else stop[1]
+
+
+def duties_for(stops, run, legs_by_run):
+    """[[duty, station], ...]: who drives the trip from which stop, from the
+    legs of the same run. A leg covers its pick-up second to the end of its
+    relief minute (a leg with no relief time, such as a depot move, to the
+    duty's next pick-up); where two overlap (a relief), the later pick-up wins."""
+    legs = legs_by_run.get(run, [])
+    out = []
+    for stop in stops:
+        t = stop_time(stop)
+        if t is None:
+            continue
+        cover = [l for l in legs if l["end"] is not None and l["t"] - 5 <= t < l["end"]]
+        if not cover:
+            return None
+        duty = max(cover, key=lambda l: l["t"])["duty"]
+        if not out or out[-1][0] != duty:
+            out.append([duty, stop[0]])
+    return out or None
+
+
 def build(meta, legs, stats, base_entry, base):
     day = DAY_BY_TYPE.get(meta["code"][0], "special")
     trips_in = trips_from_legs(legs)
     templates = template_trips(base)
+    legs_by_run = {}
+    for i, leg in enumerate(legs):
+        # DM shuttles carry no passengers; "Riding" is a driver travelling as a
+        # passenger, not driving the train.
+        if leg["dm"] or leg["remark"].lower().startswith("rid"):
+            continue
+        after = legs[i + 1] if i + 1 < len(legs) else None
+        if leg.get("rel") is not None:
+            end = leg["rel"] + 60
+        elif after is not None and after["duty"] == leg["duty"] and after["t"] > leg["t"]:
+            end = after["t"]
+        else:
+            end = None
+        legs_by_run.setdefault(leg["run"], []).append({**leg, "end": end})
     trips, precision = [], {"exact": 0, "anchored": 0, "terminal": 0}
-    # A trip the base timetable already has (same run, direction, departure) keeps
-    # the base's own stop times: they are the official ones, the rebuild is not.
-    exact = {}
+    sheet = {(t["run"], t["dir"], t["dep"]): t for t in trips_in}
+    # Base trips the sheet confirms keep the base's own stop times, trip numbers
+    # and notes: they are the official ones, a rebuild is not. A terminal
+    # departure counts as confirmed when the sheet has it (same run, direction,
+    # second); any other trip (depot pull-outs such as KSR, short workings)
+    # when the same run has a driver on every stop.
+    used = set()
     for bt in base["trips"]:
         f = bt["stops"][0]
-        if f[0] in TERMINI and len(f) < 4 and f[2] is not None and len(bt["stops"]) > 1:
-            exact[(bt["run"], bt["dir"], f[2])] = bt
-    for t in trips_in:
-        official = exact.get((t["run"], t["dir"], t["dep"]))
-        rebuilt = (official["stops"], "exact") if official else rebuild(t, templates)
+        key = (bt["run"], bt["dir"], f[2])
+        terminal = f[0] in TERMINI and len(f) < 4 and f[2] is not None and len(bt["stops"]) > 1
+        if terminal and key not in sheet:
+            continue
+        duties = duties_for(bt["stops"], bt["run"], legs_by_run)
+        if not duties:
+            if terminal:
+                stats.setdefault("noDuty", []).append(key)
+            else:
+                continue
+        if terminal:
+            used.add(key)
+        row = dict(bt)
+        row.update({"duties": duties, "src": "duty", "precision": "exact"})
+        if terminal and sheet[key]["lastLeg"] and "LAST TRIP, TRAIN TO DEPOT AT TERMINUS" not in row.get("notes", []):
+            row["notes"] = row.get("notes", []) + ["LAST TRIP, TRAIN TO DEPOT AT TERMINUS"]
+        precision["exact"] += 1
+        trips.append(row)
+    # Terminal departures the base does not have: rebuilt from the sheet.
+    for key, t in sheet.items():
+        if key in used:
+            continue
+        rebuilt = rebuild(t, templates)
         if not rebuilt:
             continue
         stops, prec = rebuilt
         precision[prec] += 1
         notes = ["LAST TRIP, TRAIN TO DEPOT AT TERMINUS"] if t["lastLeg"] else []
-        row = {"dir": t["dir"], "run": t["run"], "trip": "", "notes": notes, "duties": t["duties"], "stops": stops,
-               "src": "duty", "precision": prec}
-        if official:
-            # Trip number, notes and platform time are the timetable's own.
-            row.update({k: official[k] for k in ("trip", "notes", "platformFrom") if k in official})
-            if t["lastLeg"] and "LAST TRIP, TRAIN TO DEPOT AT TERMINUS" not in row["notes"]:
-                row["notes"] = row["notes"] + ["LAST TRIP, TRAIN TO DEPOT AT TERMINUS"]
-        trips.append(row)
-    trips.sort(key=lambda t: t["stops"][0][2])
+        trips.append({"dir": t["dir"], "run": t["run"], "trip": "", "notes": notes,
+                      "duties": duties_for(stops, t["run"], legs_by_run), "stops": stops,
+                      "src": "duty", "precision": prec})
+    trips.sort(key=lambda t: stop_time(t["stops"][0]))
     out = {
         "schema": "dutysheet/1",
         "timetable": f"DS{meta['code']}",

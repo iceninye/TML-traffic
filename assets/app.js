@@ -101,6 +101,7 @@ const STRINGS = {
     waiting: (a) => `${a} 即將開出`,
     waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
     duty: "更份",
+    relief: (place, duty) => `（${place}換 ${duty}）`,
     schedDep: "原定開出",
     expectedDep: (clock) => `（預計 ${clock}）`,
     arrived: (a) => `已抵達 ${a}`,
@@ -182,6 +183,7 @@ const STRINGS = {
     waiting: (a) => `About to leave ${a}`,
     waitingIn: (a, m) => `Standing at ${a}, leaves in about ${m} min`,
     duty: "Duty",
+    relief: (place, duty) => `(relief at ${place}: ${duty})`,
     schedDep: "Scheduled departure",
     expectedDep: (clock) => ` (expected ${clock})`,
     arrived: (a) => `Arrived at ${a}`,
@@ -1558,12 +1560,22 @@ function scheduledDeparture(run) {
   return `<dt>${s.schedDep}</dt><dd>${network.name(run.trip.origin, state.lang)} ${secClock(dep)}${off}</dd>`
 }
 
-// Duty numbers of the trip, in order of relief (KSR/TAW), when the loaded
-// timetable came from a Duty Sheet.
+// Duty number (更份) driving the train now, when the loaded timetable came
+// from a Duty Sheet: duties are [duty, from station] pairs along the trip.
+// A relief still ahead is named after it.
 function dutyRow(run) {
   const duties = run.kind === "sched" ? run.trip.duties : null
   if (!duties?.length) return ""
-  return `<dt>${t().duty}</dt><dd>${duties.map(escapeHtml).join(" → ")}</dd>`
+  const codes = run.trip.stops.map((st) => st.code)
+  const reached = codes.indexOf(run.pos?.from)
+  let current = 0
+  duties.forEach(([, code], i) => {
+    if (reached >= 0 && codes.indexOf(code) <= reached) current = i
+  })
+  const next = duties[current + 1]
+  const s = t()
+  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], state.lang), escapeHtml(next[0]))}</span>` : ""
+  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}</dd>`
 }
 
 function openTrain(runId) {

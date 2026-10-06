@@ -8,7 +8,8 @@ release commits stamped in the page footer.
 - Train card: a train standing at its first platform shows "候發，約 N 分鐘後開出" instead of "即將開出" when it is two or more minutes from leaving.
 - Train card: trains starting at TUM/WKS show their timetabled (or Duty Sheet) departure to the second, with the expected time when running 60 s or more off it.
 
-- Duty Sheet parser 0.2.0 keeps each trip's duty numbers (更份, 7 digits, in order of relief at KSR/TAW); the train card shows them as "更份 1101160 → 1101162". Trips that the base timetable already has keep its official stop times and trip numbers instead of the rebuilt ones. A sheet is now primary when not older than its base timetable, even if its trips are identical, so the duty numbers load. DS1101, DS6091 and DS7091 are registered (run, times, duty numbers only).
+- Duty Sheet parser 0.2.0 records who drives each trip: [duty, from station] pairs (更份, 7 digits), taken from the legs of the same Run (a relief hands over at KSR/TAW or the terminus; "Riding" legs and DM shuttles are skipped). The train card shows the duty driving now, and the next relief if one is ahead as "（<station>換 <duty>）".
+- Duty Sheet books now start from the base timetable: every trip the sheet confirms keeps the official stop times, trip number and notes, including depot pull-outs and short workings that start mid-line (Run 64 from Kam Sheung Road at 16:26:12, duty 1101160, was missing before). Only terminal departures the base lacks are rebuilt. A sheet is primary when not older than its base, so the duty numbers load. DS1101, DS6091, DS7091 registered: all base trips present with identical times, duty numbers on every trip; 1960 of 1963 duty hand-overs match a pick-up leg at that station within 60 s, the other 3 start from a depot or siding (W1C, AUP).
 
 ## v0.6.0 — 2026-10-06 (`4427014`)
 Duty Sheet as a schedule source, for when the official working timetable is late.

@@ -21,6 +21,7 @@ Checks:
 """
 
 import json
+import re
 import os
 import sys
 from datetime import date
@@ -63,6 +64,9 @@ def validate(data, base=None, base_entry=None, today=None):
             errors.append(f"{label}: times go backwards")
         if len(codes) < 2:
             errors.append(f"{label}: fewer than two stops")
+        duties = t.get("duties")
+        if not duties or any(not re.fullmatch(r"\d{7}", str(d)) for d in duties):
+            errors.append(f"{label}: missing or malformed duty numbers {duties}")
 
     seen = {}
     for t in trips:
@@ -124,9 +128,9 @@ def validate(data, base=None, base_entry=None, today=None):
             notes.append(f"trip count {len(trips)} differs from the base's {len(base['trips'])} by over 15%")
         identical = share >= 0.99 and new == 0
         eff, base_eff = data.get("effective") or "", base_entry.get("effective") or ""
-        primary = not identical and eff >= base_eff
+        primary = eff >= base_eff
         if identical:
-            notes.append("identical to the base timetable (whose times are exact): the app keeps the base as primary")
+            notes.append("same trips as the base timetable (whose times are exact); still primary, for the duty numbers")
         elif eff < base_eff:
             notes.append(f"older than its base ({eff} < {base_eff}): not primary")
 

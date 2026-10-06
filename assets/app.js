@@ -100,6 +100,7 @@ const STRINGS = {
     dwelling: (a) => `${a} 停站中`,
     waiting: (a) => `${a} 即將開出`,
     waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
+    duty: "更份",
     schedDep: "原定開出",
     expectedDep: (clock) => `（預計 ${clock}）`,
     arrived: (a) => `已抵達 ${a}`,
@@ -180,6 +181,7 @@ const STRINGS = {
     dwelling: (a) => `Stopped at ${a}`,
     waiting: (a) => `About to leave ${a}`,
     waitingIn: (a, m) => `Standing at ${a}, leaves in about ${m} min`,
+    duty: "Duty",
     schedDep: "Scheduled departure",
     expectedDep: (clock) => ` (expected ${clock})`,
     arrived: (a) => `Arrived at ${a}`,
@@ -1556,6 +1558,14 @@ function scheduledDeparture(run) {
   return `<dt>${s.schedDep}</dt><dd>${network.name(run.trip.origin, state.lang)} ${secClock(dep)}${off}</dd>`
 }
 
+// Duty numbers of the trip, in order of relief (KSR/TAW), when the loaded
+// timetable came from a Duty Sheet.
+function dutyRow(run) {
+  const duties = run.kind === "sched" ? run.trip.duties : null
+  if (!duties?.length) return ""
+  return `<dt>${t().duty}</dt><dd>${duties.map(escapeHtml).join(" → ")}</dd>`
+}
+
 function openTrain(runId) {
   state.selected = runId
   state.sheetKind = "train"
@@ -1601,6 +1611,7 @@ function paintTrainSheet(first = false) {
           : s.spacingOk}</dd>`) +
     `<dt>${s.platform}</dt><dd>${escapeHtml(run.plat || "—")}</dd>` +
     scheduledDeparture(run) +
+    dutyRow(run) +
     `</dl>` +
     `<p class="fine">${run.kind === "sched"
       ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`

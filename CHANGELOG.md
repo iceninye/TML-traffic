@@ -8,6 +8,8 @@ release commits stamped in the page footer.
 - Train card: a train standing at its first platform shows "候發，約 N 分鐘後開出" instead of "即將開出" when it is two or more minutes from leaving.
 - Train card: trains starting at TUM/WKS show their timetabled (or Duty Sheet) departure to the second, with the expected time when running 60 s or more off it.
 
+- Duty Sheet parser 0.2.0 keeps each trip's duty numbers (更份, 7 digits, in order of relief at KSR/TAW); the train card shows them as "更份 1101160 → 1101162". Trips that the base timetable already has keep its official stop times and trip numbers instead of the rebuilt ones. A sheet is now primary when not older than its base timetable, even if its trips are identical, so the duty numbers load. DS1101, DS6091 and DS7091 are registered (run, times, duty numbers only).
+
 ## v0.6.0 — 2026-10-06 (`4427014`)
 Duty Sheet as a schedule source, for when the official working timetable is late.
 - `tools/parse_dutysheet.py` reads a Duty Sheet PDF (run, terminal departure, KSR/TAW relief, arrival), rebuilds the stops between from the nearest trip of a base timetable and writes `data/timetables/DS<code>.json` only after `tools/validate_dutysheet.py` passes. Output holds run, direction and times only: no duty numbers or crew details.

@@ -77,6 +77,42 @@
    "day": "special",
    "kind": "special",
    "effective": "2025-05-12"
+  },
+  {
+   "code": "DS1101",
+   "file": "DS1101.json",
+   "day": "weekday",
+   "kind": "normal",
+   "effective": "2026-09-14",
+   "source": "dutysheet",
+   "base": "TML1100B",
+   "revision": 1,
+   "sha256": "9e201683b3dc8c577323d8db23a0f57b56787e69d1e075c6223a27e2e477aa59",
+   "primary": true
+  },
+  {
+   "code": "DS7091",
+   "file": "DS7091.json",
+   "day": "sunday",
+   "kind": "normal",
+   "effective": "2025-08-31",
+   "source": "dutysheet",
+   "base": "TML7090",
+   "revision": 1,
+   "sha256": "69d59970242b0a029ad9e2504ca4bde6dbab31a7aac9a40938161d9428a101bd",
+   "primary": true
+  },
+  {
+   "code": "DS6091",
+   "file": "DS6091.json",
+   "day": "saturday",
+   "kind": "normal",
+   "effective": "2026-05-02",
+   "source": "dutysheet",
+   "base": "TML6090A",
+   "revision": 1,
+   "sha256": "e257cb64ac9b0a9d09534534906640cc3a88722bee42b7e9bce4e3edd6bca135",
+   "primary": true
   }
  ]
 }

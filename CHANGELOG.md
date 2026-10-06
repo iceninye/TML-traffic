@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.6.0 — 2026-10-06 (`4427014`)
+Duty Sheet as a schedule source, for when the official working timetable is late.
+- `tools/parse_dutysheet.py` reads a Duty Sheet PDF (run, terminal departure, KSR/TAW relief, arrival), rebuilds the stops between from the nearest trip of a base timetable and writes `data/timetables/DS<code>.json` only after `tools/validate_dutysheet.py` passes. Output holds run, direction and times only: no duty numbers or crew details.
+- On the three sample sheets (6091, 7091, 1101) the parser reproduces every terminal departure of the matching timetable (401, 360, 460 trips, 0 new, 0 missing). Rebuilt stop times against the real ones: median 3-10 s, P90 15-47 s.
+- `index.json` entries can carry `source: "dutysheet"` and `primary`; the app loads only primary ones (newer than their base and different from it), labels them "Duty Sheet" in the header, and otherwise behaves as before.
+- Timetable `pickFirstEntry` / `serviceDate` moved into `lib/tml-timetable.js`.
+
 ## v0.5.4 — 2026-10-06 (`5118645`)
 Reliability fixes from a code audit; no change to train matching or positions.
 - Feed: each station request now times out after 10 s (a stalled connection used to hold the refresh open indefinitely, freezing updates until reload). After 8 consecutive failures the feed pauses requests for 45 s, as documented; before, the counter was reset on every pass so the pause never happened.

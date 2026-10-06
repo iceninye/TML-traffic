@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.6.1 — 2026-10-06
+- Station countdowns: a "即將"/"now" reading is dropped once its train has left (30 s after an arrival time, at the departure time for a published departure) and the board repaints every second, so it no longer lingers after the dot has left the platform until the next feed read.
+- Train card: a train standing at its first platform shows "候發，約 N 分鐘後開出" instead of "即將開出" when it is two or more minutes from leaving.
+- Train card: trains starting at TUM/WKS show their timetabled (or Duty Sheet) departure to the second, with the expected time when running 60 s or more off it.
+
 ## v0.6.0 — 2026-10-06 (`4427014`)
 Duty Sheet as a schedule source, for when the official working timetable is late.
 - `tools/parse_dutysheet.py` reads a Duty Sheet PDF (run, terminal departure, KSR/TAW relief, arrival), rebuilds the stops between from the nearest trip of a base timetable and writes `data/timetables/DS<code>.json` only after `tools/validate_dutysheet.py` passes. Output holds run, direction and times only: no duty numbers or crew details.

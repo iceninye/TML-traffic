@@ -401,16 +401,20 @@ async function runRefresh(first) {
   if (first) setStatus("loading")
   const at = Date.now()
   try {
-    await feed.refresh(at)
-    const snapshot = feed.snapshot(at)
+    const active = feed
+    await active.refresh(at)
+    // Language switch swapped the feed mid-flight: this result belongs to the
+    // old one (the switch handler queues a fresh refresh).
+    if (active !== feed) return
+    const snapshot = active.snapshot(at)
     if (!snapshot.ok) {
       // Nothing usable at all. Keep whatever was on screen.
       setStatus(state.data ? "stale" : "error")
       return
     }
     state.data = snapshot
-    state.loadedAtMs = feed.newestAt || Date.now()
-    state.stationCount = feed.stationCount
+    state.loadedAtMs = active.newestAt || Date.now()
+    state.stationCount = active.stationCount
     placeTrains(snapshot, Date.now())
     state.runs = tracker.frame(Date.now())
     setStatus(Date.now() - state.loadedAtMs > STALE_AFTER_MS ? "stale" : "ok")
@@ -540,6 +544,8 @@ function placeTrains(snapshot, now) {
 }
 
 function setStatus(kind) {
+  // A refresh already in flight when Pause was pressed must not repaint "live".
+  if (state.paused && kind !== "paused") return
   state.status = kind
   els.pulse.dataset.state = kind === "ok" ? "live" : kind === "stale" ? "loading" : kind
 }
@@ -1026,8 +1032,24 @@ function trackCoords() {
   })
 }
 
-async function ensureMap() {
-  if (mapInstance) return mapInstance
+let mapReady = null
+
+// One shared promise: concurrent callers wait for the same load instead of
+// receiving a half-built instance, and a failed load is torn down so the next
+// attempt starts clean rather than reusing a map with no layers.
+function ensureMap() {
+  if (!mapReady) {
+    mapReady = buildMap().catch((error) => {
+      mapInstance?.remove()
+      mapInstance = null
+      mapReady = null
+      throw error
+    })
+  }
+  return mapReady
+}
+
+async function buildMap() {
   ensureMapCss()
   const maplibre = await loadMapLibre()
   mapInstance = new maplibre.Map({
@@ -1579,7 +1601,8 @@ function wireControls() {
     buildDiagram()
     if (state.sheetKind === "train") paintTrainSheet()
     else if (state.sheetKind) closeSheet()
-    refresh(true)
+    // refresh() would just return the in-flight pass on the old feed.
+    ;(inFlight ?? Promise.resolve()).then(() => refresh(true))
   })
   els.pauseBtn.addEventListener("click", () => {
     state.paused = !state.paused

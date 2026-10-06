@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.6.1 — 2026-10-06
+## v0.6.1 — 2026-10-06 (`fb98092`)
 - Station countdowns: a "即將"/"now" reading is dropped once its train has left (30 s after an arrival time, at the departure time for a published departure) and the board repaints every second, so it no longer lingers after the dot has left the platform until the next feed read.
 - Train card: a train standing at its first platform shows "候發，約 N 分鐘後開出" instead of "即將開出" when it is two or more minutes from leaving.
 - Train card: trains starting at TUM/WKS show their timetabled (or Duty Sheet) departure to the second, with the expected time when running 60 s or more off it.

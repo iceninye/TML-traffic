@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.5.3 — 2026-10-06 (`pending`)
+## v0.5.3 — 2026-10-06 (`760d64a`)
 - Special timetables converted and registered: TML110SB (2026 Mid-Autumn, weekday), TML709CA/CB/GA/GC/UF (Sunday events), TML906V/906Y (typhoon, non-peak/peak). Manifest `kind` is now read from the PDF ("Special" on page 1); the validator no longer demands a full-day window for special timetables (typhoon peak pattern runs 09:00-21:00).
 - The app loads normal timetables first and fetches special ones only when the normal ones fit the boards badly (< 70% of near readings within 40 s); `pickDay` then switches to a special timetable that fits clearly better, otherwise countdown-only mode as before. Header shows "特別時間表" for a special one.
 - Checked on live Sunday boards: the normal timetable still wins (0.74–0.96 vs best special 0.56); synthetic readings built from each special timetable select that timetable.

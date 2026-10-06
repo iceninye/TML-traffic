@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.5.4 — 2026-10-06 (`COMMIT`)
+## v0.5.4 — 2026-10-06 (`5118645`)
 Reliability fixes from a code audit; no change to train matching or positions.
 - Feed: each station request now times out after 10 s (a stalled connection used to hold the refresh open indefinitely, freezing updates until reload). After 8 consecutive failures the feed pauses requests for 45 s, as documented; before, the counter was reset on every pass so the pause never happened.
 - Language switch: a refresh already in flight on the old feed no longer overwrites the new feed's result with an empty snapshot; a fresh refresh runs right after it.

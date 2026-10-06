@@ -21,6 +21,62 @@
    "day": "sunday",
    "kind": "normal",
    "effective": "2025-03-23"
+  },
+  {
+   "code": "TML110SB",
+   "file": "TML110SB.json",
+   "day": "weekday",
+   "kind": "special",
+   "effective": "2026-09-25"
+  },
+  {
+   "code": "TML709CA",
+   "file": "TML709CA.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-05-17"
+  },
+  {
+   "code": "TML709CB",
+   "file": "TML709CB.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-07-12"
+  },
+  {
+   "code": "TML709GA",
+   "file": "TML709GA.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2025-09-28"
+  },
+  {
+   "code": "TML709GC",
+   "file": "TML709GC.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-06-28"
+  },
+  {
+   "code": "TML709UF",
+   "file": "TML709UF.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2025-05-25"
+  },
+  {
+   "code": "TML906V",
+   "file": "TML906V.json",
+   "day": "special",
+   "kind": "special",
+   "effective": "2025-05-12"
+  },
+  {
+   "code": "TML906Y",
+   "file": "TML906Y.json",
+   "day": "special",
+   "kind": "special",
+   "effective": "2025-05-12"
   }
  ]
 }

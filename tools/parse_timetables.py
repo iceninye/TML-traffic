@@ -435,12 +435,16 @@ def main(paths):
         code = code_m.group(1)
         type_digit = code[3] if len(code) > 3 else ""
         day = DAY_BY_TYPE.get(type_digit, "special")
+        # Page 1 says "Normal ..." or "Special ..."; only normal ones are the
+        # calendar's default, special ones are tried when those do not fit.
+        kind = "special" if re.search(r"\bSpecial\b", first) else "normal"
         eff = re.search(r"Effective:\s*(\d{1,2} \w+ \d{4})", first)
         section_a = parse_section_a(pdf)
         trips = parse_section_h(pdf, section_a)
         out = {
             "timetable": code,
             "day": day,
+            "kind": kind,
             "sectionA": section_a,
             "headways": parse_section_c(pdf),
             "firstLast": parse_section_f(pdf),
@@ -457,7 +461,7 @@ def main(paths):
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
             fh.write("\n")
         entry = {"code": code, "file": f"{code}.json", "day": day,
-                 "kind": "normal" if day != "special" else "special",
+                 "kind": kind,
                  "effective": iso_date(eff.group(1)) if eff else None}
         index["timetables"] = [e for e in index["timetables"] if e["code"] != code] + [entry]
         print(f"{code}: PASS, registered as {day}")

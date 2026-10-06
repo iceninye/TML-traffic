@@ -48,7 +48,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.5.2", commit: "fe3fd25" }
+const BUILD = { version: "0.5.3", commit: "pending" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -286,6 +286,18 @@ const t = () => STRINGS[state.lang]
 
 /* ------------------------------------------------------------------ data */
 
+// Special timetables (events, typhoon) are fetched once, the first time the
+// normal ones fit the boards badly; pickDay then considers them too.
+let specialEntries = []
+let specialsRequested = false
+function requestSpecials() {
+  if (specialsRequested) return
+  specialsRequested = true
+  for (const e of specialEntries) {
+    fetchJson(`data/timetables/${e.file}`).then((data) => timetables.add(data)).catch(() => {})
+  }
+}
+
 async function boot() {
   const [netJson, timetable, track, manifest] = await Promise.all([
     fetchJson("data/tml-network.json"),
@@ -307,8 +319,11 @@ async function boot() {
     timetables.add(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
     state.book = first.code
   }
+  // The other normal timetables load now; special ones (events, typhoon) only
+  // when the normal ones stop fitting the boards (see requestSpecials).
+  specialEntries = entries.filter((e) => e.kind === "special")
   for (const e of entries) {
-    if (e === first) continue
+    if (e === first || e.kind === "special") continue
     fetchJson(`data/timetables/${e.file}`).then((data) => timetables.add(data)).catch(() => {})
   }
   // Section labels and the fallback model use this period's timetable times.
@@ -434,6 +449,7 @@ function placeTrains(snapshot, now) {
   // boards clearly fit another one better (public holidays run Sunday's).
   const pick = timetables.pickDay(readings, now)
   const mine = pick.scores[state.book]
+  if (!mine || (mine.n >= 6 && mine.close < 0.7)) requestSpecials()
   const theirs = pick.day && pick.scores[pick.day]
   if (theirs && pick.day !== state.book && theirs.n >= 10 && theirs.close - (mine?.close ?? 0) > 0.25) {
     state.book = pick.day
@@ -601,7 +617,7 @@ function paintClock() {
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${s.dayType[book.day] ?? s.dayType.special} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }

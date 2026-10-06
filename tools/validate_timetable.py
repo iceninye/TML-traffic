@@ -70,10 +70,13 @@ def validate(data):
             continue
         first, last = min(times), max(times)
         notes.append(f"{code} {d}: first {hm(first)}, last {hm(last)}")
-        if not (5 * 3600 <= first <= 7 * 3600):
-            errors.append(f"{code} first departure {hm(first)} outside 05:00-07:00")
-        if last < 23 * 3600:
-            errors.append(f"{code} last departure {hm(last)} before 23:00")
+        # A special timetable may cover only part of the day (typhoon peak
+        # pattern runs 09:00-21:00), so the full-day window is for normal ones.
+        if data.get("kind") != "special" or data.get("day") != "special":
+            if not (5 * 3600 <= first <= 7 * 3600):
+                errors.append(f"{code} first departure {hm(first)} outside 05:00-07:00")
+            if last < 23 * 3600:
+                errors.append(f"{code} last departure {hm(last)} before 23:00")
 
     by_run = {}
     for t in trips:

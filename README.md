@@ -69,7 +69,10 @@ python3 tools/parse_timetables.py 新時間表.pdf
 
 工具會解析 PDF → 執行 `tools/validate_timetable.py`（站序、時間唔倒退、首尾班車、總站 Run 接續、A 部 26 段、班距表）→
 **通過先**寫入 `data/timetables/<代號>.json` 同登記喺 `data/timetables/index.json`；唔通過唔會加入。
-App 會自動讀清單，唔使改程式。檔案格式見 `tools/parse_timetables.py` 開頭說明同 `docs/ALGORITHM.md` §3e。
+App 會自動讀清單，唔使改程式。
+清單分 `normal`（平日／星期六／星期日正常班）同 `special`（活動、颱風等特別班，由 PDF 第一頁「Special」判斷）：
+正常班先載入；只有當正常班同月台讀數唔夾（夾度 < 70%）先會載入特別班逐份試，夾得明顯好過（高 25% 以上）就轉用，
+全部都唔夾就轉去「只用倒數」模式。檔案格式見 `tools/parse_timetables.py` 開頭說明同 `docs/ALGORITHM.md` §3e。
 
 ## 重建資料
 

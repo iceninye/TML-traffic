@@ -64,7 +64,7 @@ MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本
 列車位置係**由到站倒數推算**，並非港鐵官方列車位置。港鐵並無發佈列車實時位置。
 推算位置可能有 1–2 個站嘅偏差（見 `docs/EXTRACTION.md` §3.3）。請勿用於任何安全關鍵用途。
 
-## 3. 屯馬綫走綫（`data/tml-track.json`）
+## 6. 屯馬綫走綫（`data/tml-track.json`）
 
 `data/tml-track.json` 嘅路軌座標由 `tools/build_data.py` 從 **OpenStreetMap** relation
 [6102298](https://www.openstreetmap.org/relation/6102298)（港鐵屯馬綫，下行）抽取、串接並簡化（Douglas–Peucker 6 m）。
@@ -72,3 +72,9 @@ MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本
 - **© OpenStreetMap contributors**
 - **授權**：Open Database License (ODbL) 1.0 — https://www.openstreetmap.org/copyright
 - 地圖上已顯示署名。再分發此檔案須保留署名及 ODbL。
+
+## 7. 本專案自身授權同時間表資料
+
+- 本專案原創程式碼以 MIT License 發佈，見根目錄 [`LICENSE`](LICENSE)；上文第 1、2、6 節嘅第三方內容維持各自授權，MIT 並不覆蓋。
+- `data/timetables/` 嘅時間表（包括由 Duty Sheet 解析、只含 Run、更份編號同時間嘅檔案）源自港鐵公佈嘅工作時間表同 Duty Sheet。本專案**無法確認**港鐵有否准許公開再授權，故 MIT **不適用於**呢批資料，其權利屬原發佈者。本專案同港鐵並無關係，亦非港鐵官方產品。
+- Duty Sheet PDF 本身唔入 repo，亦不包含司機姓名或其他人手資料。

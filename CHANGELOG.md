@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.0 — 2026-10-07 (`dev`)
+- Trip matching (the "–" dots): a dot shows "–" in Run-number mode when no timetable trip claimed its readings and the countdown model drew it. Delayed trains caused this: readings 120-150 s off their trip cost more than skipping them, so they were always dropped and drawn again as a "–" train beside the real one, and the line delay taken from the nearest slot could read a late line as an early one. The matching cost is now continuous, the line delay is scored over all near readings with lateness favoured over earliness, each direction gets its own, and readings attached in the second pass must keep the trains' order. Synthetic boards like the 2026-10-07 08:56 screenshot (a few trains +80-130 s, page opened during the delay): "–" dots 1.5 to 0 per snapshot, readings on the wrong trip 5.5% to 1.0%. With a train held 5-8 minutes and a queue behind it, "–" dots fall (e.g. 3.8 to 1.2) but some of those readings now go to a neighbouring trip in the queue (wrong-trip share up to 8.5% from 4.2% in one case): queued trains are hard to tell apart from the boards alone. `tools/validate_matching.mjs` runs these scenarios.
+- Run numbers: the orange dot left of the title is now a switch. Tap once and every train dot shows its Run number until tapped again; the choice is remembered (it used to show for 15 s).
+- L trips (last trip of the day for that train, back to depot after it) are drawn at 70% opacity on the diagram and the map, and the card says "L 尾程". The flag comes from the Duty Sheet; the official timetable PDFs have none, so special-timetable days show no L.
+- Train card page 2: tap the ▲/▼ chip (or "全日更份 ›") for the train's duties for the day from the Duty Sheet: duty number, pick-up station and time, relief station and time, with the current duty highlighted and "回廠" on the last. Tap the chip again to go back.
+- Station countdowns: a "即將" reading from a board read in the last 30 s is never hidden. A train dwelling past its due clock keeps its board at 0; v0.6.1 hid it 30 s after the due clock even when the read was fresh.
+
 ## v0.6.3 — 2026-10-06 (`b3d0e2a`)
 - Station countdowns: a reading's minutes now count down from its due time between feed reads (never upwards). Before, a board kept after a failed read (up to 3 min) showed the same "3" for its whole life; now it falls to "即將" and then leaves like any other.
 - Duty Sheet tooltip: states that stop times are the official timetable's with duty numbers added, and only trips the timetable lacks are modelled (it still said every mid-station time was modelled).

@@ -150,5 +150,5 @@ probe-runs: snapshot 1/2 -> 37 runs each, tracked 37, dropped 0
 
 ## 授權
 
-`lib/mtr-*.js` 及 `data/tml-network.json` 抽取自 MIT 授權專案；`lib/maplibre/` 為 BSD-3-Clause；`data/tml-track.json` © OpenStreetMap contributors（ODbL）。
+原創程式碼為 MIT（見 [`LICENSE`](LICENSE)）；`lib/mtr-*.js` 及 `data/tml-network.json` 抽取自 MIT 授權專案；`data/timetables/` 源自港鐵，不在 MIT 範圍內；`lib/maplibre/` 為 BSD-3-Clause；`data/tml-track.json` © OpenStreetMap contributors（ODbL）。
 見 [`NOTICE.md`](NOTICE.md)。

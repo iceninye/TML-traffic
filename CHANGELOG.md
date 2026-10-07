@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.2 — 2026-10-07 (`dev`)
+## v0.7.2 — 2026-10-07 (`84824aa`)
 - Resume after pause: with nothing read yet (the app opened paused, or MTR withholding data under special arrangements), tapping 繼續 showed "資料延遲（29855776 分鐘前）" until the first read finished, 1-10 s. It now shows "讀取中…" until then. Shell cache renamed `v24`.
 
 ## v0.7.1 — 2026-10-07 (`ed9f043`)

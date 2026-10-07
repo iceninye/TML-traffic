@@ -3,6 +3,9 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.2 — 2026-10-07 (`84824aa`)
+- Resume after pause: with nothing read yet (the app opened paused, or MTR withholding data under special arrangements), tapping 繼續 showed "資料延遲（29855776 分鐘前）" until the first read finished, 1-10 s. It now shows "讀取中…" until then. Shell cache renamed `v24`.
+
 ## v0.7.1 — 2026-10-07 (`ed9f043`)
 - Feed status: during special train service arrangements the MTR feed answers every station with `status: 0`, its own message and a link, and no train times. The app treated that like a failed connection and showed "暫時連唔到港鐵班次資料" for as long as it lasted. It now says "港鐵暫停提供實時班次" and shows MTR's message with a 詳情 link in the banner; the banner also appears while older boards are still on screen, and clears once the feed sends times again.
 - "Can't reach" now names the reason: HTTP status (e.g. 503, 429), 逾時 (no answer in 10 s), 網絡錯誤 (blocked or offline), 資料無法讀取 (an answer that is not the feed's JSON), or 程式錯誤 when the app itself failed before reading anything.

@@ -50,7 +50,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.1", commit: "ed9f043" }
+const BUILD = { version: "0.7.2", commit: "84824aa" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1853,7 +1853,9 @@ function wireControls() {
     writePref(PAUSE_KEY, state.paused ? "1" : "0")
     els.pauseBtn.textContent = state.paused ? t().resume : t().pause
     els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
-    setStatus(state.paused ? "paused" : "ok")
+    // With nothing read yet (opened paused, or MTR withholding data), "ok"
+    // would age from 0 and show decades-old data until the refresh lands.
+    setStatus(state.paused ? "paused" : state.data ? "ok" : "loading")
     if (!state.paused) refresh(false)
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)

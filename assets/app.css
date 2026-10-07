@@ -686,8 +686,9 @@ svg.diagram {
 }
 .train-chip.up { background: var(--up); }
 .train-chip.down { background: var(--down); }
-/* The chip is a button: it flips the card to the day's duty list. */
+/* With Run numbers on, the chip shows the Run and flips the card to the day's duty list. */
 button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px; }
+.train-chip.run { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .train-chip[data-page="2"] { box-shadow: 0 0 0 3px var(--tml-lite); }
 .train-chip:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: 3px; }
 

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.4 — 2026-10-07 (`dev`)
+## v0.7.4 — 2026-10-07 (`c35a340`)
 - Run-number switch (the orange dot left of the title) now also covers the train card. Switched on: the card's chip shows the train's Run number instead of ▲/▼, and the chip and "全日更份 ›" open the Run's duties for the day. Switched off: the chip is a plain ▲/▼ and the duty list is hidden (an open card on that page goes back to the train details). A train no timetable trip claims shows "–" on the chip, as on the diagram. The choice is still remembered after reloading.
 - Header: the timetable line no longer ends in "· Duty Sheet" (e.g. "平日 · 繁忙 · 班距約 3.5 分"); its tooltip still names the Duty Sheet.
 - Footer: the second line is now a disclaimer: "⚠免責聲明：本站列車位置為演算法推算之模擬數據，非港鐵官方即時定位。資料僅供參考，本站概不承擔任何責任。"

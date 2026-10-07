@@ -340,6 +340,7 @@ button {
 .alert[data-show="1"] { display: block; }
 
 .alert b { color: var(--warn); }
+.alert a { color: inherit; text-decoration: underline; white-space: nowrap; }
 
 /* ---------- diagram ---------- */
 

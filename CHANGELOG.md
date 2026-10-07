@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.5 — 2026-10-07 (`dev`)
+## v0.7.5 — 2026-10-07 (`e30df5f`)
 - Train card and keyboard: the card is rebuilt every second, so focus on any of its buttons (✕, the Run chip, "全日更份 ›", 跟隨) dropped back to the page within a second, and flipping the card with Enter or Space lost it at once. Focus now stays on the same button, or moves to the Run chip when "全日更份 ›" is no longer on the card. Mouse and touch use is unchanged.
 - docs/DUTYSHEET.md no longer says the header line ends in "Duty Sheet" (gone since v0.7.4; the tooltip still names it). Shell cache renamed `v27`.
 

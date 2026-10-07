@@ -34,7 +34,7 @@ Run 同秒數全部一樣，KSR／TAW 接班時間等於時間表嘅開出時間
 
 - `index.json` 入面 `source: "dutysheet"` 嘅項目，`primary: true` 先會被載入：生效日 ≥ 底表生效日。Duty Sheet 時間表以底表為基礎：Duty Sheet 證實嘅班次（包括錦上路等中途開出嘅出廠車）沿用底表逐站時間、車次號；只有底表冇嘅總站班次先重建。
 - 啟動時：生效日已到嘅最新 primary Duty Sheet 優先，否則日曆對應嘅正常時間表。之後仍按看板讀數（`pickDay`）校正。
-- 畫面日期／班距標籤後面會加「Duty Sheet」，滑鼠移上去睇來源同生效日。
+- 時段列（「平日 · 繁忙 · 班距」嗰行）唔再加「Duty Sheet」字樣（v0.7.4 起）；滑鼠移上去，提示會註明來源 Duty Sheet 同生效日。
 
 ## 驗證（`tools/validate_dutysheet.py`）
 

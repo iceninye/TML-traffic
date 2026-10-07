@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.5 — 2026-10-07 (`e30df5f`)
+- Train card and keyboard: the card is rebuilt every second, so focus on any of its buttons (✕, the Run chip, "全日更份 ›", 跟隨) dropped back to the page within a second, and flipping the card with Enter or Space lost it at once. Focus now stays on the same button, or moves to the Run chip when "全日更份 ›" is no longer on the card. Mouse and touch use is unchanged.
+- docs/DUTYSHEET.md no longer says the header line ends in "Duty Sheet" (gone since v0.7.4; the tooltip still names it). Shell cache renamed `v27`.
+
 ## v0.7.4 — 2026-10-07 (`c35a340`)
 - Run-number switch (the orange dot left of the title) now also covers the train card. Switched on: the card's chip shows the train's Run number instead of ▲/▼, and the chip and "全日更份 ›" open the Run's duties for the day. Switched off: the chip is a plain ▲/▼ and the duty list is hidden (an open card on that page goes back to the train details). A train no timetable trip claims shows "–" on the chip, as on the diagram. The choice is still remembered after reloading.
 - Header: the timetable line no longer ends in "· Duty Sheet" (e.g. "平日 · 繁忙 · 班距約 3.5 分"); its tooltip still names the Duty Sheet.

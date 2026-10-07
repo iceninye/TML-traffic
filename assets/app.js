@@ -12,7 +12,7 @@
 //   map     (optional) — MapLibre GL on OpenFreeMap tiles, real OSM alignment,
 //                       the two directions drawn side by side in two colours.
 
-import { readSchedule } from "../lib/mtr-schedule.js"
+import { readNotice, readSchedule } from "../lib/mtr-schedule.js"
 import { carryArrivalClock, estimateTrains, setHopModel } from "../lib/mtr-estimate.js"
 import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
@@ -50,7 +50,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.0", commit: "0b89ed3" }
+const BUILD = { version: "0.7.1", commit: "ed9f043" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -87,7 +87,12 @@ const STRINGS = {
     stations: (n) => `${n}/27 站`,
     updated: (s) => (s < 60 ? `${s} 秒前更新` : `${Math.floor(s / 60)} 分鐘前更新`),
     loading: "讀取中…",
-    feedDown: (r) => `暫時連唔到港鐵班次資料，${r} 秒後自動重試`,
+    feedDown: (r, why) => `暫時連唔到港鐵班次資料${why ? `（${why}）` : ""}，${r} 秒後自動重試`,
+    feedWhy: { timeout: "逾時", network: "網絡錯誤", data: "資料無法讀取", app: "程式錯誤" },
+    mtrPaused: (r) => `港鐵暫停提供實時班次，${r} 秒後再試`,
+    mtrNotice: "港鐵通告",
+    mtrNoticeNone: "港鐵暫停提供實時班次資料",
+    noticeMore: "詳情",
     stale: (a, r) => `資料延遲（${a < 60 ? `${a} 秒` : `${Math.floor(a / 60)} 分鐘`}前），列車按時間表推算・${r} 秒後重試`,
     offline: "網絡離線，恢復後自動更新",
     paused: "已暫停更新",
@@ -181,7 +186,12 @@ const STRINGS = {
     stations: (n) => `${n}/27 stations`,
     updated: (s) => (s < 60 ? `updated ${s}s ago` : `updated ${Math.floor(s / 60)}m ago`),
     loading: "Loading…",
-    feedDown: (r) => `Can't reach the MTR feed, retrying in ${r}s`,
+    feedDown: (r, why) => `Can't reach the MTR feed${why ? ` (${why})` : ""}, retrying in ${r}s`,
+    feedWhy: { timeout: "timed out", network: "network error", data: "unreadable answer", app: "app error" },
+    mtrPaused: (r) => `MTR has paused live train times, retrying in ${r}s`,
+    mtrNotice: "MTR notice",
+    mtrNoticeNone: "MTR has paused live train times",
+    noticeMore: "Details",
     stale: (a, r) => `Data ${a < 60 ? `${a}s` : `${Math.floor(a / 60)}m`} old, trains estimated from timetable · retry in ${r}s`,
     offline: "Offline, will update when back online",
     paused: "Updates paused",
@@ -296,6 +306,8 @@ const state = {
   loadedAtMs: 0,
   stationCount: 0,
   status: "loading",
+  // The last refresh threw before reading anything (an app bug, not the feed).
+  crashed: false,
   selected: null,
   // Train card page: 1 details, 2 the train's duties for the day.
   trainPage: 1,
@@ -400,7 +412,7 @@ async function boot() {
 }
 
 function makeFeed() {
-  return createFeed(network, { readSchedule, carryArrivalClock, estimateTrains, lang: state.lang })
+  return createFeed(network, { readSchedule, readNotice, carryArrivalClock, estimateTrains, lang: state.lang })
 }
 
 async function fetchJson(url) {
@@ -452,9 +464,12 @@ async function runRefresh(first) {
     // old one (the switch handler queues a fresh refresh).
     if (active !== feed) return
     const snapshot = active.snapshot(at)
+    state.crashed = false
     if (!snapshot.ok) {
-      // Nothing usable at all. Keep whatever was on screen.
-      setStatus(state.data ? "stale" : "error")
+      // Nothing usable at all. Keep whatever was on screen. With special
+      // arrangements MTR answers but withholds the data: say that, not
+      // "can't reach".
+      setStatus(state.data ? "stale" : active.notice ? "notice" : "error")
       return
     }
     state.data = snapshot
@@ -468,6 +483,8 @@ async function runRefresh(first) {
     if (state.view === "diagram") syncTrains()
   } catch (error) {
     console.warn("refresh failed", error)
+    // Before any data this would read as "can't reach"; say it is the app.
+    state.crashed = true
     setStatus(state.data ? "stale" : "error")
   }
 }
@@ -592,7 +609,7 @@ function setStatus(kind) {
   // A refresh already in flight when Pause was pressed must not repaint "live".
   if (state.paused && kind !== "paused") return
   state.status = kind
-  els.pulse.dataset.state = kind === "ok" ? "live" : kind === "stale" ? "loading" : kind
+  els.pulse.dataset.state = kind === "ok" ? "live" : kind === "stale" ? "loading" : kind === "notice" ? "error" : kind
 }
 
 /* ---------------------------------------------------------------- strings */
@@ -633,6 +650,13 @@ function paintRunsToggle() {
   els.brandDot.title = t().showRuns
 }
 
+// Why the last pass got nothing, for the "can't reach" line.
+function failureReason(s) {
+  if (state.crashed) return s.feedWhy.app
+  const why = feed?.problem
+  return why ? (s.feedWhy[why] ?? why) : ""
+}
+
 function paintClock() {
   const s = t()
   const now = Date.now()
@@ -650,11 +674,13 @@ function paintClock() {
     ? s.paused
     : state.status === "loading"
       ? s.loading
-      : state.status === "error"
-        ? (offline ? s.offline : s.feedDown(retryIn))
-        : state.status === "stale"
-          ? (offline ? s.offline : s.stale(age, retryIn))
-          : s.updated(age)
+      : state.status === "notice"
+        ? s.mtrPaused(retryIn)
+        : state.status === "error"
+          ? (offline ? s.offline : s.feedDown(retryIn, failureReason(s)))
+          : state.status === "stale"
+            ? (offline ? s.offline : s.stale(age, retryIn))
+            : s.updated(age)
   els.statusCounts.textContent = counts.join(" · ")
   const book = timetables?.books[state.book]
   if (state.offTimetable) {
@@ -909,17 +935,29 @@ function render() {
     }
   }
 
-  if (notices.size > 0) {
-    els.alert.dataset.show = "1"
-    els.alert.innerHTML = `<b>${s.notice}</b> ${[...notices].map(escapeHtml).join(" · ")}`
+  const posted = feed?.notice
+  if (posted) {
+    const more = posted.url ? ` <a href="${escapeHtml(posted.url)}" target="_blank" rel="noopener">${s.noticeMore}</a>` : ""
+    showAlert(`<b>${s.mtrNotice}</b> ${escapeHtml(posted.message || s.mtrNoticeNone)}${more}`)
+  } else if (notices.size > 0) {
+    showAlert(`<b>${s.notice}</b> ${[...notices].map(escapeHtml).join(" · ")}`)
   } else if (delayed > 0) {
-    els.alert.dataset.show = "1"
-    els.alert.innerHTML = `<b>${s.delayNote}</b>`
+    showAlert(`<b>${s.delayNote}</b>`)
   } else {
-    els.alert.dataset.show = "0"
+    showAlert("")
   }
   paintStationSheet()
   paintClock()
+}
+
+// The banner repaints every second; rewrite it only when it changes, so a
+// tap on its link is not lost to a replaced node.
+let alertHtml = null
+function showAlert(html) {
+  if (html === alertHtml) return
+  alertHtml = html
+  els.alert.dataset.show = html ? "1" : "0"
+  els.alert.innerHTML = html
 }
 
 /* ------------------------------------------------------------- animation */

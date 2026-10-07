@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.1 — 2026-10-07 (`ed9f043`)
+- Feed status: during special train service arrangements the MTR feed answers every station with `status: 0`, its own message and a link, and no train times. The app treated that like a failed connection and showed "暫時連唔到港鐵班次資料" for as long as it lasted. It now says "港鐵暫停提供實時班次" and shows MTR's message with a 詳情 link in the banner; the banner also appears while older boards are still on screen, and clears once the feed sends times again.
+- "Can't reach" now names the reason: HTTP status (e.g. 503, 429), 逾時 (no answer in 10 s), 網絡錯誤 (blocked or offline), 資料無法讀取 (an answer that is not the feed's JSON), or 程式錯誤 when the app itself failed before reading anything.
+- The banner is rewritten only when its text changes (it was rewritten every second), so its link can be tapped. Shell cache renamed `v23`.
+
 ## v0.7.0 — 2026-10-07 (`0b89ed3`)
 - Trip matching (the "–" dots): a dot shows "–" in Run-number mode when no timetable trip claimed its readings and the countdown model drew it. Delayed trains caused this: readings 120-150 s off their trip cost more than skipping them, so they were always dropped and drawn again as a "–" train beside the real one, and the line delay taken from the nearest slot could read a late line as an early one. The matching cost is now continuous, the line delay is scored over all near readings with lateness favoured over earliness, each direction gets its own, and readings attached in the second pass must keep the trains' order. Synthetic boards like the 2026-10-07 08:56 screenshot (a few trains +80-130 s, page opened during the delay): "–" dots 1.5 to 0 per snapshot, readings on the wrong trip 5.5% to 1.0%. With a train held 5-8 minutes and a queue behind it, "–" dots fall (e.g. 3.8 to 1.2) but some of those readings now go to a neighbouring trip in the queue (wrong-trip share up to 8.5% from 4.2% in one case): queued trains are hard to tell apart from the boards alone. `tools/validate_matching.mjs` runs these scenarios.
 - Run numbers: the orange dot left of the title is now a switch. Tap once and every train dot shows its Run number until tapped again; the choice is remembered (it used to show for 15 s).

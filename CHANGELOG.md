@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.6 — 2026-10-07 (`dev`)
+- Late trains no longer run ahead of their boards. At 18:40 Run 73 showed +110 s but its dot was already half way from To Kwa Wan to Sung Wong Toi, while the To Kwa Wan board still counted down to it. The badge was right; the dot's clock was still at about +50 s, because it closed on the estimate at no more than 0.3 s per second and kept running at 0.7x. A dot standing at a platform now waits there until its clock catches up (or leaves sooner when the train is ahead of it); between stations it still runs at 0.7-1.3x and never stops or goes backwards. In a synthetic check of held trains (`tools/validate_position.mjs`), dots that had left a platform the train had not reached went from 2-8% of the time to none; on-time running is unchanged. A train held at a platform can still leave on time on screen and wait at the next station, because the boards show the hold only 40-60 s later (docs/ALGORITHM.md §3h).
+- Shell cache renamed `v28`.
+
 ## v0.7.5 — 2026-10-07 (`e30df5f`)
 - Train card and keyboard: the card is rebuilt every second, so focus on any of its buttons (✕, the Run chip, "全日更份 ›", 跟隨) dropped back to the page within a second, and flipping the card with Enter or Space lost it at once. Focus now stays on the same button, or moves to the Run chip when "全日更份 ›" is no longer on the card. Mouse and touch use is unchanged.
 - docs/DUTYSHEET.md no longer says the header line ends in "Duty Sheet" (gone since v0.7.4; the tooltip still names it). Shell cache renamed `v27`.

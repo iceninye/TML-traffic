@@ -23,6 +23,8 @@ import { calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings
 const LOCALE_KEY = "tml-traffic-locale"
 const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
+// The brand dot toggles Run numbers on the train dots; remembered.
+const RUNS_KEY = "tml-traffic-show-runs"
 // Hop-time calibration learned from the feed, kept so a reload starts warm.
 // v2: corrections are now relative to the working timetable's own hop
 // times; v1 values were relative to the old single-table model.
@@ -48,7 +50,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.6.3", commit: "b3d0e2a" }
+const BUILD = { version: "0.7.0", commit: "0b89ed3" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -73,6 +75,7 @@ const STRINGS = {
     diagram: "路綫圖",
     map: "地圖",
     pause: "暫停",
+    showRuns: "顯示 Run 編號",
     resume: "繼續",
     up: "上行",
     down: "下行",
@@ -102,6 +105,17 @@ const STRINGS = {
     waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
     duty: "更份",
     relief: (place, duty) => `（${place}換 ${duty}）`,
+    dutyAll: "全日更份 ›",
+    dutyPlan: (run) => `Run ${run} 全日更份`,
+    dutyPickUp: "接車",
+    dutyRelief: "交車",
+    dutyNow: "現時",
+    toDepot: "回廠",
+    dutyBack: "返回列車資料",
+    dutyNote: (code) => `來源：Duty Sheet ${code}。接車時間為開出時間（準確到秒）；交車時間為列車到站時間（按時間表）。`,
+    noDuties: "呢架車冇更份資料（只有 Duty Sheet 時間表先有）",
+    lastTrip: "L 尾程",
+    lastTripNote: "最後一程，到站後回廠",
     schedDep: "原定開出",
     expectedDep: (clock) => `（預計 ${clock}）`,
     arrived: (a) => `已抵達 ${a}`,
@@ -155,6 +169,7 @@ const STRINGS = {
     diagram: "Diagram",
     map: "Map",
     pause: "Pause",
+    showRuns: "Show Run numbers",
     resume: "Resume",
     up: "Up",
     down: "Down",
@@ -184,6 +199,17 @@ const STRINGS = {
     waitingIn: (a, m) => `Standing at ${a}, leaves in about ${m} min`,
     duty: "Duty",
     relief: (place, duty) => `(relief at ${place}: ${duty})`,
+    dutyAll: "All duties ›",
+    dutyPlan: (run) => `Run ${run} duties today`,
+    dutyPickUp: "Pick up",
+    dutyRelief: "Relief",
+    dutyNow: "Now",
+    toDepot: "to depot",
+    dutyBack: "Back to train",
+    dutyNote: (code) => `Source: Duty Sheet ${code}. Pick-up is the departure time (to the second); relief is the train's timetabled arrival.`,
+    noDuties: "No duty data for this train (only Duty Sheet timetables have it)",
+    lastTrip: "L last trip",
+    lastTripNote: "last trip, then to depot",
     schedDep: "Scheduled departure",
     expectedDep: (clock) => ` (expected ${clock})`,
     arrived: (a) => `Arrived at ${a}`,
@@ -264,13 +290,15 @@ const state = {
   lang: readPref(LOCALE_KEY) === "en" ? "en" : "tc",
   view: readPref(VIEW_KEY) === "map" ? "map" : "diagram",
   paused: readPref(PAUSE_KEY) === "1",
+  showRuns: readPref(RUNS_KEY) === "1",
   runs: [],
   data: null,
   loadedAtMs: 0,
   stationCount: 0,
   status: "loading",
   selected: null,
-  runsUntil: 0,
+  // Train card page: 1 details, 2 the train's duties for the day.
+  trainPage: 1,
   follow: false,
   sheetKind: null,
   station: null,
@@ -580,6 +608,7 @@ function applyStrings() {
   for (const button of els.viewSeg.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === state.view))
   els.pauseBtn.textContent = state.paused ? s.resume : s.pause
   els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
+  paintRunsToggle()
   els.mapNote.textContent = s.mapLoading
   els.mapFallback.querySelector("p").textContent = s.mapUnavailable
   els.colLegend.innerHTML =
@@ -595,6 +624,13 @@ function applyStrings() {
     `<p>${s.source}</p><p>${s.engine}</p>` +
     `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
+}
+
+function paintRunsToggle() {
+  els.brandDot.dataset.on = state.showRuns ? "1" : "0"
+  els.brandDot.setAttribute("aria-pressed", String(state.showRuns))
+  els.brandDot.setAttribute("aria-label", t().showRuns)
+  els.brandDot.title = t().showRuns
 }
 
 function paintClock() {
@@ -819,10 +855,14 @@ function approxWidth(text, perChar) {
 // ~20 s and kept up to 3 min when a read fails, so it can outlive the train.
 // Drop it once the train has left, by the same clock the map uses: an arrival
 // reading leaves after the stop (ARRIVAL_STOP_MS, as lib/mtr-estimate.js), a
-// published departure leaves at its time.
+// published departure leaves at its time. A read younger than FRESH_READ_MS
+// is MTR saying the train is still there (a long dwell at a busy station keeps
+// its board at 0 past the due clock), so it always stays.
 const ARRIVAL_STOP_MS = 30_000
-function hasLeft(train, now) {
+const FRESH_READ_MS = 30_000
+function hasLeft(train, now, readAt) {
   if (train.ttnt > 0 || !Number.isFinite(train.dueAt)) return false
+  if (Number.isFinite(readAt) && now - readAt <= FRESH_READ_MS) return false
   return now > train.dueAt + (train.timeType === "D" ? 0 : ARRIVAL_STOP_MS)
 }
 
@@ -838,7 +878,7 @@ function agedTrain(train, now) {
 function boardTrains(board, dir, now = Date.now()) {
   return (board?.trains ?? [])
     .map((train) => agedTrain(train, now))
-    .filter((train) => !hasLeft(train, now) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
+    .filter((train) => !hasLeft(train, now, board?.observedAt) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
 }
 
 function render() {
@@ -883,6 +923,11 @@ function render() {
 }
 
 /* ------------------------------------------------------------- animation */
+
+// L trips (last trip of the day for that train, then to depot) are drawn dim.
+function isLastTrip(run) {
+  return run.kind === "sched" && run.trip.last
+}
 
 function isShortTrip(run) {
   return run.dest !== "TUM" && run.dest !== "WKS"
@@ -934,9 +979,11 @@ function syncTrains() {
       node.dataset.selected = state.selected === run.id ? "1" : "0"
       node.dataset.phase = run.pos.phase
       node.dataset.level = String(lateLevel(run))
-      // Hidden feature: tapping the brand dot shows each train's Run number
-      // in place of its arrow for a few seconds (N/A trains show a dash).
-      const reveal = Date.now() < state.runsUntil
+      node.dataset.last = isLastTrip(run) ? "1" : "0"
+      // The brand dot switches each train's Run number on in place of its
+      // arrow. A train no timetable trip claims (countdown model) has no Run
+      // number and shows a dash.
+      const reveal = state.showRuns
       node.dataset.reveal = reveal ? "1" : "0"
       if (reveal) {
         const label = run.kind === "sched" ? String(run.trip.run) : "–"
@@ -1216,7 +1263,7 @@ function installMapLayers() {
     id: "tml-cars",
     type: "fill",
     source: "tml-cars",
-    paint: { "fill-color": "#a1a2a5", "fill-opacity": 1 },
+    paint: { "fill-color": "#a1a2a5", "fill-opacity": ["case", ["==", ["get", "last"], 1], 0.7, 1] },
   })
   // White outline around every car so the train stands out on the map.
   map.addLayer({
@@ -1405,6 +1452,7 @@ function paintMap() {
       level: lateLevel(run),
       delay: run.delay ? 1 : 0,
       selected: run.id === state.selected ? 1 : 0,
+      last: isLastTrip(run) ? 1 : 0,
       lateText: lateText(run),
       glow: shape.glow,
     }
@@ -1596,21 +1644,76 @@ function scheduledDeparture(run) {
 function dutyRow(run) {
   const duties = run.kind === "sched" ? run.trip.duties : null
   if (!duties?.length) return ""
-  const codes = run.trip.stops.map((st) => st.code)
-  const reached = codes.indexOf(run.pos?.from)
-  let current = 0
-  duties.forEach(([, code], i) => {
-    if (reached >= 0 && codes.indexOf(code) <= reached) current = i
-  })
+  const current = currentDuty(run)
   const next = duties[current + 1]
   const s = t()
   const later = next ? ` <span class="meta">${s.relief(network.name(next[1], state.lang), escapeHtml(next[0]))}</span>` : ""
-  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}</dd>`
+  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later} <button type="button" class="link duty-more">${s.dutyAll}</button></dd>`
+}
+
+// Index into run.trip.duties of the duty driving now: the last one picked up
+// at a station the train has reached.
+function currentDuty(run) {
+  const codes = run.trip.stops.map((st) => st.code)
+  const reached = codes.indexOf(run.pos?.from)
+  let current = 0
+  run.trip.duties.forEach(([, code], i) => {
+    if (reached >= 0 && codes.indexOf(code) <= reached) current = i
+  })
+  return current
+}
+
+// The day's duties for a train: every trip of its Run in the loaded Duty
+// Sheet book, in order. Each row is one duty's stint: picked up at a station
+// (the departure time there, exact in the sheet) and relieved where the next
+// duty picks up or where the trip ends (the train's arrival there). A duty
+// that carries on through a terminus layover stays one row.
+function dutyPlan(run) {
+  const book = timetables.books[state.book]
+  if (run.kind !== "sched" || !run.trip.duties?.length || !book) return null
+  const trips = book.trips
+    .filter((trip) => trip.run === run.trip.run && trip.duties?.length)
+    .sort((a, b) => a.stops[0].dep - b.stops[0].dep)
+  const rows = []
+  for (const trip of trips) {
+    const codes = trip.stops.map((st) => st.code)
+    trip.duties.forEach(([duty, from], i) => {
+      const a = Math.max(0, codes.indexOf(from))
+      const nextFrom = trip.duties[i + 1]?.[1]
+      const b = nextFrom && codes.indexOf(nextFrom) > a ? codes.indexOf(nextFrom) : codes.length - 1
+      const off = { code: codes[b], at: trip.stops[b].arr, depot: trip.last && b === codes.length - 1 }
+      const prev = rows[rows.length - 1]
+      if (prev && prev.duty === duty && prev.off.code === codes[a]) {
+        prev.off = off
+        prev.keys.push(`${trip.id}#${i}`)
+        return
+      }
+      rows.push({ duty, pick: { code: codes[a], at: trip.stops[a].dep }, off, keys: [`${trip.id}#${i}`] })
+    })
+  }
+  const now = `${run.trip.id}#${currentDuty(run)}`
+  for (const row of rows) row.now = row.keys.includes(now)
+  return { rows, sheet: book.dutysheet }
+}
+
+function dutyPage(run) {
+  const s = t()
+  const plan = dutyPlan(run)
+  if (!plan?.rows.length) return `<p class="empty">${s.noDuties}</p>`
+  const hhmm = (sec) => secClock(sec).slice(0, 5)
+  const rows = plan.rows.map((row) =>
+    `<li data-now="${row.now ? 1 : 0}"><span class="duty-no">${escapeHtml(row.duty)}${row.now ? ` <span class="badge now">${s.dutyNow}</span>` : ""}</span>` +
+    `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${network.name(row.pick.code, state.lang)} ${secClock(row.pick.at)}</span>` +
+    `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${network.name(row.off.code, state.lang)} ${hhmm(row.off.at)}` +
+    `${row.off.depot ? ` <span class="badge plain">${s.toDepot}</span>` : ""}</span></li>`).join("")
+  return `<div class="stops-head">${s.dutyPlan(run.trip.run)}</div><ol class="duties">${rows}</ol>` +
+    `<p class="fine">${s.dutyNote(escapeHtml(plan.sheet ?? ""))}</p>`
 }
 
 function openTrain(runId) {
   state.selected = runId
   state.sheetKind = "train"
+  state.trainPage = 1
   paintTrainSheet(true)
 }
 
@@ -1622,7 +1725,8 @@ function paintTrainSheet(first = false) {
     return
   }
   const now = Date.now()
-  const stops = tracker.upcoming(run, now).slice(0, 8)
+  const page = state.trainPage === 2 ? 2 : 1
+  const stops = page === 1 ? tracker.upcoming(run, now).slice(0, 8) : []
   const dirClass = run.dir === "UP" ? "up" : "down"
   const destName = network.name(run.dest, state.lang)
   const stopRows = stops
@@ -1635,12 +1739,21 @@ function paintTrainSheet(first = false) {
     .join("")
   const html =
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
-    `<div class="train-head"><span class="train-chip ${dirClass}">${run.dir === "UP" ? "▲" : "▼"}</span>` +
+    // The direction triangle flips the card to the train's duty list and back.
+    `<div class="train-head"><button type="button" class="train-chip ${dirClass}" data-page="${page}" aria-pressed="${page === 2}" ` +
+    `aria-label="${page === 2 ? s.dutyBack : s.dutyPlan(run.kind === "sched" ? run.trip.run : "")}">${run.dir === "UP" ? "▲" : "▼"}</button>` +
     `<div><h2>${destName}</h2><div class="sub">${run.dir === "UP" ? s.up : s.down} · TML` +
     `${isShortTrip(run) ? ` · <span class="badge plain">${s.shortTrip}</span>` : ""}` +
+    `${isLastTrip(run) ? ` · <span class="badge plain" title="${s.lastTripNote}">${s.lastTrip}</span>` : ""}` +
     `${run.delay ? ` · <span class="badge">${s.delayBadge}</span>` : ""}</div></div>` +
     `<button class="btn follow" aria-pressed="${state.follow}">${state.follow ? s.following : s.follow}</button></div>` +
-    `<dl class="kv">` +
+    (page === 2 ? dutyPage(run) : trainPage(run, s, stopRows))
+  if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
+  else els.sheetBody.innerHTML = html
+}
+
+function trainPage(run, s, stopRows) {
+  return `<dl class="kv">` +
     `<dt>${s.position}</dt><dd>${positionText(run)}</dd>` +
     `<dt>${s.speed}</dt><dd>${Math.round(run.pos.speedKmh)} km/h</dd>` +
     (run.kind === "sched"
@@ -1659,8 +1772,6 @@ function paintTrainSheet(first = false) {
       ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`
       : `${s.tripId(s.na, s.na)} · ${s.basis.model(run.readings)}`}</p>` +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
-  if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
-  else els.sheetBody.innerHTML = html
 }
 
 function setFollow(on) {
@@ -1674,18 +1785,11 @@ function setFollow(on) {
 
 /* -------------------------------------------------------------- controls */
 
-// How long the brand-dot reveal shows Run numbers.
-const RUN_REVEAL_MS = 15_000
-let revealTimer = 0
-
 function wireControls() {
   els.brandDot.addEventListener("click", () => {
-    state.runsUntil = Date.now() + RUN_REVEAL_MS
-    els.brandDot.dataset.on = "1"
-    clearTimeout(revealTimer)
-    revealTimer = setTimeout(() => {
-      els.brandDot.dataset.on = "0"
-    }, RUN_REVEAL_MS)
+    state.showRuns = !state.showRuns
+    writePref(RUNS_KEY, state.showRuns ? "1" : "0")
+    paintRunsToggle()
     if (state.view === "diagram") syncTrains()
   })
   els.viewSeg.addEventListener("click", (event) => {
@@ -1717,7 +1821,10 @@ function wireControls() {
   els.sheetBackdrop.addEventListener("click", closeSheet)
   els.sheet.addEventListener("click", (event) => {
     if (event.target.closest(".sheet-close")) closeSheet()
-    else if (event.target.closest(".follow")) {
+    else if (event.target.closest(".train-chip, .duty-more")) {
+      state.trainPage = state.trainPage === 2 ? 1 : 2
+      paintTrainSheet()
+    } else if (event.target.closest(".follow")) {
       setFollow(!state.follow)
       lastFollow = 0
     }

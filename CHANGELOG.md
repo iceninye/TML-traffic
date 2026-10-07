@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.0 — 2026-10-07 (`dev`)
+## v0.7.0 — 2026-10-07 (`0b89ed3`)
 - Trip matching (the "–" dots): a dot shows "–" in Run-number mode when no timetable trip claimed its readings and the countdown model drew it. Delayed trains caused this: readings 120-150 s off their trip cost more than skipping them, so they were always dropped and drawn again as a "–" train beside the real one, and the line delay taken from the nearest slot could read a late line as an early one. The matching cost is now continuous, the line delay is scored over all near readings with lateness favoured over earliness, each direction gets its own, and readings attached in the second pass must keep the trains' order. Synthetic boards like the 2026-10-07 08:56 screenshot (a few trains +80-130 s, page opened during the delay): "–" dots 1.5 to 0 per snapshot, readings on the wrong trip 5.5% to 1.0%. With a train held 5-8 minutes and a queue behind it, "–" dots fall (e.g. 3.8 to 1.2) but some of those readings now go to a neighbouring trip in the queue (wrong-trip share up to 8.5% from 4.2% in one case): queued trains are hard to tell apart from the boards alone. `tools/validate_matching.mjs` runs these scenarios.
 - Run numbers: the orange dot left of the title is now a switch. Tap once and every train dot shows its Run number until tapped again; the choice is remembered (it used to show for 15 s).
 - L trips (last trip of the day for that train, back to depot after it) are drawn at 70% opacity on the diagram and the map, and the card says "L 尾程". The flag comes from the Duty Sheet; the official timetable PDFs have none, so special-timetable days show no L.

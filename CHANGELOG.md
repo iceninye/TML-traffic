@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.6 — 2026-10-07 (`dev`)
+## v0.7.6 — 2026-10-07 (`942f025`)
 - Late trains no longer run ahead of their boards. At 18:40 Run 73 showed +110 s but its dot was already half way from To Kwa Wan to Sung Wong Toi, while the To Kwa Wan board still counted down to it. The badge was right; the dot's clock was still at about +50 s, because it closed on the estimate at no more than 0.3 s per second and kept running at 0.7x. A dot standing at a platform now waits there until its clock catches up (or leaves sooner when the train is ahead of it); between stations it still runs at 0.7-1.3x and never stops or goes backwards. In a synthetic check of held trains (`tools/validate_position.mjs`), dots that had left a platform the train had not reached went from 2-8% of the time to none; on-time running is unchanged. A train held at a platform can still leave on time on screen and wait at the next station, because the boards show the hold only 40-60 s later (docs/ALGORITHM.md §3h).
 - Shell cache renamed `v28`.
 

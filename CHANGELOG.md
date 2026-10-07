@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.3 — 2026-10-07 (`dev`)
+## v0.7.3 — 2026-10-07 (`86ae0e5`)
 - Station countdowns: "即將" now goes as soon as the dot of the train it belongs to starts to pull out of the platform. MTR's board keeps a departed train at 0 for a while and each board is read every ~20 s, and since v0.7.0 any 0 from a read in the last 30 s was kept, so "即將" could stay up to about a minute after the dot left. Each board reading is now tied to its drawn train (its timetable trip, or the countdown-model train built from it); readings no train claims keep the old clock. Synthetic boards (DS1101 11:50, 52 rows over 10 min, board still at 0 for 20 s after a departure): rows showing "即將" with no train at or within a minute of the platform, 2174 to 38 row-seconds; the same with a 40 s board lag, 3746 to 29. Rows missing "即將" while a train dwells are unchanged (565 vs 565), except a train held at the platform past its timetabled dwell: its dot leaves on time and "即將" goes with it (90 s holds: 560 to 743). Details in docs/ALGORITHM.md §3g. Shell cache renamed `v25`.
 
 ## v0.7.2 — 2026-10-07 (`84824aa`)

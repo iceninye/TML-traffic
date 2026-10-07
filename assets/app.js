@@ -20,7 +20,8 @@ import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
 import { calendarDay, createTimetables, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
 
-const LOCALE_KEY = "tml-traffic-locale"
+// Chinese only: the English switch went in v0.7.4.
+const LANG = "tc"
 const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
 // The brand dot toggles Run numbers on the train dots; remembered.
@@ -50,7 +51,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.3", commit: "86ae0e5" }
+const BUILD = { version: "0.7.4", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -66,7 +67,7 @@ const INTERCHANGE = {
   DIH: [["KTL", "#00AB4E"]],
   TAW: [["EAL", "#5EB6E4"]],
 }
-const TUNNEL = { from: "KSR", to: "TWW", tc: "大欖隧道", en: "Tai Lam Tunnel" }
+const TUNNEL = { from: "KSR", to: "TWW", name: "大欖隧道" }
 
 const STRINGS = {
   tc: {
@@ -136,7 +137,7 @@ const STRINGS = {
     mapLoading: "載入地圖…",
     attribution: "路軌 © OpenStreetMap 貢獻者 (ODbL) · 底圖 OpenFreeMap",
     source: "資料來源：港鐵 Next Train API（data.gov.hk）",
-    engine: "列車位置由到站時間推算模擬，非港鐵官方列車位置",
+    disclaimer: "⚠免責聲明：本站列車位置為演算法推算之模擬數據，非港鐵官方即時定位。資料僅供參考，本站概不承擔任何責任。",
     lateTag: (sec) => `+ ${sec}s`,
     lateLabel: "慢於時間表",
     lateSec: (sec) => `${sec} 秒`,
@@ -154,7 +155,6 @@ const STRINGS = {
     offPeak: "非繁忙",
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
     dutySource: (code, date) => `班次來源：Duty Sheet ${code}（${date} 起）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
-    dutyTag: "Duty Sheet",
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
@@ -167,105 +167,6 @@ const STRINGS = {
     shortLegend: "虛線圈＝短程車",
     colUp: "往屯門",
     colDown: "往烏溪沙",
-  },
-  en: {
-    title: "Tuen Ma Line Live",
-    sub: "Tuen Ma Line · estimated",
-    diagram: "Diagram",
-    map: "Map",
-    pause: "Pause",
-    showRuns: "Show Run numbers",
-    resume: "Resume",
-    up: "Up",
-    down: "Down",
-    toTum: "To Tuen Mun",
-    toWks: "To Wu Kai Sha",
-    terminus: "Terminus",
-    live: "LIVE",
-    trainsDir: (u, d) => `▲ ${u} · ▼ ${d} trains`,
-    stations: (n) => `${n}/27 stations`,
-    updated: (s) => (s < 60 ? `updated ${s}s ago` : `updated ${Math.floor(s / 60)}m ago`),
-    loading: "Loading…",
-    feedDown: (r, why) => `Can't reach the MTR feed${why ? ` (${why})` : ""}, retrying in ${r}s`,
-    feedWhy: { timeout: "timed out", network: "network error", data: "unreadable answer", app: "app error" },
-    mtrPaused: (r) => `MTR has paused live train times, retrying in ${r}s`,
-    mtrNotice: "MTR notice",
-    mtrNoticeNone: "MTR has paused live train times",
-    noticeMore: "Details",
-    stale: (a, r) => `Data ${a < 60 ? `${a}s` : `${Math.floor(a / 60)}m`} old, trains estimated from timetable · retry in ${r}s`,
-    offline: "Offline, will update when back online",
-    paused: "Updates paused",
-    min: "min",
-    due: "now",
-    platform: "Platform",
-    scheduled: "Scheduled",
-    delayBadge: "Delay",
-    delayNote: "MTR reports a delay; affected trains are outlined in amber",
-    notice: "Service notice",
-    position: "Position",
-    running: (a, b) => `Running ${a} → ${b}`,
-    dwelling: (a) => `Stopped at ${a}`,
-    waiting: (a) => `About to leave ${a}`,
-    waitingIn: (a, m) => `Standing at ${a}, leaves in about ${m} min`,
-    duty: "Duty",
-    relief: (place, duty) => `(relief at ${place}: ${duty})`,
-    dutyAll: "All duties ›",
-    dutyPlan: (run) => `Run ${run} duties today`,
-    dutyPickUp: "Pick up",
-    dutyRelief: "Relief",
-    dutyNow: "Now",
-    toDepot: "to depot",
-    dutyBack: "Back to train",
-    dutyNote: (code) => `Source: Duty Sheet ${code}. Pick-up is the departure time (to the second); relief is the train's timetabled arrival.`,
-    noDuties: "No duty data for this train (only Duty Sheet timetables have it)",
-    lastTrip: "L last trip",
-    lastTripNote: "last trip, then to depot",
-    schedDep: "Scheduled departure",
-    expectedDep: (clock) => ` (expected ${clock})`,
-    arrived: (a) => `Arrived at ${a}`,
-    dest: "Destination",
-    nextStops: "Next stops (estimated)",
-    speed: "Speed",
-    shortTrip: "Short trip",
-    follow: "Follow",
-    following: "Following",
-    close: "Close",
-    noTrains: "No board data yet",
-    mapUnavailable: "The map could not start (no WebGL, or the tiles would not load). Switched back to the diagram.",
-    mapLoading: "Loading map…",
-    attribution: "Track © OpenStreetMap contributors (ODbL) · basemap OpenFreeMap",
-    source: "Source: MTR Next Train API (data.gov.hk)",
-    engine: "Train positions are simulated from arrival times, not official MTR train locations",
-    lateTag: (sec) => `+ ${sec}s`,
-    lateLabel: "Behind timetable",
-    lateSec: (sec) => `${sec} s`,
-    lateSource: { timetable: "behind its timetabled trip", spacing: "gap to the train ahead is longer than the measured headway" },
-    gapTag: (sec) => `Gap +${sec}s`,
-    spacing: "Spacing",
-    spacingOk: "Normal",
-    na: "N/A",
-    onTime: "On time (within 60 s)",
-    readings: (n) => `fused from ${n} station countdowns`,
-    dayType: { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday/PH", special: "Special timetable" },
-    peak: "peak",
-    offTimetable: (u, d, mu, md) => `Special service: placed from countdowns · up ${u} / down ${d} trains · measured headway up ${mu} / down ${md} min`,
-    offTimetableNote: "The service does not match any timetable; trains are placed from MTR countdowns only. Trip, run and timetable delay do not apply",
-    offPeak: "off-peak",
-    matchNote: (m, f) => `${m} trains matched to timetabled trips, ${f} estimated by the running model`,
-    dutySource: (code, date) => `Trips from Duty Sheet ${code} (effective ${date}): stop times are the official timetable's, with duty numbers added; only trips the timetable lacks are modelled`,
-    dutyTag: "Duty Sheet",
-    tripId: (run, trip) => `Trip ${trip} (run ${run})`,
-    basis: { sched: (n) => `Timetabled trip, corrected by ${n} station countdowns`, model: (n) => `No timetabled trip matched; estimated from ${n} station countdowns` },
-    band: { early: "Early", shoulder: "Shoulder", amPeak: "AM peak", day: "Daytime", pmPeak: "PM peak", evening: "Evening" },
-    headway: (m) => `every ~${m} min`,
-    offService: "Out of service hours",
-    lastTrains: "Last trains",
-    peakRun: "peak run times",
-    offRun: "off-peak run times",
-    hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
-    shortLegend: "dashed ring = short trip",
-    colUp: "Tuen Mun",
-    colDown: "Wu Kai Sha",
   },
 }
 
@@ -287,7 +188,6 @@ const els = {
   mapLegend: document.getElementById("map-legend"),
   mapFallback: document.getElementById("map-fallback"),
   viewSeg: document.getElementById("view-seg"),
-  langSeg: document.getElementById("lang-seg"),
   pauseBtn: document.getElementById("pause-btn"),
   colLegend: document.getElementById("col-legend"),
   sheet: document.getElementById("sheet"),
@@ -297,7 +197,6 @@ const els = {
 }
 
 const state = {
-  lang: readPref(LOCALE_KEY) === "en" ? "en" : "tc",
   view: readPref(VIEW_KEY) === "map" ? "map" : "diagram",
   paused: readPref(PAUSE_KEY) === "1",
   showRuns: readPref(RUNS_KEY) === "1",
@@ -339,7 +238,7 @@ let lastMapPaint = 0
 let lastSheetPaint = 0
 let lastFollow = 0
 
-const t = () => STRINGS[state.lang]
+const t = () => STRINGS[LANG]
 
 /* ------------------------------------------------------------------ data */
 
@@ -414,7 +313,7 @@ async function boot() {
 }
 
 function makeFeed() {
-  return createFeed(network, { readSchedule, readNotice, carryArrivalClock, estimateTrains, lang: state.lang })
+  return createFeed(network, { readSchedule, readNotice, carryArrivalClock, estimateTrains, lang: LANG })
 }
 
 async function fetchJson(url) {
@@ -642,12 +541,10 @@ function setStatus(kind) {
 
 function applyStrings() {
   const s = t()
-  document.documentElement.lang = state.lang === "en" ? "en" : "zh-HK"
   els.title.textContent = s.title
   els.sub.textContent = s.sub
   els.viewSeg.querySelector('[data-view="diagram"]').textContent = s.diagram
   els.viewSeg.querySelector('[data-view="map"]').textContent = s.map
-  for (const button of els.langSeg.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.lang === state.lang))
   for (const button of els.viewSeg.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === state.view))
   els.pauseBtn.textContent = state.paused ? s.resume : s.pause
   els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
@@ -664,7 +561,7 @@ function applyStrings() {
     ? "dev"
     : `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}">${BUILD.commit}</a>`
   els.foot.innerHTML =
-    `<p>${s.source}</p><p>${s.engine}</p>` +
+    `<p>${s.source}</p><p>${s.disclaimer}</p>` +
     `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
 }
@@ -728,8 +625,7 @@ function paintClock() {
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      const source = book.source === "dutysheet" ? ` · ${s.dutyTag}` : ""
-      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}${source}`
+      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = (book.source === "dutysheet" ? `${s.dutySource(book.dutysheet, book.effective)}\n` : "") + s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
@@ -819,7 +715,7 @@ function buildDiagram() {
     if (a === TUNNEL.from && b === TUNNEL.to) {
       base.append(
         make("rect", { x: TRACK_UP_X - 12, y: ya + 22, width: TRACK_DN_X - TRACK_UP_X + 24, height: yb - ya - 44, rx: 10, class: "dg-tunnel" }),
-        make("text", { x: NAME_X, y: mid + 16, class: "dg-tunnel-label" }, state.lang === "en" ? TUNNEL.en : TUNNEL.tc),
+        make("text", { x: NAME_X, y: mid + 16, class: "dg-tunnel-label" }, TUNNEL.name),
       )
     }
   }
@@ -847,17 +743,15 @@ function buildDiagram() {
     group.append(make("rect", { x: 0, y: y - 22, width, height: 44, class: "dg-row-bg" }))
     // Station: one capsule across both tracks, like a platform.
     group.append(make("rect", { x: TRACK_UP_X - 9, y: y - 7, width: TRACK_DN_X - TRACK_UP_X + 18, height: 14, rx: 7, class: "dg-station" }))
-    const primary = network.name(code, state.lang)
-    const secondary = state.lang === "en" ? network.name(code, "tc") : network.name(code, "en")
+    const primary = network.name(code, LANG)
+    const secondary = network.name(code, "en")
     group.append(
       make("text", { x: NAME_X, y: y - 5, class: "dg-name" }, primary),
       make("text", { x: NAME_X, y: y + 11, class: "dg-name-2" }, secondary),
     )
-    // Interchange tags sit beside whichever line carries the Chinese name,
-    // which is always short.
-    const cjkOnFirst = state.lang !== "en"
-    const tagX = NAME_X + approxWidth(cjkOnFirst ? primary : secondary, cjkOnFirst ? 15.5 : 11) + 6
-    const tagY = cjkOnFirst ? y - 5 : y + 11
+    // Interchange tags sit beside the Chinese name, which is always short.
+    const tagX = NAME_X + approxWidth(primary, 15.5) + 6
+    const tagY = y - 5
     ;(INTERCHANGE[code] ?? []).forEach(([line, color], k) => {
       const x = tagX + k * 34
       group.append(
@@ -1073,7 +967,7 @@ function syncTrains() {
         if (text.textContent !== label) text.textContent = label
       }
       paintLateTag(node, run)
-      node.setAttribute("aria-label", `${network.name(run.dest, state.lang)} · ${positionText(run)}`)
+      node.setAttribute("aria-label", `${network.name(run.dest, LANG)} · ${positionText(run)}`)
     }
   }
 
@@ -1425,7 +1319,7 @@ function installMapLayers() {
 }
 
 function labelField() {
-  return ["coalesce", ["get", state.lang === "en" ? "name" : "nameTc"], ["get", "code"]]
+  return ["coalesce", ["get", "nameTc"], ["get", "code"]]
 }
 
 function stationCollection() {
@@ -1636,7 +1530,7 @@ function trainRow(train) {
   const kind = train.timeType === "D" ? s.scheduled : ""
   const meta = [platform, kind].filter(Boolean).join(" · ")
   return `<div class="train-item" data-delay="${train.delay ? 1 : 0}">${minutesLabel(train.ttnt)}` +
-    `<span>${network.name(train.dest, state.lang)}${badge}</span>` +
+    `<span>${network.name(train.dest, LANG)}${badge}</span>` +
     `<span class="meta">${meta}</span></div>`
 }
 
@@ -1648,7 +1542,7 @@ let stationHtmlShown = ""
 function stationSheetHtml(code) {
   const s = t()
   const board = (state.data?.boards ?? []).find((item) => item.station === code)
-  const name = network.name(code, state.lang)
+  const name = network.name(code, LANG)
   const blocks = []
   for (const [dir, dest, label] of [["UP", "TUM", s.toTum], ["DOWN", "WKS", s.toWks]]) {
     const head = `<div class="dir-head" data-dir="${dir}"><i class="sw ${dir === "UP" ? "up" : "down"}"></i>${dir === "UP" ? s.up : s.down} · ${label}</div>`
@@ -1691,7 +1585,7 @@ function paintStationSheet() {
 function positionText(run) {
   const s = t()
   const pos = run.pos
-  const n = (code) => network.name(code, state.lang)
+  const n = (code) => network.name(code, LANG)
   if (pos.phase === "run") return s.running(n(pos.from), n(pos.to))
   if (pos.phase === "dwell") return s.dwelling(n(pos.from))
   if (pos.phase === "wait") {
@@ -1717,7 +1611,7 @@ function scheduledDeparture(run) {
   const dep = run.trip.stops[0]?.dep
   if (!Number.isFinite(dep)) return ""
   const off = Math.abs(run.delayDisp) >= 60 ? s.expectedDep(secClock(dep + run.delayDisp)) : ""
-  return `<dt>${s.schedDep}</dt><dd>${network.name(run.trip.origin, state.lang)} ${secClock(dep)}${off}</dd>`
+  return `<dt>${s.schedDep}</dt><dd>${network.name(run.trip.origin, LANG)} ${secClock(dep)}${off}</dd>`
 }
 
 // Duty number (更份) driving the train now, when the loaded timetable came
@@ -1729,8 +1623,10 @@ function dutyRow(run) {
   const current = currentDuty(run)
   const next = duties[current + 1]
   const s = t()
-  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], state.lang), escapeHtml(next[0]))}</span>` : ""
-  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later} <button type="button" class="link duty-more">${s.dutyAll}</button></dd>`
+  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), escapeHtml(next[0]))}</span>` : ""
+  // The link to the day's duty list only shows with Run numbers switched on.
+  const more = state.showRuns ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
+  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}${more}</dd>`
 }
 
 // Index into run.trip.duties of the duty driving now: the last one picked up
@@ -1785,8 +1681,8 @@ function dutyPage(run) {
   const hhmm = (sec) => secClock(sec).slice(0, 5)
   const rows = plan.rows.map((row) =>
     `<li data-now="${row.now ? 1 : 0}"><span class="duty-no">${escapeHtml(row.duty)}${row.now ? ` <span class="badge now">${s.dutyNow}</span>` : ""}</span>` +
-    `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${network.name(row.pick.code, state.lang)} ${secClock(row.pick.at)}</span>` +
-    `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${network.name(row.off.code, state.lang)} ${hhmm(row.off.at)}` +
+    `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${network.name(row.pick.code, LANG)} ${secClock(row.pick.at)}</span>` +
+    `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${network.name(row.off.code, LANG)} ${hhmm(row.off.at)}` +
     `${row.off.depot ? ` <span class="badge plain">${s.toDepot}</span>` : ""}</span></li>`).join("")
   return `<div class="stops-head">${s.dutyPlan(run.trip.run)}</div><ol class="duties">${rows}</ol>` +
     `<p class="fine">${s.dutyNote(escapeHtml(plan.sheet ?? ""))}</p>`
@@ -1807,23 +1703,21 @@ function paintTrainSheet(first = false) {
     return
   }
   const now = Date.now()
-  const page = state.trainPage === 2 ? 2 : 1
+  const page = state.trainPage === 2 && state.showRuns && run.kind === "sched" ? 2 : 1
   const stops = page === 1 ? tracker.upcoming(run, now).slice(0, 8) : []
   const dirClass = run.dir === "UP" ? "up" : "down"
-  const destName = network.name(run.dest, state.lang)
+  const destName = network.name(run.dest, LANG)
   const stopRows = stops
     .map((stop) => {
       const mins = Math.max(0, Math.round((stop.at - now) / 60_000))
       const clock = new Date(stop.at).toLocaleTimeString("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit", hour12: false })
-      return `<li><span class="stop-dot ${dirClass}"></span><span class="stop-name">${network.name(stop.code, state.lang)}</span>` +
+      return `<li><span class="stop-dot ${dirClass}"></span><span class="stop-name">${network.name(stop.code, LANG)}</span>` +
         `<span class="stop-eta">${mins <= 0 ? s.due : `${mins} ${s.min}`}</span><span class="stop-clock">${clock}</span></li>`
     })
     .join("")
   const html =
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
-    // The direction triangle flips the card to the train's duty list and back.
-    `<div class="train-head"><button type="button" class="train-chip ${dirClass}" data-page="${page}" aria-pressed="${page === 2}" ` +
-    `aria-label="${page === 2 ? s.dutyBack : s.dutyPlan(run.kind === "sched" ? run.trip.run : "")}">${run.dir === "UP" ? "▲" : "▼"}</button>` +
+    `<div class="train-head">${trainChip(run, s, page)}` +
     `<div><h2>${destName}</h2><div class="sub">${run.dir === "UP" ? s.up : s.down} · TML` +
     `${isShortTrip(run) ? ` · <span class="badge plain">${s.shortTrip}</span>` : ""}` +
     `${isLastTrip(run) ? ` · <span class="badge plain" title="${s.lastTripNote}">${s.lastTrip}</span>` : ""}` +
@@ -1832,6 +1726,20 @@ function paintTrainSheet(first = false) {
     (page === 2 ? dutyPage(run) : trainPage(run, s, stopRows))
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
   else els.sheetBody.innerHTML = html
+}
+
+// The chip left of the destination. With Run numbers switched on (brand
+// dot) it shows the train's Run number and flips the card to the Run's duty
+// list and back; a countdown-model train has no Run and shows a dash.
+// Switched off, it is a plain direction triangle.
+function trainChip(run, s, page) {
+  const dirClass = run.dir === "UP" ? "up" : "down"
+  if (state.showRuns && run.kind === "sched") {
+    return `<button type="button" class="train-chip run ${dirClass}" data-page="${page}" aria-pressed="${page === 2}" ` +
+      `aria-label="${page === 2 ? s.dutyBack : s.dutyPlan(run.trip.run)}">${escapeHtml(String(run.trip.run))}</button>`
+  }
+  const label = state.showRuns ? "–" : run.dir === "UP" ? "▲" : "▼"
+  return `<span class="train-chip ${dirClass}" aria-hidden="true">${label}</span>`
 }
 
 function trainPage(run, s, stopRows) {
@@ -1873,24 +1781,13 @@ function wireControls() {
     writePref(RUNS_KEY, state.showRuns ? "1" : "0")
     paintRunsToggle()
     if (state.view === "diagram") syncTrains()
+    // The duty list sits behind the switch too: switching off leaves it.
+    if (!state.showRuns) state.trainPage = 1
+    if (state.sheetKind === "train") paintTrainSheet()
   })
   els.viewSeg.addEventListener("click", (event) => {
     const button = event.target.closest("button")
     if (button) showView(button.dataset.view)
-  })
-  els.langSeg.addEventListener("click", (event) => {
-    const button = event.target.closest("button")
-    if (!button || button.dataset.lang === state.lang) return
-    state.lang = button.dataset.lang
-    writePref(LOCALE_KEY, state.lang)
-    feed = makeFeed()
-    state.data = null
-    applyStrings()
-    buildDiagram()
-    if (state.sheetKind === "train") paintTrainSheet()
-    else if (state.sheetKind) closeSheet()
-    // refresh() would just return the in-flight pass on the old feed.
-    ;(inFlight ?? Promise.resolve()).then(() => refresh(true))
   })
   els.pauseBtn.addEventListener("click", () => {
     state.paused = !state.paused
@@ -1905,7 +1802,7 @@ function wireControls() {
   els.sheetBackdrop.addEventListener("click", closeSheet)
   els.sheet.addEventListener("click", (event) => {
     if (event.target.closest(".sheet-close")) closeSheet()
-    else if (event.target.closest(".train-chip, .duty-more")) {
+    else if (state.showRuns && event.target.closest("button.train-chip, .duty-more")) {
       state.trainPage = state.trainPage === 2 ? 1 : 2
       paintTrainSheet()
     } else if (event.target.closest(".follow")) {

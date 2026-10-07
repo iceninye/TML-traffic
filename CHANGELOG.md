@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.4 — 2026-10-07 (`dev`)
+- Run-number switch (the orange dot left of the title) now also covers the train card. Switched on: the card's chip shows the train's Run number instead of ▲/▼, and the chip and "全日更份 ›" open the Run's duties for the day. Switched off: the chip is a plain ▲/▼ and the duty list is hidden (an open card on that page goes back to the train details). A train no timetable trip claims shows "–" on the chip, as on the diagram. The choice is still remembered after reloading.
+- Header: the timetable line no longer ends in "· Duty Sheet" (e.g. "平日 · 繁忙 · 班距約 3.5 分"); its tooltip still names the Duty Sheet.
+- Footer: the second line is now a disclaimer: "⚠免責聲明：本站列車位置為演算法推算之模擬數據，非港鐵官方即時定位。資料僅供參考，本站概不承擔任何責任。"
+- The 繁 / EN switch is gone; the app is Chinese only. The diagram still shows each station's English name under the Chinese one. Shell cache renamed `v26`.
+
 ## v0.7.3 — 2026-10-07 (`86ae0e5`)
 - Station countdowns: "即將" now goes as soon as the dot of the train it belongs to starts to pull out of the platform. MTR's board keeps a departed train at 0 for a while and each board is read every ~20 s, and since v0.7.0 any 0 from a read in the last 30 s was kept, so "即將" could stay up to about a minute after the dot left. Each board reading is now tied to its drawn train (its timetable trip, or the countdown-model train built from it); readings no train claims keep the old clock. Synthetic boards (DS1101 11:50, 52 rows over 10 min, board still at 0 for 20 s after a departure): rows showing "即將" with no train at or within a minute of the platform, 2174 to 38 row-seconds; the same with a 40 s board lag, 3746 to 29. Rows missing "即將" while a train dwells are unchanged (565 vs 565), except a train held at the platform past its timetabled dwell: its dot leaves on time and "即將" goes with it (90 s holds: 560 to 743). Details in docs/ALGORITHM.md §3g. Shell cache renamed `v25`.
 

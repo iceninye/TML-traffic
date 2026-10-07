@@ -80,7 +80,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 |---|---|
 | 點站名／站點 | bottom sheet：兩個方向各 4 班，含月台、預定/實時、延誤 |
 | 點列車圓點 | 列車卡：目的地、現時位置（A → B）、最近一站倒數、車速、月台 |
-| 繁 / EN | 即時切換，重讀 feed（唔同 lang 參數） |
+| 標題左邊橙點 | 開／關 Run 編號（記入 localStorage）；開咗先會喺列車卡左上角顯示 Run 編號同「全日更份 ›」 |
 | 暫停 | 停止輪詢同動畫推進，保留畫面 |
 | 路綫圖 / 地圖 | 切換 view，記入 localStorage |
 
@@ -190,7 +190,7 @@ tiles.openfreemap.org  →  server: cloudflare, cf-cache-status: HIT, cf-ray: ..
 python3 -m http.server 8790 --bind 127.0.0.1
 
 # 2. 開 http://127.0.0.1:8790/  → 應該 3 秒內出 27 行 + 列車點
-# 3. 點站名 → 彈窗；點列車點 → 列車卡；切 EN → 全英文
+# 3. 點站名 → 彈窗；點列車點 → 列車卡；撳橙點 → 列車點同列車卡顯示 Run 編號
 # 4. 切地圖 → 應該出真地圖；再切回路綫圖 → 列車點仍然貼住路軌
 
 # 5. 語法檢查（無 bundler，所以逐檔 parse）

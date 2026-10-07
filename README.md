@@ -4,7 +4,7 @@
 
 🔗 **https://tml-traffic.iceninye.workers.dev**（Cloudflare Workers；GitHub Pages 備用：https://iceninye.github.io/TML-traffic/）
 
-目前版本 v0.7.5，每版改動見 [`CHANGELOG.md`](CHANGELOG.md)。
+目前版本 v0.7.6，每版改動見 [`CHANGELOG.md`](CHANGELOG.md)。
 
 港鐵**冇公開列車位置 API**，只公佈「下一班幾分鐘後到」。本專案由各站到站倒數
 **反推列車位置**，引擎抽取自 [keithligh/hk-traffic-intelligence](https://github.com/keithligh/hk-traffic-intelligence)（MIT），
@@ -115,6 +115,7 @@ python3 tools/build_data.py --no-track   # 只重建時間表
 node tools/probe-tml.mjs     # 列車位置（v0.1 引擎）
 node tools/probe-runs.mjs    # 動畫層平滑度
 node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀數）
+node tools/validate_position.mjs   # 被扣列車嘅列車點位置（合成讀數）
 node --check assets/app.js   # 無 bundler，逐檔 parse
 ```
 

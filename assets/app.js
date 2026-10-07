@@ -50,7 +50,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.2", commit: "84824aa" }
+const BUILD = { version: "0.7.3", commit: "86ae0e5" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -308,6 +308,8 @@ const state = {
   status: "loading",
   // The last refresh threw before reading anything (an app bug, not the feed).
   crashed: false,
+  // Board reading -> id of the drawn train it belongs to (ownReadings).
+  owners: null,
   selected: null,
   // Train card page: 1 details, 2 the train's duties for the day.
   trainPage: 1,
@@ -602,7 +604,31 @@ function placeTrains(snapshot, now) {
   state.fallbackCount = fallback.length
   // Fallback trains report spacing against the headway measured from the
   // boards, never against a timetable.
-  tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
+  const runs = tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
+  state.owners = ownReadings(snapshot.boards ?? [], matched, runs, now)
+}
+
+// Which drawn train each board reading belongs to: a matched reading by its
+// trip, a leftover one by the fallback train built from it. A station's
+// "now" then follows that train's dot (see dotLeft).
+function ownReadings(boards, matched, runs, now) {
+  const key = (station, dest, ttnt) => `${station}|${dest}|${ttnt}`
+  const byKey = new Map()
+  for (const [id, entry] of matched) {
+    for (const r of entry.readings) byKey.set(key(r.station, r.dest, r.ttnt), id)
+  }
+  for (const run of runs) {
+    if (run.kind !== "model" || run.seenAt !== now) continue
+    for (const o of run.train.obs ?? []) byKey.set(key(o.station, run.dest, o.ttnt), run.id)
+  }
+  const owners = new WeakMap()
+  for (const board of boards) {
+    for (const train of board.trains ?? []) {
+      const id = byKey.get(key(board.station, train.dest, train.ttnt))
+      if (id) owners.set(train, id)
+    }
+  }
+  return owners
 }
 
 function setStatus(kind) {
@@ -901,10 +927,28 @@ function agedTrain(train, now) {
   return left < train.ttnt ? { ...train, ttnt: left } : train
 }
 
+// A "now" reading also goes as soon as the dot of the train it belongs to
+// starts to pull out of the platform, even from a fresh read: MTR keeps a
+// departed train at 0 until its board refreshes, and each board is read
+// every ~20 s, so the board trails the departure by up to a minute. The dot
+// decides, whatever the board's lag. A train held past its timetabled dwell
+// keeps "now" only while its dot is still at the platform. Readings no
+// drawn train claims fall back to hasLeft's clock.
+const LEAVE_KM = 0.005
+function dotLeft(raw, train, station) {
+  if (train.ttnt > 0) return false
+  const id = state.owners?.get(raw)
+  const run = id ? state.runs.find((item) => item.id === id) : null
+  if (!run || !Number.isFinite(run.km)) return false
+  const at = model.km(station)
+  return run.dir === "DOWN" ? run.km > at + LEAVE_KM : run.km < at - LEAVE_KM
+}
+
 function boardTrains(board, dir, now = Date.now()) {
   return (board?.trains ?? [])
-    .map((train) => agedTrain(train, now))
-    .filter((train) => !hasLeft(train, now, board?.observedAt) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
+    .map((raw) => [raw, agedTrain(raw, now)])
+    .filter(([raw, train]) => !hasLeft(train, now, board?.observedAt) && !dotLeft(raw, train, board.station) && (dir === "DOWN" ? model.km(train.dest) > model.km(board.station) : model.km(train.dest) < model.km(board.station)))
+    .map(([, train]) => train)
 }
 
 function render() {

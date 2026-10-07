@@ -51,7 +51,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.4", commit: "c35a340" }
+const BUILD = { version: "0.7.5", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1725,7 +1725,21 @@ function paintTrainSheet(first = false) {
     `<button class="btn follow" aria-pressed="${state.follow}">${state.follow ? s.following : s.follow}</button></div>` +
     (page === 2 ? dutyPage(run) : trainPage(run, s, stopRows))
   if (first || els.sheet.dataset.open !== "1") openSheet(html, "train")
-  else els.sheetBody.innerHTML = html
+  else repaintKeepingFocus(html)
+}
+
+// The train card is rebuilt every second. Without this a keyboard user's
+// focus fell back to the page after at most a second, and flipping the card
+// with Enter lost it too: put it back on the same control (the chip when the
+// "全日更份" link it was on is gone).
+const SHEET_CONTROLS = [".sheet-close", "button.train-chip", ".duty-more", ".follow"]
+function repaintKeepingFocus(html) {
+  const active = document.activeElement
+  const held = els.sheetBody.contains(active) ? SHEET_CONTROLS.find((sel) => active.matches(sel)) : null
+  els.sheetBody.innerHTML = html
+  if (!held) return
+  const next = els.sheetBody.querySelector(held) ?? els.sheetBody.querySelector("button.train-chip")
+  next?.focus({ preventScroll: true })
 }
 
 // The chip left of the destination. With Run numbers switched on (brand

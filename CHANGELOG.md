@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.7 — 2026-10-09 (`pending`)
+## v0.7.7 — 2026-10-09 (`8cfb6d5`)
 - A late train's dot no longer reaches a platform before the train. At 17:04 Run 5 (towards Wu Kai Sha) showed +95 s, yet its dot was already at Shek Mun while the Shek Mun board still read 1 min. The dot's clock closes on the delay estimate at no more than 0.3 s per second, so after the delay jumped the dot kept running ahead of the badge. Now, when the dot is ahead of the estimate by more than that clock could still close before the dot reaches the next platform, the dot stands still short of the platform until the estimate has caught up, then runs on at 0.7x. In the synthetic check (`tools/validate_position.mjs`, new "early" column: dot at or past a platform the train has not reached) held trains went from 3-19% of the time early to 0-1.2%, and a train running 4 sections at 1.5x slow from 7.5% to 4.5%; on-time running and the rest of the line are unchanged. The slow case is not fully closed because the delay estimate itself lags a gradual slow-down (docs/ALGORITHM.md §3i).
 - Shell cache renamed `v29`.
 

@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.7 — 2026-10-09 (`8cfb6d5`)
+- A late train's dot no longer reaches a platform before the train. At 17:04 Run 5 (towards Wu Kai Sha) showed +95 s, yet its dot was already at Shek Mun while the Shek Mun board still read 1 min. The dot's clock closes on the delay estimate at no more than 0.3 s per second, so after the delay jumped the dot kept running ahead of the badge. Now, when the dot is ahead of the estimate by more than that clock could still close before the dot reaches the next platform, the dot stands still short of the platform until the estimate has caught up, then runs on at 0.7x. In the synthetic check (`tools/validate_position.mjs`, new "early" column: dot at or past a platform the train has not reached) held trains went from 3-19% of the time early to 0-1.2%, and a train running 4 sections at 1.5x slow from 7.5% to 4.5%; on-time running and the rest of the line are unchanged. The slow case is not fully closed because the delay estimate itself lags a gradual slow-down (docs/ALGORITHM.md §3i).
+- Shell cache renamed `v29`.
+
 ## v0.7.6 — 2026-10-07 (`942f025`)
 - Late trains no longer run ahead of their boards. At 18:40 Run 73 showed +110 s but its dot was already half way from To Kwa Wan to Sung Wong Toi, while the To Kwa Wan board still counted down to it. The badge was right; the dot's clock was still at about +50 s, because it closed on the estimate at no more than 0.3 s per second and kept running at 0.7x. A dot standing at a platform now waits there until its clock catches up (or leaves sooner when the train is ahead of it); between stations it still runs at 0.7-1.3x and never stops or goes backwards. In a synthetic check of held trains (`tools/validate_position.mjs`), dots that had left a platform the train had not reached went from 2-8% of the time to none; on-time running is unchanged. A train held at a platform can still leave on time on screen and wait at the next station, because the boards show the hold only 40-60 s later (docs/ALGORITHM.md §3h).
 - Shell cache renamed `v28`.

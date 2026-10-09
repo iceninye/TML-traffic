@@ -28,6 +28,8 @@
 //   passed            share of seconds the dot has left a platform the train
 //                     has not reached yet (the 18:40 report, docs/ALGORITHM.md
 //                     §3h)
+//   early             share of seconds the dot is at or past a platform the
+//                     train has not reached (2026-10-09, Run 5 +95 s)
 //   behind p90        how far the dot trails the train (m)
 
 import { readFileSync } from "node:fs"
@@ -201,7 +203,10 @@ function scenario(name, base, hold, lag = 20, slow = null) {
       const tauDot = t - run.delayDisp
       const tauTrue = tauOf(r, t)
       const passed = r.trip.stops.some((st, k) => k > 0 && k < r.trip.stops.length - 1 && tauDot > st.dep && tauTrue < st.arr)
-      ;(affected.has(run.id) ? errs.hit : errs.rest).push({ ahead, passed })
+      // The dot is already at (or past) a platform the train has not reached
+      // (2026-10-09, Run 5 +95 s drawn at Shek Mun while its board read 1).
+      const early = passed || r.trip.stops.some((st, k) => k > 0 && k < r.trip.stops.length - 1 && tauDot >= st.arr && tauTrue < st.arr)
+      ;(affected.has(run.id) ? errs.hit : errs.rest).push({ ahead, passed, early })
     }
   }
   const fmt = (list) => {
@@ -210,7 +215,7 @@ function scenario(name, base, hold, lag = 20, slow = null) {
     const ahead = xs.map((x) => Math.max(0, x))
     const behind = xs.map((x) => Math.max(0, -x))
     const share = (n) => `${((100 * n) / xs.length).toFixed(1).padStart(4)}%`
-    return `ahead p90 ${pct(ahead, 0.9).toFixed(0).padStart(4)} max ${Math.max(...ahead).toFixed(0).padStart(4)}, >300 m ${share(xs.filter((x) => x > 300).length)}, passed ${share(list.filter((x) => x.passed).length)}, behind p90 ${pct(behind, 0.9).toFixed(0).padStart(4)}`
+    return `ahead p90 ${pct(ahead, 0.9).toFixed(0).padStart(4)} max ${Math.max(...ahead).toFixed(0).padStart(4)}, >300 m ${share(xs.filter((x) => x > 300).length)}, passed ${share(list.filter((x) => x.passed).length)}, early ${share(list.filter((x) => x.early).length)}, behind p90 ${pct(behind, 0.9).toFixed(0).padStart(4)}`
   }
   console.log(`${name.padEnd(30)} affected: ${fmt(errs.hit)} | others: ${fmt(errs.rest)}`)
   return errs

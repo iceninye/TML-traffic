@@ -45,9 +45,15 @@ const at = (h, m, s = 0) => h * 3600 + m * 60 + s
 let st = dutyState(d101, at(5, 50))
 check(st.phase === "drive" && st.run === 25 && st.from === "TUM" && st.to === "WKS", "8022101 05:50 drives Run 25 TUM→WKS")
 check(dutyState(d101, at(4, 50)).phase === "prep", "8022101 04:50 is preparing")
+// The meal runs from getting off a train to picking up the next one.
+check(d101.meal[0] === at(8, 54, 5) && d101.meal[1] === at(10, 39, 55), "8022101 meal is 08:54:05 (alights) to 10:39:55 (picks up)")
 st = dutyState(d101, at(8, 56))
-check(st.phase === "wait" && st.place === "KSR2" && st.until === at(8, 58, 5) && st.next.type === "meal", "8022101 08:56 waits at KSR2 for the meal")
-check(dutyState(d101, at(9, 0)).phase === "meal", "8022101 09:00 is on the meal break")
+check(st.phase === "meal" && st.place === "KSR2" && st.until === at(10, 39, 55), "8022101 08:56 is on the meal break at KSR2")
+check(dutyState(d101, at(10, 40)).phase === "drive", "8022101 10:40 drives again")
+const d1165 = load("1101").duties.find((d) => d.id === "1101165")
+check(d1165.meal[0] === at(19, 44) && d1165.meal[1] === at(20, 57, 55) && d1165.meal[2] === "KSR1" && d1165.meal[3] === "KSR2", "1101165 meal is 19:44 KSR1 to 20:57 KSR2")
+const d1101 = load("1101").duties
+check(!d1101.some((d) => d.id === "1101586") && d1101.find((d) => d.id === "1101107").work === 390 && d1101.find((d) => d.id === "1101131").work === 480, "1101586 skipped, 1101107 and 1101131 keep 6.5 h and 8 h")
 check(dutyState(d101, at(13, 15)) === null && dutyState(d101, at(4, 44)) === null, "8022101 is off duty before 04:45 and from 13:15")
 const late = load("8022").duties.find((d) => d.id === "8022509")
 check(dutyState(late, at(0, 10) + 86400) !== null && dutyState(late, at(0, 30) + 86400) === null, "8022509 crosses midnight and ends 00:26")

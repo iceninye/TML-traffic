@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.1", commit: "0f434b8" }
+const BUILD = { version: "0.8.2", commit: "b6ccd27" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -158,7 +158,7 @@ const STRINGS = {
     dutySource: (code, date, only) => `班次來源：Duty Sheet ${code}（${only ? `只用於 ${date}` : `${date} 起`}）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     tripNo: (trip) => `車次 ${trip}`,
-    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"} ›`,
+    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"}`,
     dsTitle: (code) => `Duty Sheet ${code ?? "不適用"}`,
     dsTabs: ["當值", "今日全部", "所有編號"],
     dsGroupAll: "全部",
@@ -687,8 +687,8 @@ function paintClock() {
   }
 }
 
-// The header line: the day's text, then a button " · Duty Sheet 1101 ›" (the
-// sheet in use) or " · Duty Sheet 不適用 ›" that opens the Duty Sheet card.
+// The header line: the day's text, then a button " · Duty Sheet 1101" (the
+// sheet in use) or " · Duty Sheet 不適用" that opens the Duty Sheet card.
 // The pieces are kept and only changed when their text changes, so the
 // button survives the once-a-second repaint (focus, a press in progress).
 function paintPeriod(text, s) {
@@ -2044,6 +2044,13 @@ function dutyAllSheetsHtml(tau) {
 
 // One duty in a list. With a state (page 1) the second line says what it is
 // doing now and what comes next; without, only book on/off and the meal.
+// The meal runs from getting off a train to picking up the next one, so it can
+// start and end at different places: "KSR1 → KSR2".
+function mealPlace(meal) {
+  const [, , from, to] = meal
+  return to && to !== from ? `${placeName(from)} → ${placeName(to)}` : placeName(from)
+}
+
 function dutyListItem(duty, code, st, compact = false) {
   const s = t()
   const times = duty.on
@@ -2101,7 +2108,7 @@ function dutyDetailHtml({ sheet, id }) {
     })
   })
   if (duty.meal) {
-    rows.push({ at: duty.meal[0], now: live?.phase === "meal", html: `<span class="duty-t">${hhmm(duty.meal[0])}</span><span>${s.dsMeal}</span><span>${placeName(duty.meal[2])} ${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])}</span>` })
+    rows.push({ at: duty.meal[0], now: live?.phase === "meal", html: `<span class="duty-t">${hhmm(duty.meal[0])}</span><span>${s.dsMeal}</span><span>${mealPlace(duty.meal)} ${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])}</span>` })
   }
   rows.sort((a, b) => a.at - b.at)
   rows.push({ at: duty.off[0], html: `<span class="duty-t">${hhmm(duty.off[0])}</span><span>${s.dsBookOff}</span><span>${placeName(duty.off[1])}</span>` })
@@ -2109,7 +2116,7 @@ function dutyDetailHtml({ sheet, id }) {
     `<dl class="kv"><dt>${s.dsOn}</dt><dd>${hhmm(duty.on[0])} ${placeName(duty.on[1])}</dd>` +
     `<dt>${s.dsOff}</dt><dd>${hhmm(duty.off[0])} ${placeName(duty.off[1])}</dd>` +
     (duty.work != null ? `<dt>${s.dsWork}</dt><dd>${s.dsWorkMin(duty.work)}</dd>` : "") +
-    (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${placeName(duty.meal[2])}</dd>` : "") +
+    (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${mealPlace(duty.meal)}</dd>` : "") +
     `</dl>${nowBox}<div class="stops-head">${s.dsLegs}</div><ol class="duty-legs">` +
     rows.map((row) => `<li data-now="${row.now ? 1 : 0}">${row.html}</li>`).join("") + `</ol><p class="fine">${source}</p>`
 }

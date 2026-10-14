@@ -46,6 +46,45 @@ def text(value):
     return "" if value is None else str(value).strip()
 
 
+# Duties that are not published: 6091588 and 7091587 (HUH ETS DM shuttle cards whose
+# legs fall outside sign-on/off) and 1101586 (Ice, 2026-10-14).
+SKIP_DUTIES = {"6091588", "7091587", "1101586"}
+# Printed Work Hr that the source sheet gets wrong (Ice, 2026-10-14: 6.5 h and 8 h,
+# later sheet versions will correct them), in minutes.
+WORK_OVERRIDES = {"1101107": 390, "1101131": 480}
+
+
+def meal_gap(meal, legs, on_place, pos=None):
+    """The meal break is the time from getting off a train to picking up the next
+    one, not the printed MB row (Ice, 2026-10-14: 1101165 alights 19:44 at KSR1,
+    picks up 20:57 at KSR2: 1 h 13 min). The MB row only says which gap it is:
+    the last leg before it is the one alighted from, the next leg after it is
+    the pick-up. In a workbook the MB row's own time can be wrong (8023586 prints
+    18:41 between legs at 19:16 and 20:30), so its position among the card's rows
+    (pos = number of legs above it) decides; the PDF reader has no position and
+    goes by the MB time. Returns [from, to, placeFrom, placeTo]."""
+    if not meal:
+        return None
+    if pos is not None:
+        before, after = legs[:pos], legs[pos:]
+    else:
+        before = [l for l in legs if l[3] <= meal[0]]
+        after = [l for l in legs if l[3] > meal[0]]
+    if before:
+        prev = before[-1]
+        start = prev[5] if prev[5] is not None else prev[3]
+        place_from = prev[4] or prev[2]
+    else:
+        start, place_from = meal[0], meal[2] or on_place
+    if after:
+        end, place_to = after[0][3], after[0][2]
+    else:
+        end, place_to = meal[1], meal[2] or place_from
+    if end <= start:
+        return [meal[0], meal[1], meal[2], meal[2]]
+    return [start, end, place_from, place_to]
+
+
 def leg_kind(remark, flag, has_run):
     r = remark.lower()
     if r.startswith("train preparation") or r.startswith("empty train"):
@@ -101,7 +140,7 @@ def read_cards(path):
             group = CARD_SHEETS[name]
             if GROUP_BY_DIGIT.get(duty_id[4]) not in (None, group):
                 stats["warnings"].append(f"{where}: number says {GROUP_BY_DIGIT[duty_id[4]]}, sheet says {group}")
-            legs, meal = [], None
+            legs, meal, meal_pos = [], None, None
             prev, place = on_t, on_place
             for r in block:
                 run, remark, flag = r[2], text(r[6]), text(r[9])
@@ -115,6 +154,7 @@ def read_cards(path):
                     if until is not None and until < start:
                         until += 86400
                     meal = [start, until, place]
+                    meal_pos = len(legs)
                     stats["meals"] += 1
                     prev = until if until is not None else start
                     continue
@@ -132,6 +172,11 @@ def read_cards(path):
                 stats["kinds"][kind] = stats["kinds"].get(kind, 0) + 1
                 prev = relief if relief is not None else start
                 place = text(r[8]) or place
+            if duty_id in SKIP_DUTIES:
+                continue
+            meal = meal_gap(meal, legs, on_place, meal_pos)
+            work = WORK_OVERRIDES.get(duty_id, work // 60 if work is not None else None)
+            work = None if work is None else work * 60
             if work is not None:
                 made = (off_t - on_t - (meal[1] - meal[0] if meal and meal[1] else 0)) // 60
                 if abs(made - work // 60) > 1:
@@ -206,8 +251,12 @@ def cards_from_pdf(meta, legs, stats):
             continue
         for leg in card_legs:
             out["kinds"][leg[0]] = out["kinds"].get(leg[0], 0) + 1
-        meal = card["meal"]
+        if duty_id in SKIP_DUTIES:
+            continue
+        meal = meal_gap(card["meal"], card_legs, card["on_place"])
         work = card.get("work")
+        if duty_id in WORK_OVERRIDES:
+            work = WORK_OVERRIDES[duty_id] * 60
         if work is not None:
             made = (off_t - on_t - (meal[1] - meal[0] if meal else 0)) // 60
             if abs(made - work // 60) > 1:

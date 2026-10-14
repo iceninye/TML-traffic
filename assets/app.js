@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.0", commit: "74d4e70" }
+const BUILD = { version: "0.8.1", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -179,8 +179,8 @@ const STRINGS = {
     dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
     dsBack: "‹ 返回",
     dsNow: "現時",
-    dsSource: (code, tab, issued, dates, cls) =>
-      `來源：Duty Sheet ${code}（${cls}${dates ? `，只用於 ${dates}` : ""}）${tab ? `、工作表 ${tab}` : ""}${issued ? `、發佈 ${issued}` : ""}。${tab ? "只收編號、上下班、用膳、各腿 Run 及時間，備註原文不收錄；接班時間準確到秒，離班時間為到站時間（按分鐘）。" : "此份只有更份編號。"}`,
+    dsSource: (code, tab, issued, dates, cls, full) =>
+      `來源：Duty Sheet ${code}（${cls}${dates ? `，只用於 ${dates}` : ""}）${tab ? `、工作表 ${tab}` : ""}${issued ? `、發佈 ${issued}` : ""}。${full ? "只收編號、上下班、用膳、各腿 Run 及時間，備註原文不收錄；接班時間準確到秒，離班時間為到站時間（按分鐘）。" : "此份只有更份編號。"}`,
     dsLegs: "全日行程",
     dsBookOn: "上班",
     dsBookOff: "下班",
@@ -2080,7 +2080,7 @@ function dutyDetailHtml({ sheet, id }) {
   const duty = book.status === "ok" ? book.data.duties.find((item) => item.id === id) : null
   if (!duty) return `<p class="empty">${s.dsFailed}</p>`
   const entry = book.entry
-  const source = s.dsSource(sheet, duty.tab, entry.issued, entry.dates?.join("、"), s.dsClass[entry.class] ?? entry.class)
+  const source = s.dsSource(sheet, duty.tab, entry.issued, entry.dates?.join("、"), s.dsClass[entry.class] ?? entry.class, Boolean(duty.on))
   if (!duty.on) return `<p class="empty">${s.dsNoCards(sheet)}</p><dl class="kv"><dt>${s.duty}</dt><dd>${id} · ${duty.group}</dd></dl><p class="fine">${source}</p>`
   const tau = serviceSeconds(Date.now())
   const live = sheet === todaySheet() ? dutyState(duty, tau) : null

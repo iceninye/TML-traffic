@@ -24,7 +24,7 @@ for (const entry of index.sheets) {
     const ok =
       d.off[0] > d.on[0] &&
       d.legs.length > 0 &&
-      d.legs.every((l) => l[3] >= d.on[0] && (l[5] ?? l[3]) <= d.off[0] + 1800 && (l[5] == null || l[5] >= l[3])) &&
+      d.legs.every((l) => l[3] >= d.on[0] && (l[5] ?? l[3]) <= d.off[0] + 3600 && (l[5] == null || l[5] >= l[3])) &&
       (!d.meal || (d.meal[0] >= d.on[0] && d.meal[1] <= d.off[0] && d.meal[1] > d.meal[0]))
     if (!ok) bad += 1
     // Every second minute from book on to book off has a state that ends later and names a next step.

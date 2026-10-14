@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.7 — 2026-10-14 (`6ea7ef6`)
+- Train card: duty numbers (both the current one and the relief ahead) are plain text in the body colour, with no underline, and tapping either opens its Duty Sheet card. The relief-ahead number was plain text before.
+- Shell cache renamed `v38`.
+
 ## v0.8.6 — 2026-10-14 (`44becd1`)
 - Train card: the duty number (更份) is now a button. Tap it and the Duty Sheet card opens on that duty's own card (hours, meal, 飯腳, every leg); 返回 goes to the day's duty list. The duty numbers in the train card's 全日更份 page open their cards the same way. A number the sheet has no card for (a skipped card) says so instead of "讀取失敗".
 - Shell cache renamed `v37`.

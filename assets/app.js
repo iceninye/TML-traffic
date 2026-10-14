@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.6", commit: "44becd1" }
+const BUILD = { version: "0.8.7", commit: "6ea7ef6" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1710,10 +1710,11 @@ function dutyRow(run) {
   const current = currentDuty(run)
   const next = duties[current + 1]
   const s = t()
-  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), escapeHtml(next[0]))}</span>` : ""
+  const sheet = timetables?.books[state.book]?.dutysheet
+  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), dutyLink(next[0], sheet))}</span>` : ""
   // The link to the day's duty list only shows with Run numbers switched on.
   const more = runsOn() ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
-  return `<dt>${s.duty}</dt><dd>${dutyLink(duties[current][0], timetables?.books[state.book]?.dutysheet)}${later}${more}</dd>`
+  return `<dt>${s.duty}</dt><dd>${dutyLink(duties[current][0], sheet)}${later}${more}</dd>`
 }
 
 // A duty number that opens its card in the Duty Sheet card (see openDutyCard).

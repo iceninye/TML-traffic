@@ -4,7 +4,7 @@ All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
 ## v0.8.5 — 2026-10-14 (`3537493`)
-- 飯腳 compares meals by station, not platform: 大圍3 and 大圍4 (KSR1, KSR2) are both 大圍, and 紅磡2 and 紅磡3 (HUH2, HUH3) are both 紅磡 (`placeStation()` in `lib/tml-duties.js`). Only duties of the same Duty Sheet are compared, since one sheet runs per day.
+- 飯腳 compares meals by station, not platform: 錦上路1 and 錦上路2 (KSR1, KSR2) are both 錦上路, 大圍3 and 大圍4 (TAW3, TAW4) are both 大圍, and 紅磡2 and 紅磡3 (HUH2, HUH3) are both 紅磡 (`placeStation()` in `lib/tml-duties.js`). Only duties of the same Duty Sheet are compared, since one sheet runs per day.
 - Shell cache renamed `v36`.
 
 ## v0.8.4 — 2026-10-14 (`f49dbec`)

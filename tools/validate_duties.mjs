@@ -59,7 +59,7 @@ check(mates.length > 0 && mates.every(({ duty, from, to }) => placeStation(duty.
 check(mates.every(({ duty }) => mealMates(duty, d1101).some((m) => m.duty.id === "1101165")), "飯腳 is symmetric")
 const edge = (start) => mealMates({ id: "x", meal: [0, 4000, "KSR1", "KSR2"] }, [{ id: "y", meal: [start, 4000, "KSR1", "KSR2"] }]).length
 check(edge(1300) === 1 && edge(1301) === 0 && mealMates({ id: "x", meal: [0, 4000, "KSR1", "KSR2"] }, [{ id: "z", meal: [0, 4000, "TAW3", "TAW3"] }]).length === 0, "飯腳 edge: exactly 45 min counts, 44:59 does not, another station does not")
-check(mealMates({ id: "x", meal: [0, 4000, "HUH2", "HUH3"] }, [{ id: "y", meal: [0, 4000, "HUH3", "HUH3"] }]).length === 1 && placeStation("KSR1") === "KSR" && placeStation("W1A") === "W1A" && placeStation("TT") === "TT", "飯腳: platforms of one station (HUH2, HUH3) count as the same place")
+check(mealMates({ id: "x", meal: [0, 4000, "HUH2", "HUH3"] }, [{ id: "y", meal: [0, 4000, "HUH3", "HUH3"] }]).length === 1 && placeStation("KSR1") === "KSR" && placeStation("TAW4") === "TAW" && placeStation("W1A") === "W1A" && placeStation("TT") === "TT", "飯腳: platforms of one station (HUH2, HUH3) count as the same place")
 const d1334 = d1101.find((d) => d.id === "1101334")
 const park = (run, from) => d1334.legs.find((l) => l[1] === run && l[2] === from)
 check(park(20, "HUH3")?.[0] === "park" && park(20, "HUH3")[3] === at(16, 58, 24) && park(62, "ETS2")?.[0] === "park", "1101334 Run 20 HUH3→ETS1 16:58:24 and Run 62 ETS2→HUH2 are 泊車")

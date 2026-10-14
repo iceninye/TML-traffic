@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v30"
+const CACHE = "tml-traffic-shell-v31"
 const SHELL = [
   "./",
   "index.html",
@@ -14,6 +14,7 @@ const SHELL = [
   "lib/mtr-network.js",
   "lib/mtr-run.js",
   "lib/mtr-schedule.js",
+  "lib/tml-duties.js",
   "lib/tml-model.js",
   "lib/tml-motion.js",
   "lib/tml-timetable.js",

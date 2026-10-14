@@ -18,6 +18,7 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
+import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, onDuty } from "../lib/tml-duties.js"
 import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -51,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.7.8", commit: "0d47bcf" }
+const BUILD = { version: "0.8.0", commit: "74d4e70" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -157,7 +158,52 @@ const STRINGS = {
     dutySource: (code, date, only) => `班次來源：Duty Sheet ${code}（${only ? `只用於 ${date}` : `${date} 起`}）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     tripNo: (trip) => `車次 ${trip}`,
-    sheetTag: (code) => ` · Duty Sheet ${code ?? "不適用"}`,
+    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"} ›`,
+    dsTitle: (code) => `Duty Sheet ${code ?? "不適用"}`,
+    dsTabs: ["當值", "今日全部", "所有編號"],
+    dsGroupAll: "全部",
+    dsClass: { weekday: "平日", saturday: "星期六", sunday: "星期日", special: "特別日" },
+    dsNone: "今日沒有適用的 Duty Sheet（顯示「不適用」），所以沒有當值資料；可到「所有編號」查看其他 Duty Sheet。",
+    dsLoading: "讀取更份資料中…",
+    dsFailed: "讀取更份資料失敗，稍後再試",
+    dsNoCards: (code) => `Duty Sheet ${code} 只有更份編號，未有上班、下班及用膳資料`,
+    dsOnNow: (n) => `當值 ${n} 更`,
+    dsNobody: "此刻沒有更份當值",
+    dsSearch: "搜尋更份編號",
+    dsNoMatch: "沒有符合的更份",
+    dsCount: (n) => `${n} 更`,
+    dsOn: "上班",
+    dsOff: "下班",
+    dsMeal: "用膳",
+    dsWork: "工時",
+    dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
+    dsBack: "‹ 返回",
+    dsNow: "現時",
+    dsSource: (code, tab, issued, dates, cls) =>
+      `來源：Duty Sheet ${code}（${cls}${dates ? `，只用於 ${dates}` : ""}）${tab ? `、工作表 ${tab}` : ""}${issued ? `、發佈 ${issued}` : ""}。${tab ? "只收編號、上下班、用膳、各腿 Run 及時間，備註原文不收錄；接班時間準確到秒，離班時間為到站時間（按分鐘）。" : "此份只有更份編號。"}`,
+    dsLegs: "全日行程",
+    dsBookOn: "上班",
+    dsBookOff: "下班",
+    dsLiveTrain: "睇列車",
+    dsPhase: {
+      drive: (run, a, b) => `Run ${run} 行駛中 ${a} → ${b}`,
+      empty: (run, a, b) => `Run ${run} 空車 ${a} → ${b}`,
+      ride: (run, a, b) => `乘搭接駁 ${a} → ${b}`,
+      prep: (run, a) => `出車準備 ${a}`,
+      wait: (run, a) => `待命／等候 ${a}`,
+      other: (run, a) => `其他 ${a}`,
+      meal: (run, a) => `用膳中 ${a}`,
+      end: (run, a) => `收車 ${a}`,
+      gap: (run, a) => `等待接班 ${a}`,
+    },
+    dsKind: { drive: "載客", empty: "空車", prep: "準備", ride: "乘搭", wait: "待命", other: "其他" },
+    dsUntil: (clock) => `至 ${clock}`,
+    dsNext: {
+      leg: (clock, run, place) => `${clock} 接${run == null ? "" : ` Run ${run}`}（${place}）`,
+      meal: (clock, place) => `${clock} 用膳（${place}）`,
+      off: (clock, place) => `${clock} 下班（${place}）`,
+    },
+    dsNextLabel: "之後",
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
@@ -181,6 +227,9 @@ const els = {
   statusText: document.getElementById("status-text"),
   statusCounts: document.getElementById("status-counts"),
   period: document.getElementById("period"),
+  periodText: document.getElementById("period-text"),
+  periodSep: document.getElementById("period-sep"),
+  periodTag: document.getElementById("period-tag"),
   alert: document.getElementById("alert"),
   paneDiagram: document.getElementById("pane-diagram"),
   paneMap: document.getElementById("pane-map"),
@@ -215,6 +264,9 @@ const state = {
   // Train card page: 1 details, 2 the train's duties for the day.
   trainPage: 1,
   follow: false,
+  // Duty Sheet card (header tag): page 1 on duty now, 2 the day's duties,
+  // 3 every sheet's duties; detail = {sheet, id} is a duty's full card.
+  duty: { page: 1, group: "all", cls: null, query: "", detail: null },
   sheetKind: null,
   station: null,
 }
@@ -615,7 +667,7 @@ function paintClock() {
     for (const run of state.runs) run.dir === "UP" ? (up += 1) : (down += 1)
     const m = state.measured ?? {}
     const mins = (sec) => (sec ? Math.round((sec / 60) * 10) / 10 : "—")
-    els.period.textContent = s.offTimetable(up, down, mins(m.UP), mins(m.DOWN)) + sheetTag(s)
+    paintPeriod(s.offTimetable(up, down, mins(m.UP), mins(m.DOWN)), s)
     els.period.dataset.peak = "0"
     els.period.title = s.offTimetableNote
   } else if (book) {
@@ -623,24 +675,30 @@ function paintClock() {
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
     if (!headway) {
       // Past the last headway band, the last trains may still be running.
-      els.period.textContent = (state.runs.length ? s.lastTrains : s.offService) + sheetTag(s)
+      paintPeriod(state.runs.length ? s.lastTrains : s.offService, s)
       els.period.dataset.peak = "0"
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}${sheetTag(s)}`
+      paintPeriod(`${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`, s)
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = (book.source === "dutysheet" ? `${s.dutySource(book.dutysheet, book.effective, Boolean(book.dates))}\n` : "") + s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
   }
 }
 
-// " · Duty Sheet 1101" (the sheet in use) or " · Duty Sheet 不適用", on the
-// header line; nothing while no timetable is loaded.
-function sheetTag(s) {
+// The header line: the day's text, then a button " · Duty Sheet 1101 ›" (the
+// sheet in use) or " · Duty Sheet 不適用 ›" that opens the Duty Sheet card.
+// The pieces are kept and only changed when their text changes, so the
+// button survives the once-a-second repaint (focus, a press in progress).
+function paintPeriod(text, s) {
   const book = timetables?.books[state.book]
-  if (!book) return ""
-  return s.sheetTag(sheetActive() ? book.dutysheet : null)
+  const label = book ? s.sheetTag(sheetActive() ? book.dutysheet : null) : ""
+  if (els.periodText.textContent !== text) els.periodText.textContent = text
+  if (els.periodTag.textContent !== label) els.periodTag.textContent = label
+  els.periodTag.hidden = !label
+  els.periodSep.hidden = !label || !text
+  els.period.hidden = !text && !label
 }
 
 /* ---------------------------------------------------------------- diagram */
@@ -1055,6 +1113,9 @@ function loop(stamp) {
   if (state.sheetKind === "train" && stamp - lastSheetPaint > 1000) {
     lastSheetPaint = stamp
     paintTrainSheet()
+  } else if (state.sheetKind === "duty" && stamp - lastSheetPaint > 1000) {
+    lastSheetPaint = stamp
+    paintDutyBody()
   }
 }
 
@@ -1809,6 +1870,271 @@ function setFollow(on) {
   }
 }
 
+/* ------------------------------------------------------------ duty card */
+
+// Duty cards (data/duties/DS<code>.json, written by tools/dutycards.py) load
+// the first time the card opens and stay for the session.
+const dutyBooks = new Map()
+let dutyIndex = null
+// The sheets listed in data/duties/index.json (null until it has loaded).
+let dutySheets = null
+let dutyBodyShown = ""
+
+// Depot and siding codes as the sheets print them, named after the places on
+// the sheet's own "duty list" page (read from it, not from MTR documents).
+const DEPOT_NAMES = { TAD: "大圍廠", HHS: "紅磡廠", TT: "大圍廠", W1A: "八鄉廠", W1C: "八鄉廠", W1F: "八鄉廠", LT1: "紅磡廠", LT2: "紅磡廠", E3A: "錦上路", E3C: "錦上路" }
+
+// "KSR2" is platform 2 of 錦上路; a code that is no station keeps its letters.
+function placeName(code) {
+  if (!code) return "—"
+  if (DEPOT_NAMES[code]) return `${DEPOT_NAMES[code]} ${code}`
+  const base = code.replace(/\d$/, "")
+  const name = network.name(base, LANG)
+  return name === base ? code : `${name}${base === code ? "" : ` ${code.slice(base.length)}`}`
+}
+
+function dutyIndexPromise() {
+  dutyIndex ??= fetchJson("data/duties/index.json")
+    .then((index) => {
+      dutySheets = index.sheets
+      return index
+    })
+    .catch(() => {
+      dutySheets = []
+      return null
+    })
+  return dutyIndex
+}
+
+function dutyBook(code) {
+  let entry = dutyBooks.get(code)
+  if (!entry) {
+    entry = { status: "loading", data: null, entry: null }
+    dutyBooks.set(code, entry)
+    dutyIndexPromise()
+      .then((index) => {
+        entry.entry = index?.sheets.find((item) => item.code === code) ?? null
+        if (!entry.entry) throw new Error("no such sheet")
+        return fetchJson(`data/duties/${entry.entry.file}`)
+      })
+      .then((data) => {
+        entry.data = data
+        entry.status = "ok"
+      })
+      .catch(() => {
+        entry.status = "error"
+      })
+      .finally(() => {
+        if (state.sheetKind === "duty") paintDutyBody()
+      })
+  }
+  return entry
+}
+
+// The Duty Sheet in use now (null = 不適用).
+function todaySheet() {
+  return sheetActive() ? timetables.books[state.book].dutysheet : null
+}
+
+function hhmm(sec) {
+  return secClock(sec).slice(0, 5)
+}
+
+function openDutySheet() {
+  const d = state.duty
+  d.detail = null
+  d.query = ""
+  d.page = todaySheet() ? 1 : 3
+  d.cls = null
+  openSheet("", "duty")
+  paintDutySheet()
+  dutyIndexPromise().then(() => state.sheetKind === "duty" && paintDutySheet())
+}
+
+// Chrome of the card (title, page tabs, filters, search): rebuilt when the
+// page or a filter changes. The list under it repaints on its own each second.
+function paintDutySheet() {
+  const s = t()
+  const d = state.duty
+  const code = todaySheet()
+  const seg = (items, attr, active) =>
+    `<div class="seg" role="group">${items.map(([value, label]) => `<button type="button" data-${attr}="${value}" aria-pressed="${active === value}">${label}</button>`).join("")}</div>`
+  let head
+  if (d.detail) {
+    head = `<div class="duty-head"><button type="button" class="btn duty-back">${s.dsBack}</button><h2>${escapeHtml(d.detail.id)}</h2></div>`
+  } else {
+    const tabs = seg(s.dsTabs.map((label, i) => [i + 1, label]), "dpage", d.page)
+    const groups = seg([["all", s.dsGroupAll], ...GROUPS.map((g) => [g, g])], "group", d.group)
+    const classes = d.page === 3 ? seg(CLASSES.map((c) => [c, s.dsClass[c]]), "cls", dutyClass()) : ""
+    const search = d.page > 1 ? `<input class="duty-search" type="search" inputmode="numeric" placeholder="${s.dsSearch}" value="${escapeHtml(d.query)}" aria-label="${s.dsSearch}">` : ""
+    head = `<div class="duty-head"><h2>${s.dsTitle(code)}</h2></div>${tabs}<div class="duty-filters">${classes}${groups}</div>${search}`
+  }
+  els.sheetBody.innerHTML = `<button class="sheet-close" aria-label="${s.close}">✕</button>${head}<div id="duty-body"></div>`
+  dutyBodyShown = ""
+  paintDutyBody()
+}
+
+// The class the "all sheets" page shows: the one chosen, else the class of the
+// sheet in use, else weekday.
+function dutyClass() {
+  const d = state.duty
+  if (d.cls) return d.cls
+  return dutySheets?.find((sheet) => sheet.code === todaySheet())?.class ?? "weekday"
+}
+
+function paintDutyBody() {
+  const box = document.getElementById("duty-body")
+  if (!box || state.sheetKind !== "duty") return
+  const html = dutyBodyHtml()
+  if (html === dutyBodyShown) return
+  dutyBodyShown = html
+  box.innerHTML = html
+}
+
+function dutyBodyHtml() {
+  const s = t()
+  const d = state.duty
+  if (d.detail) return dutyDetailHtml(d.detail)
+  const tau = serviceSeconds(Date.now())
+  if (d.page === 3) return dutyAllSheetsHtml(tau)
+  const code = todaySheet()
+  if (!code) return `<p class="empty">${s.dsNone}</p>`
+  const book = dutyBook(code)
+  if (book.status === "loading") return `<p class="empty">${s.dsLoading}</p>`
+  if (book.status === "error") return `<p class="empty">${s.dsFailed}</p>`
+  if (book.data.cards === false) return `<p class="empty">${s.dsNoCards(code)}</p>`
+  const duties = book.data.duties.filter((duty) => inGroup(duty, d.group))
+  if (d.page === 1) {
+    const rows = onDuty(duties, tau)
+    const counts = GROUPS.map((g) => `${g} ${rows.filter((r) => r.duty.group === g).length}`).join(" · ")
+    return `<div class="duty-sum"><b>${rows.length ? s.dsOnNow(rows.length) : s.dsNobody}</b>${rows.length ? ` <span class="meta">${counts}</span>` : ""}</div>` +
+      (rows.length ? `<ul class="duty-list">${rows.map((r) => dutyListItem(r.duty, code, r.state)).join("")}</ul>` : "")
+  }
+  return dutyListHtml(duties, code, tau)
+}
+
+// Page 2/3 list: every duty of a sheet in book-on order; "現時" marks duties on now.
+function dutyListHtml(duties, code, tau, live = true) {
+  const s = t()
+  const q = state.duty.query
+  const shown = duties.filter((duty) => matchesQuery(duty, q)).sort((a, b) => (a.on?.[0] ?? 1e9) - (b.on?.[0] ?? 1e9) || a.id.localeCompare(b.id))
+  if (!shown.length) return `<p class="empty">${s.dsNoMatch}</p>`
+  return `<ul class="duty-list compact">${shown.map((duty) => dutyListItem(duty, code, live ? dutyState(duty, tau) : null, true)).join("")}</ul>`
+}
+
+function dutyAllSheetsHtml(tau) {
+  const s = t()
+  const d = state.duty
+  const cls = dutyClass()
+  if (!dutySheets) return `<p class="empty">${s.dsLoading}</p>`
+  const sheets = dutySheets.filter((sheet) => sheet.class === cls)
+  if (!sheets.length) return `<p class="empty">${s.dsNoMatch}</p>`
+  const today = todaySheet()
+  return sheets.map((sheet) => {
+    const book = dutyBook(sheet.code)
+    const dates = sheet.dates?.join("、")
+    const title = `<div class="duty-sheet-title"><b>Duty Sheet ${sheet.code}</b><span class="meta">${dates ? `${dates} · ` : ""}${s.dsCount(sheet.duties)}</span></div>`
+    if (book.status === "loading") return `${title}<p class="empty">${s.dsLoading}</p>`
+    if (book.status === "error") return `${title}<p class="empty">${s.dsFailed}</p>`
+    const duties = book.data.duties.filter((duty) => inGroup(duty, d.group))
+    const note = book.data.cards === false ? `<p class="fine">${s.dsNoCards(sheet.code)}</p>` : ""
+    return `${title}${note}${dutyListHtml(duties, sheet.code, tau, sheet.code === today)}`
+  }).join("")
+}
+
+// One duty in a list. With a state (page 1) the second line says what it is
+// doing now and what comes next; without, only book on/off and the meal.
+function dutyListItem(duty, code, st, compact = false) {
+  const s = t()
+  const times = duty.on
+    ? `${s.dsOn} ${hhmm(duty.on[0])} ${s.dsOff} ${hhmm(duty.off[0])}${duty.meal ? ` · ${s.dsMeal} ${hhmm(duty.meal[0])}` : ""}`
+    : ""
+  let now = ""
+  if (st && !compact) {
+    const next = st.next
+    const nextText = next.type === "leg"
+      ? s.dsNext.leg(hhmm(next.at), next.run, placeName(next.place))
+      : s.dsNext[next.type](hhmm(next.at), placeName(next.place))
+    now = `<span class="duty-now">${escapeHtml(dutyPhaseText(st))} <span class="meta">${s.dsUntil(hhmm(st.until))}</span></span>` +
+      `<span class="meta">${s.dsNextLabel} ${nextText}</span>`
+  }
+  const badge = st && compact ? ` <span class="badge now">${s.dsNow}</span>` : ""
+  return `<li><button type="button" class="duty-row" data-duty="${duty.id}" data-sheet="${code}">` +
+    `<span class="duty-no">${duty.id}<span class="badge plain">${duty.group}</span>${badge}</span>` +
+    `${now}<span class="meta">${times}</span></button></li>`
+}
+
+function dutyPhaseText(st) {
+  const s = t()
+  const p = s.dsPhase
+  const a = placeName(st.from ?? st.place)
+  if (st.phase === "wait" && st.leg == null) return p.gap(null, a)
+  const make = p[st.phase] ?? p.other
+  return make(st.run, a, placeName(st.to))
+}
+
+function dutyDetailHtml({ sheet, id }) {
+  const s = t()
+  const book = dutyBook(sheet)
+  if (book.status === "loading") return `<p class="empty">${s.dsLoading}</p>`
+  const duty = book.status === "ok" ? book.data.duties.find((item) => item.id === id) : null
+  if (!duty) return `<p class="empty">${s.dsFailed}</p>`
+  const entry = book.entry
+  const source = s.dsSource(sheet, duty.tab, entry.issued, entry.dates?.join("、"), s.dsClass[entry.class] ?? entry.class)
+  if (!duty.on) return `<p class="empty">${s.dsNoCards(sheet)}</p><dl class="kv"><dt>${s.duty}</dt><dd>${id} · ${duty.group}</dd></dl><p class="fine">${source}</p>`
+  const tau = serviceSeconds(Date.now())
+  const live = sheet === todaySheet() ? dutyState(duty, tau) : null
+  let nowBox = ""
+  if (live) {
+    const train = live.run != null && live.phase === "drive"
+      ? state.runs.find((run) => run.kind === "sched" && run.trip.run === live.run) : null
+    nowBox = `<div class="duty-nowbox"><span class="badge now">${s.dsNow}</span> ${escapeHtml(dutyPhaseText(live))} <span class="meta">${s.dsUntil(hhmm(live.until))}</span>` +
+      `${train ? ` <button type="button" class="link duty-train" data-run="${escapeHtml(train.id)}">${s.dsLiveTrain}</button>` : ""}</div>`
+  }
+  const rows = [{ at: duty.on[0], html: `<span class="duty-t">${hhmm(duty.on[0])}</span><span>${s.dsBookOn}</span><span>${placeName(duty.on[1])}</span>` }]
+  duty.legs.forEach((leg, i) => {
+    const [kind, run, from, at, to, until] = leg
+    rows.push({
+      at, now: live?.leg === i && live.phase === kind,
+      html: `<span class="duty-t">${secClock(at)}</span><span>${s.dsKind[kind] ?? kind}${run == null ? "" : ` Run ${run}`}</span>` +
+        `<span>${placeName(from)}${to ? ` → ${placeName(to)}${until != null ? ` ${hhmm(until)}` : ""}` : ""}</span>`,
+    })
+  })
+  if (duty.meal) {
+    rows.push({ at: duty.meal[0], now: live?.phase === "meal", html: `<span class="duty-t">${hhmm(duty.meal[0])}</span><span>${s.dsMeal}</span><span>${placeName(duty.meal[2])} ${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])}</span>` })
+  }
+  rows.sort((a, b) => a.at - b.at)
+  rows.push({ at: duty.off[0], html: `<span class="duty-t">${hhmm(duty.off[0])}</span><span>${s.dsBookOff}</span><span>${placeName(duty.off[1])}</span>` })
+  return `<div class="duty-sub"><span class="badge plain">${duty.group}</span> Duty Sheet ${sheet}</div>` +
+    `<dl class="kv"><dt>${s.dsOn}</dt><dd>${hhmm(duty.on[0])} ${placeName(duty.on[1])}</dd>` +
+    `<dt>${s.dsOff}</dt><dd>${hhmm(duty.off[0])} ${placeName(duty.off[1])}</dd>` +
+    (duty.work != null ? `<dt>${s.dsWork}</dt><dd>${s.dsWorkMin(duty.work)}</dd>` : "") +
+    (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${placeName(duty.meal[2])}</dd>` : "") +
+    `</dl>${nowBox}<div class="stops-head">${s.dsLegs}</div><ol class="duty-legs">` +
+    rows.map((row) => `<li data-now="${row.now ? 1 : 0}">${row.html}</li>`).join("") + `</ol><p class="fine">${source}</p>`
+}
+
+function handleDutyClick(event) {
+  const d = state.duty
+  const target = event.target
+  if (target.closest(".sheet-close")) return closeSheet()
+  const tab = target.closest("[data-dpage]")
+  const group = target.closest("[data-group]")
+  const cls = target.closest("[data-cls]")
+  const row = target.closest("[data-duty]")
+  const train = target.closest(".duty-train")
+  if (train) return openTrain(train.dataset.run)
+  if (target.closest(".duty-back")) d.detail = null
+  else if (row) d.detail = { sheet: row.dataset.sheet, id: row.dataset.duty }
+  else if (tab) d.page = Number(tab.dataset.dpage)
+  else if (group) d.group = group.dataset.group
+  else if (cls) d.cls = cls.dataset.cls
+  else return
+  if (tab) d.query = ""
+  paintDutySheet()
+  els.sheet.scrollTop = 0
+}
+
 /* -------------------------------------------------------------- controls */
 
 function wireControls() {
@@ -1836,8 +2162,15 @@ function wireControls() {
     if (!state.paused) refresh(false)
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)
+  els.periodTag.addEventListener("click", openDutySheet)
+  els.sheet.addEventListener("input", (event) => {
+    if (state.sheetKind !== "duty" || !event.target.matches(".duty-search")) return
+    state.duty.query = event.target.value
+    paintDutyBody()
+  })
   els.sheet.addEventListener("click", (event) => {
-    if (event.target.closest(".sheet-close")) closeSheet()
+    if (state.sheetKind === "duty") handleDutyClick(event)
+    else if (event.target.closest(".sheet-close")) closeSheet()
     else if (runsOn() && event.target.closest("button.train-chip, .duty-more")) {
       state.trainPage = state.trainPage === 2 ? 1 : 2
       paintTrainSheet()

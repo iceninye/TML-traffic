@@ -1,0 +1,54 @@
+{
+ "note": "Duty cards (book on/off, meal, legs) per Duty Sheet. Written by tools/dutycards.py.",
+ "sheets": [
+  {
+   "code": "1101",
+   "file": "DS1101.json",
+   "class": "weekday",
+   "dates": null,
+   "issued": "2026-09-14",
+   "duties": 149,
+   "cards": false
+  },
+  {
+   "code": "6091",
+   "file": "DS6091.json",
+   "class": "saturday",
+   "dates": null,
+   "issued": "2026-05-02",
+   "duties": 114,
+   "cards": false
+  },
+  {
+   "code": "7091",
+   "file": "DS7091.json",
+   "class": "sunday",
+   "dates": null,
+   "issued": "2025-08-31",
+   "duties": 96,
+   "cards": false
+  },
+  {
+   "code": "8022",
+   "file": "DS8022.json",
+   "class": "special",
+   "dates": [
+    "2026-10-24"
+   ],
+   "issued": "2026-07-11",
+   "duties": 133,
+   "sha256": "4320938de630a8d98c89934ece50417ce17bff7f96fda6502198236def022049"
+  },
+  {
+   "code": "8023",
+   "file": "DS8023.json",
+   "class": "special",
+   "dates": [
+    "2026-10-25"
+   ],
+   "issued": "2026-07-12",
+   "duties": 117,
+   "sha256": "69384c7edaf93200cedd7c2786d5647ca819e81e80eb0aba16801b1976c373c8"
+  }
+ ]
+}

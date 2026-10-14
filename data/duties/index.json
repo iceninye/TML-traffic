@@ -7,8 +7,8 @@
    "class": "weekday",
    "dates": null,
    "issued": "2026-09-14",
-   "duties": 149,
-   "cards": false
+   "duties": 155,
+   "sha256": "9e201683b3dc8c577323d8db23a0f57b56787e69d1e075c6223a27e2e477aa59"
   },
   {
    "code": "6091",
@@ -16,8 +16,8 @@
    "class": "saturday",
    "dates": null,
    "issued": "2026-05-02",
-   "duties": 114,
-   "cards": false
+   "duties": 121,
+   "sha256": "e257cb64ac9b0a9d09534534906640cc3a88722bee42b7e9bce4e3edd6bca135"
   },
   {
    "code": "7091",
@@ -25,8 +25,8 @@
    "class": "sunday",
    "dates": null,
    "issued": "2025-08-31",
-   "duties": 96,
-   "cards": false
+   "duties": 102,
+   "sha256": "69d59970242b0a029ad9e2504ca4bde6dbab31a7aac9a40938161d9428a101bd"
   },
   {
    "code": "8022",

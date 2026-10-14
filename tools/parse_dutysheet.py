@@ -29,7 +29,7 @@ So the parser:
 
 The output holds run, direction, times and the duty numbers (更份, 7 digits:
 sheet code + sequence) driving each trip, as [duty, from station] pairs.
-For .xlsx sheets tools/dutycards.py also writes data/duties/DS<code>.json (book
+For both PDF and .xlsx sheets tools/dutycards.py also writes data/duties/DS<code>.json (book
 on/off, work hours, meal break and the legs of every duty, for the Duty Sheet
 card in the app). Free-text remarks and crew names are never written.
 
@@ -122,9 +122,13 @@ def parse_pdf(path):
 
     legs = []
     stats = {"duties": 0, "legs": 0, "unparsed": [], "chainBreaks": 0}
+    # Card data (tools/dutycards.py): book on/off, work hours and the meal break per duty.
+    cards = {}
+    stats["cards"] = cards
     columns = None
     duty = None
     clock = None  # (offset, previous time) inside the current duty
+    last_place = None
     for page_no, page in enumerate(pdf.pages, 1):
         for row in rows_by_y(page.extract_words()):
             cols = header_columns(row)
@@ -141,9 +145,29 @@ def parse_pdf(path):
                     duty = w["text"]
                     stats["duties"] += 1
                     clock = (0, 0)
+                    cards[duty] = {"stage": 0, "meal": None}
+                    last_place = None
+            if duty is not None:
+                read_card_left(cards[duty], [w["text"] for w in left if not DUTY.match(w["text"])])
             if not body:
                 continue
             texts = [w["text"] for w in body]
+            if "MB" in texts and not texts[0].isdigit() and duty is not None:
+                # The meal break: "<from> MB <to>" with no Run, place or flag.
+                i = texts.index("MB")
+                frm = RELIEF.match(texts[i - 1]) or PICKUP.match(texts[i - 1]) if i else None
+                to = RELIEF.match(texts[i + 1]) if i + 1 < len(texts) else None
+                if frm and to and clock:
+                    off, prev = clock
+                    start = secs(*frm.groups()) + off
+                    if start < prev - 6 * 3600:
+                        start += 86400
+                    end = secs(*to.groups()) + (start // 86400) * 86400
+                    if end < start:
+                        end += 86400
+                    cards[duty]["meal"] = [start, end, last_place or cards[duty].get("on_place")]
+                    clock = (off, end)
+                continue
             if not texts[0].isdigit():
                 continue
             pi = next((i for i, x in enumerate(texts) if PICKUP.match(x)), None)
@@ -185,7 +209,24 @@ def parse_pdf(path):
                 clock = (off, t)
             legs.append(leg)
             stats["legs"] += 1
+            last_place = rel_place or leg["place"]
     return meta, legs, stats
+
+
+# The left block of a card, row by row: "Book On  Book Off", the two places,
+# the two times, then "Work Hr <h:mm>". Fills the card dict as the rows come.
+def read_card_left(card, words):
+    if words[:4] == ["Book", "On", "Book", "Off"]:
+        card["stage"] = 1
+    elif card["stage"] == 1 and len(words) == 2 and all(re.fullmatch(r"[A-Z][A-Z0-9]{1,5}", w) for w in words):
+        card["on_place"], card["off_place"] = words
+        card["stage"] = 2
+    elif card["stage"] == 2 and len(words) == 2 and all(RELIEF.match(w) for w in words):
+        card["on"], card["off"] = (secs(*RELIEF.match(w).groups()) for w in words)
+        card["stage"] = 3
+    elif [w.lower() for w in words[:2]] == ["work", "hr"] and len(words) >= 3 and RELIEF.match(words[2]):
+        card["work"] = secs(*RELIEF.match(words[2]).groups())
+        card["stage"] = 4
 
 
 XLSX_SHEETS = ("KSR", "TAW", "HHS", "ETS DM")
@@ -559,17 +600,19 @@ def main(argv):
             print(f"{path}: {e}")
             failed = True
             continue
-        if path.lower().endswith(".xlsx"):
-            import dutycards
+        import dutycards
 
+        if path.lower().endswith(".xlsx"):
             info, duties, card_stats = dutycards.read_cards(path)
-            for w in card_stats["warnings"]:
-                if w.startswith("MISSING"):
-                    print(f"{path}: {w}")
-                    failed = True
-            if not args.dry_run and not any(w.startswith("MISSING") for w in card_stats["warnings"]):
-                dutycards.write_duties(path, info, duties, meta["issued"], dated=bool(meta.get("dates")))
-                print(f"DS{meta['code']}: {len(duties)} duty cards written to data/duties/")
+        else:
+            info, duties, card_stats = dutycards.cards_from_pdf(meta, legs, stats)
+        missing = [w for w in card_stats["warnings"] if w.startswith("MISSING")]
+        for w in missing:
+            print(f"{path}: {w}")
+            failed = True
+        if not args.dry_run and not missing:
+            dutycards.write_duties(path, info, duties, meta["issued"], dated=bool(meta.get("dates")))
+            print(f"DS{meta['code']}: {len(duties)} duty cards written to data/duties/")
         day = day_of(meta)
         base_entry = choose_base(index, meta, day, args.base, legs, folder)
         if not base_entry:

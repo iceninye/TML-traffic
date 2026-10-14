@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reads the duty cards of a Duty Sheet workbook (.xlsx) into data/duties/DS<code>.json.
 
-    python3 tools/dutycards.py TML_duty_sheet_8022.xlsx [...] [--dry-run]
+    python3 tools/dutycards.py TML_duty_sheet_8022.xlsx DUTYSHEET.pdf [...] [--dry-run]
     python3 tools/dutycards.py --stubs     # number-only lists for sheets without cards
 
 tools/parse_dutysheet.py calls read_cards() / write_duties() for every .xlsx it
@@ -166,6 +166,66 @@ def read_cards(path):
     return info, duties, stats
 
 
+def cards_from_pdf(meta, legs, stats):
+    """Cards of a PDF sheet: parse_dutysheet.parse_pdf() already collected book
+    on/off, work hours and the meal per duty; the legs come from its leg list.
+    Returns (info, duties, stats) like read_cards(). A PDF has no duty list page,
+    so every card with a complete Book On block is kept."""
+    out = {"cards": 0, "legs": 0, "meals": 0, "warnings": [], "kinds": {}}
+    by_duty = {}
+    for leg in legs:
+        by_duty.setdefault(leg["duty"], []).append(leg)
+    duties = []
+    for duty_id, card in stats["cards"].items():
+        if card.get("on") is None or card.get("off") is None:
+            out["warnings"].append(f"{duty_id}: no complete Book On block, skipped")
+            continue
+        on_t, off_t = card["on"], card["off"]
+        if off_t <= on_t:
+            off_t += 86400
+        card_legs = []
+        # Times are re-anchored on the card's own book-on time (the PDF reader
+        # starts every duty at midnight, so a duty that begins in the evening
+        # would otherwise keep its after-midnight legs on the wrong day).
+        prev = on_t
+        for leg in by_duty.get(duty_id, []):
+            t = leg["t"] % 86400
+            while t < prev - 6 * 3600:
+                t += 86400
+            rel = None
+            if leg.get("rel") is not None:
+                rel = leg["rel"] % 86400 + (t // 86400) * 86400
+                if rel < t - 6 * 3600:
+                    rel += 86400
+            kind = leg_kind(leg["remark"], leg["flag"], True)
+            card_legs.append([kind, leg["run"], leg["place"], t, leg["relPlace"], rel])
+            prev = rel if rel is not None else t
+        card_legs.sort(key=lambda l: l[3])
+        if card_legs and card_legs[-1][3] > off_t + 3600:
+            out["warnings"].append(f"{duty_id}: legs run past book off ({card_legs[-1][3] // 3600}h), card skipped")
+            continue
+        for leg in card_legs:
+            out["kinds"][leg[0]] = out["kinds"].get(leg[0], 0) + 1
+        meal = card["meal"]
+        work = card.get("work")
+        if work is not None:
+            made = (off_t - on_t - (meal[1] - meal[0] if meal else 0)) // 60
+            if abs(made - work // 60) > 1:
+                out["warnings"].append(f"{duty_id}: work {work // 60} min, book on/off minus meal {made}")
+        duties.append({"id": duty_id, "group": GROUP_BY_DIGIT.get(duty_id[4], "KSR"), "tab": None,
+                       "on": [on_t, card["on_place"]], "off": [off_t, card["off_place"]],
+                       "work": None if work is None else work // 60, "meal": meal, "legs": card_legs})
+        out["cards"] += 1
+        out["legs"] += len(card_legs)
+        out["meals"] += 1 if meal else 0
+    ids = [d["id"] for d in duties]
+    if len(ids) != len(set(ids)):
+        out["warnings"].append("duplicate duty numbers")
+    info = {"code": meta["code"], "titleDay": meta["title_day"], "issuedText": None, "issued": meta["issued"],
+            "date": meta.get("effective"), "sha256": meta["sha256"], "src": "pdf"}
+    return info, duties, out
+
+
 def duty_list_ids(wb):
     """Duty numbers on the workbook's own 'duty list' sheet (the day's roster), or None."""
     if "duty list" not in wb.sheetnames:
@@ -186,7 +246,7 @@ def write_duties(path, info, duties, issued_iso, dated=True, dry_run=False):
     index_path = os.path.join(folder, "index.json")
     cls = day_class(info, dated)
     out = {"schema": SCHEMA, "dutysheet": info["code"], "class": cls, "dates": [info["date"]] if dated else None,
-           "issued": issued_iso, "parser": PARSER_VERSION, "sha256": info["sha256"], "duties": duties}
+           "issued": issued_iso, "parser": PARSER_VERSION, "src": info.get("src", "xlsx"), "sha256": info["sha256"], "duties": duties}
     if dry_run:
         return out
     os.makedirs(folder, exist_ok=True)
@@ -254,15 +314,22 @@ def main(argv):
     failed = False
     for path in [a for a in argv if not a.startswith("--")]:
         try:
-            info, duties, stats = read_cards(path)
+            if path.lower().endswith(".pdf"):
+                sys.path.insert(0, HERE)
+                import parse_dutysheet
+
+                meta, legs, pdf_stats = parse_dutysheet.parse_pdf(path)
+                info, duties, stats = cards_from_pdf(meta, legs, pdf_stats)
+                dated, issued = False, info["issued"]
+            else:
+                info, duties, stats = read_cards(path)
+                dated = True
+                issued = datetime.strptime(info["issuedText"], "%d %b %Y").date().isoformat() if info["issuedText"] else None
         except ValueError as e:
             print(f"{path}: {e}")
             failed = True
             continue
         problems = [w for w in stats["warnings"] if w.startswith("MISSING")]
-        issued = None
-        if info["issuedText"]:
-            issued = datetime.strptime(info["issuedText"], "%d %b %Y").date().isoformat()
         by = {}
         for d in duties:
             by[d["group"]] = by.get(d["group"], 0) + 1
@@ -277,7 +344,7 @@ def main(argv):
         if problems or any("duplicate" in w for w in stats["warnings"]):
             failed = True
             continue
-        write_duties(path, info, duties, issued, dated=True, dry_run=dry)
+        write_duties(path, info, duties, issued, dated=dated, dry_run=dry)
     return 1 if failed else 0
 
 

@@ -4,7 +4,7 @@
 
 🔗 **https://tml-traffic.iceninye.workers.dev**（Cloudflare Workers；GitHub Pages 備用：https://iceninye.github.io/TML-traffic/）
 
-目前版本 v0.8.0，每版改動見 [`CHANGELOG.md`](CHANGELOG.md)。
+目前版本 v0.8.1，每版改動見 [`CHANGELOG.md`](CHANGELOG.md)。
 
 港鐵**冇公開列車位置 API**，只公佈「下一班幾分鐘後到」。本專案由各站到站倒數
 **反推列車位置**，引擎抽取自 [keithligh/hk-traffic-intelligence](https://github.com/keithligh/hk-traffic-intelligence)（MIT），
@@ -92,7 +92,7 @@ python3 tools/parse_dutysheet.py DutySheet.pdf --dry-run  # 只檢查，唔寫�
 Duty Sheet 係司機更表，只有每班車嘅 Run、更份編號、總站開出時間、錦上路／大圍接班時間同到站分鐘，**冇逐站時間、冇車次號**。
 底表已有嘅班次沿用官方逐站時間同車次號，再加上更份編號；底表冇嘅班次由最近嘅班次重建中間各站（誤差中位數約 3–10 秒、P90 約 15–47 秒），開出時間準確。
 通過 `tools/validate_dutysheet.py` 先寫 `data/timetables/DS<代號>.json` 同登記；時間表檔只有 Run、更份編號、方向同時間。
-Excel 版另外由 `tools/dutycards.py` 寫 `data/duties/DS<代號>.json`（更份卡片：上下班、工時、用膳、每腿 Run 同時間，畫面右上「· Duty Sheet 1101 ›」開）；
+另外由 `tools/dutycards.py`（PDF 同 Excel 都讀）寫 `data/duties/DS<代號>.json`（更份卡片：上下班、工時、用膳、每腿 Run 同時間，畫面右上「· Duty Sheet 1101 ›」開）；
 冇司機姓名同備註原文；Duty Sheet 源檔（PDF／Excel）本身唔入 repo（`.gitignore` 已排除 `*.pdf`）。如果同底表一模一樣（底表時間更準），就唔寫檔。
 App 只會優先用「生效日已到、比底表新而且有差異」嘅 Duty Sheet（`index.json` 入面 `primary: true`），時段列嘅提示（滑鼠停喺「平日 · 繁忙 · 班距」嗰行）會註明來源 Duty Sheet。
 詳見 `docs/DUTYSHEET.md`。
@@ -149,7 +149,7 @@ probe-runs: snapshot 1/2 -> 37 runs each, tracked 37, dropped 0
 
 ## 資料同私隱
 
-公開資料有 Run 編號、時間、更份編號，同（Excel 版 Duty Sheet 嘅）更份上下班、工時、用膳同每腿 Run／地點／時間；唔包含司機姓名同備註原文。列車位置係由港鐵公開嘅下一班倒數反推，非官方資料，只供參考。
+公開資料有 Run 編號、時間、更份編號，同更份上下班、工時、用膳同每腿 Run／地點／時間；唔包含司機姓名同備註原文。列車位置係由港鐵公開嘅下一班倒數反推，非官方資料，只供參考。
 
 ## 授權
 

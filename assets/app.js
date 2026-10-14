@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.5", commit: "3537493" }
+const BUILD = { version: "0.8.6", commit: "0000000" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -168,6 +168,7 @@ const STRINGS = {
     dsFailed: "讀取更份資料失敗，稍後再試",
     dsNoCards: (code) => `Duty Sheet ${code} 只有更份編號，未有上班、下班及用膳資料`,
     dsOnNow: (n) => `當值 ${n} 更`,
+    dsNoDuty: (id) => `Duty Sheet 冇更份 ${id} 嘅卡片資料`,
     dsNobody: "此刻沒有更份當值",
     dsSearch: "搜尋更份編號",
     dsNoMatch: "沒有符合的更份",
@@ -1712,7 +1713,13 @@ function dutyRow(run) {
   const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), escapeHtml(next[0]))}</span>` : ""
   // The link to the day's duty list only shows with Run numbers switched on.
   const more = runsOn() ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
-  return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}${more}</dd>`
+  return `<dt>${s.duty}</dt><dd>${dutyLink(duties[current][0], timetables?.books[state.book]?.dutysheet)}${later}${more}</dd>`
+}
+
+// A duty number that opens its card in the Duty Sheet card (see openDutyCard).
+function dutyLink(duty, sheet) {
+  if (!sheet) return escapeHtml(duty)
+  return `<button type="button" class="link duty-open" data-duty="${escapeHtml(duty)}" data-sheet="${escapeHtml(sheet)}">${escapeHtml(duty)}</button>`
 }
 
 // Index into run.trip.duties of the duty driving now: the last one picked up
@@ -1766,7 +1773,7 @@ function dutyPage(run) {
   if (!plan?.rows.length) return `<p class="empty">${s.noDuties}</p>`
   const hhmm = (sec) => secClock(sec).slice(0, 5)
   const rows = plan.rows.map((row) =>
-    `<li data-now="${row.now ? 1 : 0}"><span class="duty-no">${escapeHtml(row.duty)}${row.now ? ` <span class="badge now">${s.dutyNow}</span>` : ""}</span>` +
+    `<li data-now="${row.now ? 1 : 0}"><span class="duty-no">${dutyLink(row.duty, plan.sheet)}${row.now ? ` <span class="badge now">${s.dutyNow}</span>` : ""}</span>` +
     `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${network.name(row.pick.code, LANG)} ${secClock(row.pick.at)}</span>` +
     `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${network.name(row.off.code, LANG)} ${hhmm(row.off.at)}` +
     `${row.off.depot ? ` <span class="badge plain">${s.toDepot}</span>` : ""}</span></li>`).join("")
@@ -1818,7 +1825,7 @@ function paintTrainSheet(first = false) {
 // focus fell back to the page after at most a second, and flipping the card
 // with Enter lost it too: put it back on the same control (the chip when the
 // "全日更份" link it was on is gone).
-const SHEET_CONTROLS = [".sheet-close", "button.train-chip", ".duty-more", ".follow"]
+const SHEET_CONTROLS = [".sheet-close", "button.train-chip", ".duty-more", ".duty-open", ".follow"]
 function repaintKeepingFocus(html) {
   const active = document.activeElement
   const held = els.sheetBody.contains(active) ? SHEET_CONTROLS.find((sel) => active.matches(sel)) : null
@@ -1941,6 +1948,19 @@ function todaySheet() {
 
 function hhmm(sec) {
   return secClock(sec).slice(0, 5)
+}
+
+// From a duty number on the train card: the Duty Sheet card on that duty's own
+// card; back goes to the day's list (or the list of all sheets for another sheet).
+function openDutyCard(sheet, id) {
+  const d = state.duty
+  d.detail = { sheet, id }
+  d.query = ""
+  d.page = sheet === todaySheet() ? 2 : 3
+  d.cls = null
+  openSheet("", "duty")
+  paintDutySheet()
+  dutyIndexPromise().then(() => state.sheetKind === "duty" && paintDutySheet())
 }
 
 function openDutySheet() {
@@ -2099,7 +2119,7 @@ function dutyDetailHtml({ sheet, id }) {
   const book = dutyBook(sheet)
   if (book.status === "loading") return `<p class="empty">${s.dsLoading}</p>`
   const duty = book.status === "ok" ? book.data.duties.find((item) => item.id === id) : null
-  if (!duty) return `<p class="empty">${s.dsFailed}</p>`
+  if (!duty) return `<p class="empty">${book.status === "ok" ? s.dsNoDuty(id) : s.dsFailed}</p>`
   const entry = book.entry
   const source = s.dsSource(sheet, duty.tab, entry.issued, entry.dates?.join("、"), s.dsClass[entry.class] ?? entry.class, Boolean(duty.on))
   if (!duty.on) return `<p class="empty">${s.dsNoCards(sheet)}</p><dl class="kv"><dt>${s.duty}</dt><dd>${id} · ${duty.group}</dd></dl><p class="fine">${source}</p>`
@@ -2193,6 +2213,10 @@ function wireControls() {
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
+    else if (event.target.closest(".duty-open")) {
+      const open = event.target.closest(".duty-open")
+      openDutyCard(open.dataset.sheet, open.dataset.duty)
+    }
     else if (runsOn() && event.target.closest("button.train-chip, .duty-more")) {
       state.trainPage = state.trainPage === 2 ? 1 : 2
       paintTrainSheet()

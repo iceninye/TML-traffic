@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.6 — 2026-10-14 (`COMMIT`)
+- Train card: the duty number (更份) is now a button. Tap it and the Duty Sheet card opens on that duty's own card (hours, meal, 飯腳, every leg); 返回 goes to the day's duty list. The duty numbers in the train card's 全日更份 page open their cards the same way. A number the sheet has no card for (a skipped card) says so instead of "讀取失敗".
+- Shell cache renamed `v37`.
+
 ## v0.8.5 — 2026-10-14 (`3537493`)
 - 飯腳 compares meals by station, not platform: 錦上路1 and 錦上路2 (KSR1, KSR2) are both 錦上路, 大圍3 and 大圍4 (TAW3, TAW4) are both 大圍, and 紅磡2 and 紅磡3 (HUH2, HUH3) are both 紅磡 (`placeStation()` in `lib/tml-duties.js`). Only duties of the same Duty Sheet are compared, since one sheet runs per day.
 - Shell cache renamed `v36`.

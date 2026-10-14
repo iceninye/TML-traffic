@@ -3,6 +3,17 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.0 — 2026-10-14 (`dev`)
+- Duty Sheet card. The header's "· Duty Sheet 1101 ›" (any sheet number, or 不適用) is now a button that opens a card with three pages and a detail view:
+  1. 當值: the duties on duty now with their state and place ("Run 25 行駛中 屯門 → 烏溪沙", 用膳中, 等待接班, 出車準備, 乘搭接駁, 收車), until when, what comes next, book on/off and the meal break; filter 全部 / KSR / TAD / HHS.
+  2. 今日全部: every duty of the sheet in use in book-on order (book on, book off, meal), 現時 marks those on now; the same filter and a number search.
+  3. 所有編號: every sheet's duties, filtered first by 平日 / 星期六 / 星期日 / 特別日 (dated sheets such as 8022 and 8023), then KSR / TAD / HHS, with the number search.
+  4. Tapping a duty shows its whole card: book on/off with places, work hours, meal break, every leg (kind, Run, from, pick-up time to the second, to, arrival minute), the live leg highlighted, a 睇列車 link to the train when its Run is on the diagram, and where the data comes from.
+  The card needs a sheet in use for pages 1 and 2; with 不適用 it opens on page 3. The Run switch (brand dot) does not affect it.
+- New data: `data/duties/DS<code>.json` (+ `index.json`), written by the new `tools/dutycards.py` (called by `tools/parse_dutysheet.py` for every `.xlsx`; `python3 tools/dutycards.py --stubs` lists the numbers of the older PDF sheets 1101, 6091 and 7091, which have no book on/off or meal data yet). 8022 has 133 duties and 8023 117, checked against the workbook's own duty list. Published per duty: number, group, tab, book on/off, work minutes, meal, and legs as kind, Run, places and times. Free-text remarks and the one card that is not on the duty list are not written.
+- `tools/validate_duties.mjs` checks the cards and the on-duty logic on the real data (including a duty that crosses midnight).
+- Shell cache renamed `v31`.
+
 ## v0.7.8 — 2026-10-14 (`0d47bcf`)
 - Duty Sheets 8022 and 8023 now run on their own days: Saturday 24 Oct 2026 uses DS8022 and Sunday 25 Oct uses DS8023 (the Kai Tak event timetable, built on TML709CB). Every other day is unchanged. A timetable listed with `dates` in `data/timetables/index.json` is used on those service dates only and left out on all other days; the header tooltip says "只用於 <date>".
 - `tools/parse_dutysheet.py` reads the new Excel workbooks (sheets KSR, TAW, HHS, ETS DM; pick-up and relief times to the second). The service date comes from the sheet itself. For a dated sheet the base timetable is the same-day one (normal or special) whose terminal departures the sheet reproduces best. Only Run, duty number and times are written, as before.

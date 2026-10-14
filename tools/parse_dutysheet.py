@@ -29,7 +29,9 @@ So the parser:
 
 The output holds run, direction, times and the duty numbers (更份, 7 digits:
 sheet code + sequence) driving each trip, as [duty, from station] pairs.
-Nothing else about the crew (book on/off, meal breaks, remarks) is written.
+For .xlsx sheets tools/dutycards.py also writes data/duties/DS<code>.json (book
+on/off, work hours, meal break and the legs of every duty, for the Duty Sheet
+card in the app). Free-text remarks and crew names are never written.
 
 Flags in the relief column: N = empty train (no passengers) to the
 destination, L = last trip, the train goes back to depot at the terminus.
@@ -557,6 +559,17 @@ def main(argv):
             print(f"{path}: {e}")
             failed = True
             continue
+        if path.lower().endswith(".xlsx"):
+            import dutycards
+
+            info, duties, card_stats = dutycards.read_cards(path)
+            for w in card_stats["warnings"]:
+                if w.startswith("MISSING"):
+                    print(f"{path}: {w}")
+                    failed = True
+            if not args.dry_run and not any(w.startswith("MISSING") for w in card_stats["warnings"]):
+                dutycards.write_duties(path, info, duties, meta["issued"], dated=bool(meta.get("dates")))
+                print(f"DS{meta['code']}: {len(duties)} duty cards written to data/duties/")
         day = day_of(meta)
         base_entry = choose_base(index, meta, day, args.base, legs, folder)
         if not base_entry:

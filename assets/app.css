@@ -256,7 +256,9 @@ button {
   border: 1px solid var(--edge);
   background: var(--panel-2);
 }
-.period:empty { display: none; }
+.period[hidden] { display: none; }
+.sheet-tag { font: inherit; color: var(--tml-lite); padding: 0; margin: 0; background: none; border: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sheet-tag:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: 2px; border-radius: 3px; }
 .period[data-peak="1"] {
   color: #fff;
   border-color: transparent;
@@ -798,3 +800,60 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 @media (prefers-reduced-motion: reduce) {
   .sheet, .sheet-backdrop { transition: none; }
 }
+
+/* Duty Sheet card: opened from the header tag. */
+.period[data-peak="1"] .sheet-tag { color: #fff; }
+.sheet[data-kind="duty"] { min-height: 46vh; }
+.duty-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding-right: 36px; }
+.duty-head h2 { margin: 0; font-size: 17px; }
+.sheet[data-kind="duty"] > #sheet-body > .seg { margin: 0 0 8px; }
+.duty-filters { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 8px; }
+.duty-filters .seg { flex: none; }
+.duty-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+}
+.duty-sum { margin: 4px 0 6px; font-size: 13.5px; }
+.duty-sum .meta, .duty-row .meta, .duty-sheet-title .meta, .duty-sub .meta { color: var(--muted); font-size: 11.5px; }
+.duty-list { list-style: none; margin: 0; padding: 0; }
+.duty-list li { border-bottom: 1px solid var(--edge); }
+.duty-list li:last-child { border-bottom: 0; }
+.duty-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 6px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  border-radius: 8px;
+}
+.duty-row:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: -2px; }
+.duty-no { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.duty-now { font-size: 13px; }
+.duty-sheet-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 12px 0 2px; }
+.duty-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+.duty-nowbox { margin: 10px 0 2px; padding: 8px 10px; font-size: 13px; background: color-mix(in srgb, var(--tml-lite) 14%, transparent); border-radius: 8px; }
+.duty-legs { list-style: none; margin: 0; padding: 0; }
+.duty-legs li {
+  display: grid;
+  grid-template-columns: 62px 74px 1fr;
+  gap: 8px;
+  padding: 5px 6px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--edge);
+}
+.duty-legs li:last-child { border-bottom: 0; }
+.duty-legs li[data-now="1"] { background: color-mix(in srgb, var(--tml-lite) 16%, transparent); border-radius: 8px; }
+.duty-t { color: var(--muted); }

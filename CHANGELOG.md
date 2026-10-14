@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.1 — 2026-10-14 (`dev`)
+## v0.8.1 — 2026-10-14 (`0f434b8`)
 - Duty cards for the three older PDF sheets. `tools/parse_dutysheet.py` now reads the left block of every PDF card (Book On/Off places and times, Work Hr) and the meal break row ("<from> MB <to>"), and `tools/dutycards.py` turns them into `data/duties/DS<code>.json` like the Excel sheets. 1101 has 155 duty cards, 6091 121 and 7091 102 (the number-only lists of v0.8.0 are replaced), so pages 1 to 3 of the Duty Sheet card now work for weekdays, Saturdays and Sundays too, with book on/off, meal and every leg.
 - Times in a PDF card are anchored on the card's own book-on time, so a duty that starts in the evening keeps its after-midnight legs on the right day. Two stray cards whose legs run far past their book-off (6091588, 7091587) are skipped with a warning. A leg may run up to an hour past book off (the sheet's "Continue Duty" legs); a duty's phase now ends at book off.
 - The source note on a duty card no longer says "工作表" for a PDF sheet (there is no tab).

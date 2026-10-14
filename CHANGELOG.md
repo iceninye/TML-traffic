@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.7.8 — 2026-10-14 (`dev`)
+- Duty Sheets 8022 and 8023 now run on their own days: Saturday 24 Oct 2026 uses DS8022 and Sunday 25 Oct uses DS8023 (the Kai Tak event timetable, built on TML709CB). Every other day is unchanged. A timetable listed with `dates` in `data/timetables/index.json` is used on those service dates only and left out on all other days; the header tooltip says "只用於 <date>".
+- `tools/parse_dutysheet.py` reads the new Excel workbooks (sheets KSR, TAW, HHS, ETS DM; pick-up and relief times to the second). The service date comes from the sheet itself. For a dated sheet the base timetable is the same-day one (normal or special) whose terminal departures the sheet reproduces best. Only Run, duty number and times are written, as before.
+- Shell cache renamed `v30`.
+
 ## v0.7.7 — 2026-10-09 (`8cfb6d5`)
 - A late train's dot no longer reaches a platform before the train. At 17:04 Run 5 (towards Wu Kai Sha) showed +95 s, yet its dot was already at Shek Mun while the Shek Mun board still read 1 min. The dot's clock closes on the delay estimate at no more than 0.3 s per second, so after the delay jumped the dot kept running ahead of the badge. Now, when the dot is ahead of the estimate by more than that clock could still close before the dot reaches the next platform, the dot stands still short of the platform until the estimate has caught up, then runs on at 0.7x. In the synthetic check (`tools/validate_position.mjs`, new "early" column: dot at or past a platform the train has not reached) held trains went from 3-19% of the time early to 0-1.2%, and a train running 4 sections at 1.5x slow from 7.5% to 4.5%; on-time running and the rest of the line are unchanged. The slow case is not fully closed because the delay estimate itself lags a gradual slow-down (docs/ALGORITHM.md §3i).
 - Shell cache renamed `v29`.

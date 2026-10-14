@@ -4,6 +4,12 @@
     pip install pdfplumber
     python3 tools/parse_dutysheet.py DUTYSHEET.pdf [DUTYSHEET.pdf ...]
     python3 tools/parse_dutysheet.py DUTYSHEET.pdf --base TML1100B --dry-run
+    python3 tools/parse_dutysheet.py TML_duty_sheet_8022.xlsx TML_duty_sheet_8023.xlsx
+
+The newer sheets come as Excel workbooks (sheets KSR, TAW, HHS, ETS DM hold the
+duties, times to the second on both pick-up and relief). They carry the one
+service date they run on, so the output is registered with "dates": the app
+uses such a book on those dates only.
 
 A Duty Sheet is a crew roster, not a timetable. Each duty is a list of legs:
 Run, pick-up place and time (to the second), relief time (to the minute) and
@@ -180,6 +186,100 @@ def parse_pdf(path):
     return meta, legs, stats
 
 
+XLSX_SHEETS = ("KSR", "TAW", "HHS", "ETS DM")
+
+
+def cell_secs(value):
+    """Seconds of a time-of-day cell (datetime.time), else None."""
+    if value is None or not hasattr(value, "hour"):
+        return None
+    return secs(value.hour, value.minute, getattr(value, "second", 0))
+
+
+def parse_xlsx(path):
+    """Returns (meta, legs, stats) like parse_pdf, from a Duty Sheet workbook.
+    Columns are fixed: A duty number, C run, D "DM", E pick-up place, F pick-up
+    time, G remark, H relief time, I relief place, J flag. Cached cell values
+    are read (the file is never recalculated)."""
+    import openpyxl
+
+    with open(path, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()
+    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    sheets = [n for n in XLSX_SHEETS if n in wb.sheetnames]
+    if not sheets:
+        raise ValueError(f"none of the sheets {XLSX_SHEETS} in the workbook")
+    title = next((str(r[0]) for r in wb[sheets[0]].iter_rows(min_row=1, max_row=6, max_col=1, values_only=True)
+                  if r[0] and "Duty Sheet" in str(r[0])), "")
+    code_m = re.search(r"Duty Sheet (\d{4})\s*\(([^)]*)", title)
+    if not code_m:
+        raise ValueError("no 'TML Duty Sheet <code>' title at the top of the first sheet")
+    issued = re.search(r"Issue Date:\s*(\d{1,2} \w+ \d{4})", title)
+    impl = re.search(r"Implementation Date:\s*(\d{1,2} \w+ \d{4})", title)
+    dates = set()
+    legs = []
+    stats = {"duties": 0, "legs": 0, "unparsed": [], "chainBreaks": 0}
+    for name in sheets:
+        duty = None
+        clock = (0, 0)
+        for row_no, r in enumerate(wb[name].iter_rows(max_col=10, values_only=True), 1):
+            r = tuple(r) + (None,) * (10 - len(r))
+            if isinstance(r[0], datetime):
+                dates.add(r[0].date().isoformat())
+            if r[0] is not None and DUTY.match(str(r[0])):
+                duty = str(r[0])
+                stats["duties"] += 1
+                clock = (0, 0)
+            run = r[2]
+            if not isinstance(run, (int, float)):
+                continue
+            t = cell_secs(r[5])
+            place = str(r[4] or "").strip()
+            if t is None or not place:
+                continue  # depot walk-ons ("OS") have no pick-up time
+            if not PLACE.match(place):
+                stats["unparsed"].append(f"{name}!{row_no}: place {place!r}")
+                continue
+            if duty is None:
+                stats["unparsed"].append(f"{name}!{row_no}: leg before any duty")
+                continue
+            off, prev = clock
+            if t + off < prev - 6 * 3600 or (off == 0 and t < 4 * 3600 and prev == 0):
+                off += 86400
+            t += off
+            rel = cell_secs(r[7])
+            rel_place = str(r[8]).strip() if r[8] else None
+            leg = {"duty": duty, "run": int(run), "place": PLACE.match(place).group(1), "t": t,
+                   "dm": str(r[3] or "").strip() == "DM",
+                   "flag": str(r[9] or "").strip(), "relPlace": rel_place,
+                   "remark": str(r[6] or "")}
+            if rel is not None:
+                rel += off
+                if rel < t - 6 * 3600:
+                    rel += 86400
+                leg["rel"] = rel
+                clock = (off, rel)
+            else:
+                clock = (off, t)
+            legs.append(leg)
+            stats["legs"] += 1
+    if len(dates) != 1:
+        raise ValueError(f"expected one service date in the workbook, found {sorted(dates) or 'none'}")
+    date = next(iter(dates))
+    meta = {
+        "code": code_m.group(1),
+        "title_day": code_m.group(2).strip(),
+        "issued": iso_date(issued.group(1)) if issued else None,
+        # The workbook's own Implementation Date is a template leftover; the
+        # service date in the sheet is the day it runs.
+        "effective": date,
+        "dates": [date],
+        "sha256": digest,
+        "pages": len(sheets),
+    }
+    return meta, legs, stats
+
+
 STATIONS = [
     "TUM", "SIH", "TIS", "LOP", "YUL", "KSR", "TWW", "MEF", "NAC", "AUS", "ETS", "HUH", "HOM",
     "TKW", "SUW", "KAT", "DIH", "HIK", "TAW", "CKT", "STW", "CIO", "SHM", "TSH", "HEO", "MOS", "WKS",
@@ -230,10 +330,31 @@ def load_json(path):
         return json.load(fh)
 
 
-def choose_base(index, meta, day, forced):
+def terminal_keys(trips):
+    return {(t["run"], t["dir"], t["dep"]) for t in trips}
+
+
+def choose_base(index, meta, day, forced, legs=None, folder=None):
     entries = index.get("timetables", [])
     if forced:
         return next((e for e in entries if e["code"] == forced), None)
+    if meta.get("dates") and legs is not None:
+        # A dated sheet may run a special timetable (event day): take the
+        # same-day timetable, normal or special, whose terminal departures
+        # the sheet reproduces best; ties go to the newest.
+        mine = terminal_keys(trips_from_legs(legs))
+        best = None
+        for e in entries:
+            if e.get("day") != day or e.get("source") == "dutysheet" or (e.get("effective") or "") > meta["effective"]:
+                continue
+            base = load_json(os.path.join(folder, e["file"]))
+            theirs = {(t["run"], t["dir"], t["stops"][0][2]) for t in base["trips"]
+                      if t["stops"][0][0] in TERMINI and len(t["stops"][0]) < 4 and t["stops"][0][2] is not None
+                      and len(t["stops"]) > 1}
+            score = (len(mine & theirs) - len(mine ^ theirs) / 4, e.get("effective") or "")
+            if best is None or score > best[0]:
+                best = (score, e)
+        return best[1] if best else None
     cands = [e for e in entries if e.get("day") == day and e.get("kind") == "normal"
              and e.get("source") != "dutysheet" and (e.get("effective") or "") <= (meta["effective"] or "9999")]
     return max(cands, key=lambda e: e.get("effective") or "", default=None)
@@ -322,8 +443,16 @@ def duties_for(stops, run, legs_by_run):
     return out or None
 
 
+def day_of(meta):
+    """Day type: from the service date of a dated sheet, else the code's first digit."""
+    if meta.get("dates"):
+        return ("weekday", "weekday", "weekday", "weekday", "weekday", "saturday", "sunday")[
+            datetime.fromisoformat(meta["dates"][0]).weekday()]
+    return DAY_BY_TYPE.get(meta["code"][0], "special")
+
+
 def build(meta, legs, stats, base_entry, base):
-    day = DAY_BY_TYPE.get(meta["code"][0], "special")
+    day = day_of(meta)
     trips_in = trips_from_legs(legs)
     templates = template_trips(base)
     legs_by_run = {}
@@ -390,6 +519,7 @@ def build(meta, legs, stats, base_entry, base):
         "kind": "normal",
         "issued": meta["issued"],
         "effective": meta["effective"],
+        **({"dates": meta["dates"]} if meta.get("dates") else {}),
         "base": base_entry["code"],
         "source": {"sha256": meta["sha256"], "pages": meta["pages"], "parser": PARSER_VERSION,
                    "legs": stats["legs"], "unparsed": len(stats["unparsed"])},
@@ -406,7 +536,7 @@ def build(meta, legs, stats, base_entry, base):
 
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("pdf", nargs="+")
+    ap.add_argument("pdf", nargs="+", help="Duty Sheet PDFs or .xlsx workbooks")
     ap.add_argument("--base", help="base timetable code (default: latest same-day normal one not newer than the sheet)")
     ap.add_argument("--dry-run", action="store_true", help="parse and validate, write nothing")
     ap.add_argument("--keep-redundant", action="store_true",
@@ -422,13 +552,13 @@ def main(argv):
     failed = False
     for path in args.pdf:
         try:
-            meta, legs, stats = parse_pdf(path)
+            meta, legs, stats = (parse_xlsx if path.lower().endswith(".xlsx") else parse_pdf)(path)
         except ValueError as e:
             print(f"{path}: {e}")
             failed = True
             continue
-        day = DAY_BY_TYPE.get(meta["code"][0], "special")
-        base_entry = choose_base(index, meta, day, args.base)
+        day = day_of(meta)
+        base_entry = choose_base(index, meta, day, args.base, legs, folder)
         if not base_entry:
             print(f"DS{meta['code']}: no base timetable found for {day} ({meta['effective']}); pass --base")
             failed = True
@@ -461,7 +591,8 @@ def main(argv):
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
             fh.write("\n")
         entry = {"code": out["timetable"], "file": f"{out['timetable']}.json", "day": day, "kind": "normal",
-                 "effective": meta["effective"], "source": "dutysheet", "base": base_entry["code"],
+                 "effective": meta["effective"], **({"dates": meta["dates"]} if meta.get("dates") else {}),
+                 "source": "dutysheet", "base": base_entry["code"],
                  "revision": out["revision"], "sha256": meta["sha256"], "primary": primary}
         index["timetables"] = [e for e in index["timetables"] if e["code"] != out["timetable"]] + [entry]
         print(f"  registered, primary={primary}")

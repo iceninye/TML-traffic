@@ -113,6 +113,36 @@
    "revision": 1,
    "sha256": "e257cb64ac9b0a9d09534534906640cc3a88722bee42b7e9bce4e3edd6bca135",
    "primary": true
+  },
+  {
+   "code": "DS8022",
+   "file": "DS8022.json",
+   "day": "saturday",
+   "kind": "normal",
+   "effective": "2026-10-24",
+   "dates": [
+    "2026-10-24"
+   ],
+   "source": "dutysheet",
+   "base": "TML6090A",
+   "revision": 1,
+   "sha256": "4320938de630a8d98c89934ece50417ce17bff7f96fda6502198236def022049",
+   "primary": true
+  },
+  {
+   "code": "DS8023",
+   "file": "DS8023.json",
+   "day": "sunday",
+   "kind": "normal",
+   "effective": "2026-10-25",
+   "dates": [
+    "2026-10-25"
+   ],
+   "source": "dutysheet",
+   "base": "TML709CB",
+   "revision": 1,
+   "sha256": "69384c7edaf93200cedd7c2786d5647ca819e81e80eb0aba16801b1976c373c8",
+   "primary": true
   }
  ]
 }

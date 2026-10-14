@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.0 — 2026-10-14 (`dev`)
+## v0.8.0 — 2026-10-14 (`74d4e70`)
 - Duty Sheet card. The header's "· Duty Sheet 1101 ›" (any sheet number, or 不適用) is now a button that opens a card with three pages and a detail view:
   1. 當值: the duties on duty now with their state and place ("Run 25 行駛中 屯門 → 烏溪沙", 用膳中, 等待接班, 出車準備, 乘搭接駁, 收車), until when, what comes next, book on/off and the meal break; filter 全部 / KSR / TAD / HHS.
   2. 今日全部: every duty of the sheet in use in book-on order (book on, book off, meal), 現時 marks those on now; the same filter and a number search.

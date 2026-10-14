@@ -257,8 +257,8 @@ button {
   background: var(--panel-2);
 }
 .period[hidden] { display: none; }
-.sheet-tag { font: inherit; color: var(--tml-lite); padding: 0; margin: 0; background: none; border: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
-.sheet-tag:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: 2px; border-radius: 3px; }
+.sheet-tag { font: inherit; color: inherit; padding: 0; margin: 0; background: none; border: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sheet-tag:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
 .period[data-peak="1"] {
   color: #fff;
   border-color: transparent;
@@ -802,7 +802,6 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 }
 
 /* Duty Sheet card: opened from the header tag. */
-.period[data-peak="1"] .sheet-tag { color: #fff; }
 .sheet[data-kind="duty"] { min-height: 46vh; }
 .duty-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding-right: 36px; }
 .duty-head h2 { margin: 0; font-size: 17px; }

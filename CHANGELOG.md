@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.2 — 2026-10-14 (`COMMIT`)
+- Meal break is now the time from getting off a train to picking up the next one (1101165: 19:44 at KSR1 to 20:57 at KSR2, 1 h 13 min), not the printed MB row. The row only tells the parser which gap is the meal. `meal` in `data/duties/DS<code>.json` is `[from, to, placeFrom, placeTo]`; the card shows "KSR1 → KSR2" when the two places differ. Meals are therefore longer than before (median about 90 min).
+- 1101586 is no longer published (alongside 6091588 and 7091587), so 1101 has 154 duties. 1101107 and 1101131 show 6 h 30 min and 8 h (the printed 6:00 and 7:30 are source-sheet errors that later versions will correct).
+- The header line's Duty Sheet button takes the colour of the line (it was a separate orange).
+- Shell cache renamed `v33`.
+
 ## v0.8.1 — 2026-10-14 (`0f434b8`)
 - Duty cards for the three older PDF sheets. `tools/parse_dutysheet.py` now reads the left block of every PDF card (Book On/Off places and times, Work Hr) and the meal break row ("<from> MB <to>"), and `tools/dutycards.py` turns them into `data/duties/DS<code>.json` like the Excel sheets. 1101 has 155 duty cards, 6091 121 and 7091 102 (the number-only lists of v0.8.0 are replaced), so pages 1 to 3 of the Duty Sheet card now work for weekdays, Saturdays and Sundays too, with book on/off, meal and every leg.
 - Times in a PDF card are anchored on the card's own book-on time, so a duty that starts in the evening keeps its after-midnight legs on the right day. Two stray cards whose legs run far past their book-off (6091588, 7091587) are skipped with a warning. A leg may run up to an hour past book off (the sheet's "Continue Duty" legs); a duty's phase now ends at book off.

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.3 — 2026-10-14 (`COMMIT`)
+## v0.8.3 — 2026-10-14 (`4eda119`)
 - Duty cards: every HUH3 → ETS1 and ETS2 → HUH2 leg is 泊車 (parking the train), no longer 載客 (Ice: 1101334 Run 20 16:58:24 and Run 62 17:06:47). The new leg kind `park` is written by `tools/dutycards.py` into all five `data/duties/DS*.json` (2088 legs) and shown as "Run 20 泊車 紅磡3 → 尖東1" on the card.
 - Shell cache renamed `v34`.
 

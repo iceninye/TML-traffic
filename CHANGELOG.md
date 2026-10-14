@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.7 — 2026-10-14 (`COMMIT`)
+## v0.8.7 — 2026-10-14 (`6ea7ef6`)
 - Train card: duty numbers (both the current one and the relief ahead) are plain text in the body colour, with no underline, and tapping either opens its Duty Sheet card. The relief-ahead number was plain text before.
 - Shell cache renamed `v38`.
 

@@ -85,6 +85,15 @@ def meal_gap(meal, legs, on_place, pos=None):
     return [start, end, place_from, place_to]
 
 
+# A DM shuttle trip HUH3 to ETS1 or ETS2 to HUH2 carries no passengers: the train
+# is being parked (泊車; Ice, 2026-10-14, 1101334 Run 20 and Run 62).
+PARK_TRIPS = {("HUH3", "ETS1"), ("ETS2", "HUH2")}
+
+
+def park_kind(kind, frm, to):
+    return "park" if kind == "drive" and (frm, to) in PARK_TRIPS else kind
+
+
 def leg_kind(remark, flag, has_run):
     r = remark.lower()
     if r.startswith("train preparation") or r.startswith("empty train"):
@@ -165,6 +174,7 @@ def read_cards(path):
                     if relief < start - 6 * 3600:
                         relief += 86400
                 kind = leg_kind(remark, flag, isinstance(run, (int, float)))
+                kind = park_kind(kind, text(r[4]), text(r[8]) or None)
                 leg = [kind, int(run) if isinstance(run, (int, float)) else None, text(r[4]), start,
                        text(r[8]) or None, relief]
                 legs.append(leg)
@@ -242,7 +252,7 @@ def cards_from_pdf(meta, legs, stats):
                 rel = leg["rel"] % 86400 + (t // 86400) * 86400
                 if rel < t - 6 * 3600:
                     rel += 86400
-            kind = leg_kind(leg["remark"], leg["flag"], True)
+            kind = park_kind(leg_kind(leg["remark"], leg["flag"], True), leg["place"], leg["relPlace"])
             card_legs.append([kind, leg["run"], leg["place"], t, leg["relPlace"], rel])
             prev = rel if rel is not None else t
         card_legs.sort(key=lambda l: l[3])

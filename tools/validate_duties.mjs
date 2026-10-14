@@ -53,6 +53,10 @@ check(dutyState(d101, at(10, 40)).phase === "drive", "8022101 10:40 drives again
 const d1165 = load("1101").duties.find((d) => d.id === "1101165")
 check(d1165.meal[0] === at(19, 44) && d1165.meal[1] === at(20, 57, 55) && d1165.meal[2] === "KSR1" && d1165.meal[3] === "KSR2", "1101165 meal is 19:44 KSR1 to 20:57 KSR2")
 const d1101 = load("1101").duties
+const d1334 = d1101.find((d) => d.id === "1101334")
+const park = (run, from) => d1334.legs.find((l) => l[1] === run && l[2] === from)
+check(park(20, "HUH3")?.[0] === "park" && park(20, "HUH3")[3] === at(16, 58, 24) && park(62, "ETS2")?.[0] === "park", "1101334 Run 20 HUH3→ETS1 16:58:24 and Run 62 ETS2→HUH2 are 泊車")
+check(![...["1101", "6091", "7091", "8022", "8023"]].some((c) => load(c).duties.some((d) => d.legs.some((l) => l[0] === "drive" && ((l[2] === "HUH3" && l[4] === "ETS1") || (l[2] === "ETS2" && l[4] === "HUH2"))))), "no HUH3→ETS1 or ETS2→HUH2 leg is left as 載客")
 check(!d1101.some((d) => d.id === "1101586") && d1101.find((d) => d.id === "1101107").work === 390 && d1101.find((d) => d.id === "1101131").work === 480, "1101586 skipped, 1101107 and 1101131 keep 6.5 h and 8 h")
 check(dutyState(d101, at(13, 15)) === null && dutyState(d101, at(4, 44)) === null, "8022101 is off duty before 04:45 and from 13:15")
 const late = load("8022").duties.find((d) => d.id === "8022509")

@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.2", commit: "b6ccd27" }
+const BUILD = { version: "0.8.3", commit: "4eda119" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -188,6 +188,7 @@ const STRINGS = {
     dsPhase: {
       drive: (run, a, b) => `Run ${run} 行駛中 ${a} → ${b}`,
       empty: (run, a, b) => `Run ${run} 空車 ${a} → ${b}`,
+      park: (run, a, b) => `Run ${run} 泊車 ${a} → ${b}`,
       ride: (run, a, b) => `乘搭接駁 ${a} → ${b}`,
       prep: (run, a) => `出車準備 ${a}`,
       wait: (run, a) => `待命／等候 ${a}`,
@@ -196,7 +197,7 @@ const STRINGS = {
       end: (run, a) => `收車 ${a}`,
       gap: (run, a) => `等待接班 ${a}`,
     },
-    dsKind: { drive: "載客", empty: "空車", prep: "準備", ride: "乘搭", wait: "待命", other: "其他" },
+    dsKind: { drive: "載客", empty: "空車", park: "泊車", prep: "準備", ride: "乘搭", wait: "待命", other: "其他" },
     dsUntil: (clock) => `至 ${clock}`,
     dsNext: {
       leg: (clock, run, place) => `${clock} 接${run == null ? "" : ` Run ${run}`}（${place}）`,

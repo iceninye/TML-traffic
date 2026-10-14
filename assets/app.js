@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.4", commit: "f49dbec" }
+const BUILD = { version: "0.8.5", commit: "0000000" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -176,7 +176,7 @@ const STRINGS = {
     dsOff: "下班",
     dsMeal: "用膳",
     dsMates: "飯腳",
-    dsMatesNone: "冇（同地點重疊未夠 45 分鐘）",
+    dsMatesNone: "冇（同車站重疊未夠 45 分鐘）",
     dsWork: "工時",
     dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
     dsBack: "‹ 返回",

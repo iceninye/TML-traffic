@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.5 — 2026-10-14 (`COMMIT`)
+- 飯腳 compares meals by station, not platform: 大圍3 and 大圍4 (KSR1, KSR2) are both 大圍, and 紅磡2 and 紅磡3 (HUH2, HUH3) are both 紅磡 (`placeStation()` in `lib/tml-duties.js`). Only duties of the same Duty Sheet are compared, since one sheet runs per day.
+- Shell cache renamed `v36`.
+
 ## v0.8.4 — 2026-10-14 (`f49dbec`)
 - Duty detail card: under 用膳 a new line 飯腳 lists the other duties of the same Duty Sheet that eat at the same place (the place where the duty gets off) and whose meal overlaps this one's by 45 minutes or more, each with the overlap ("19:44–20:30（46 分）"); tap a number to open that duty. `mealMates()` in `lib/tml-duties.js`; checked by `tools/validate_duties.mjs`.
 - Shell cache renamed `v35`.

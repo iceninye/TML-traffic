@@ -18,7 +18,7 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
-import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, onDuty } from "../lib/tml-duties.js"
+import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
 import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.3", commit: "4eda119" }
+const BUILD = { version: "0.8.4", commit: "0000000" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -175,6 +175,8 @@ const STRINGS = {
     dsOn: "上班",
     dsOff: "下班",
     dsMeal: "用膳",
+    dsMates: "飯腳",
+    dsMatesNone: "冇（同地點重疊未夠 45 分鐘）",
     dsWork: "工時",
     dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
     dsBack: "‹ 返回",
@@ -2081,6 +2083,17 @@ function dutyPhaseText(st) {
   return make(st.run, a, placeName(st.to))
 }
 
+// 飯腳: duties eating at the same place with 45 min or more of overlap, each a
+// button to that duty's own card, with the overlapping minutes.
+function mealMatesHtml(duty, duties, sheet) {
+  const s = t()
+  const mates = mealMates(duty, duties)
+  if (!mates.length) return `<span class="meta">${s.dsMatesNone}</span>`
+  return `<span class="duty-mates">${mates.map(({ duty: other, from, to }) =>
+    `<button type="button" class="link duty-mate" data-duty="${other.id}" data-sheet="${sheet}">${other.id}</button>` +
+    `<span class="meta"> ${hhmm(from)}–${hhmm(to)}（${Math.round((to - from) / 60)} 分）</span>`).join("<br>")}</span>`
+}
+
 function dutyDetailHtml({ sheet, id }) {
   const s = t()
   const book = dutyBook(sheet)
@@ -2117,7 +2130,8 @@ function dutyDetailHtml({ sheet, id }) {
     `<dl class="kv"><dt>${s.dsOn}</dt><dd>${hhmm(duty.on[0])} ${placeName(duty.on[1])}</dd>` +
     `<dt>${s.dsOff}</dt><dd>${hhmm(duty.off[0])} ${placeName(duty.off[1])}</dd>` +
     (duty.work != null ? `<dt>${s.dsWork}</dt><dd>${s.dsWorkMin(duty.work)}</dd>` : "") +
-    (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${mealPlace(duty.meal)}</dd>` : "") +
+    (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${mealPlace(duty.meal)}</dd>` +
+      `<dt>${s.dsMates}</dt><dd>${mealMatesHtml(duty, book.data.duties, sheet)}</dd>` : "") +
     `</dl>${nowBox}<div class="stops-head">${s.dsLegs}</div><ol class="duty-legs">` +
     rows.map((row) => `<li data-now="${row.now ? 1 : 0}">${row.html}</li>`).join("") + `</ol><p class="fine">${source}</p>`
 }

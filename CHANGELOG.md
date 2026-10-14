@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.7.8 — 2026-10-14 (`f3e3054`)
+## v0.7.8 — 2026-10-14 (`0d47bcf`)
 - Duty Sheets 8022 and 8023 now run on their own days: Saturday 24 Oct 2026 uses DS8022 and Sunday 25 Oct uses DS8023 (the Kai Tak event timetable, built on TML709CB). Every other day is unchanged. A timetable listed with `dates` in `data/timetables/index.json` is used on those service dates only and left out on all other days; the header tooltip says "只用於 <date>".
 - `tools/parse_dutysheet.py` reads the new Excel workbooks (sheets KSR, TAW, HHS, ETS DM; pick-up and relief times to the second). The service date comes from the sheet itself. For a dated sheet the base timetable is the same-day one (normal or special) whose terminal departures the sheet reproduces best. Only Run, duty number and times are written, as before.
 - The header line shows the Duty Sheet in use again, now as its number: "· Duty Sheet 1101" (also 6091, 7091, 8022, 8023). When no sheet is in use it reads "· Duty Sheet 不適用": the running book is not a Duty Sheet book (for example a public holiday that follows Sunday's plain timetable) or the boards no longer fit it (special arrangements). In that state no Run number or 更份 shows anywhere (route diagram labels, the card's Run chip and 車次 line, 更份, the duty page, 全日更份) and the L dimming goes too, because all of these come from the sheet. The Run switch (brand dot) stays but does nothing then.

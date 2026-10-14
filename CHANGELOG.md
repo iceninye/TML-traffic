@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.3 — 2026-10-14 (`COMMIT`)
+- Duty cards: every HUH3 → ETS1 and ETS2 → HUH2 leg is 泊車 (parking the train), no longer 載客 (Ice: 1101334 Run 20 16:58:24 and Run 62 17:06:47). The new leg kind `park` is written by `tools/dutycards.py` into all five `data/duties/DS*.json` (2088 legs) and shown as "Run 20 泊車 紅磡3 → 尖東1" on the card.
+- Shell cache renamed `v34`.
+
 ## v0.8.2 — 2026-10-14 (`b6ccd27`)
 - Meal break is now the time from getting off a train to picking up the next one (1101165: 19:44 at KSR1 to 20:57 at KSR2, 1 h 13 min), not the printed MB row. The row only tells the parser which gap is the meal. `meal` in `data/duties/DS<code>.json` is `[from, to, placeFrom, placeTo]`; the card shows "KSR1 → KSR2" when the two places differ. Meals are therefore longer than before (median about 90 min).
 - 1101586 is no longer published (alongside 6091588 and 7091587), so 1101 has 154 duties. 1101107 and 1101131 show 6 h 30 min and 8 h (the printed 6:00 and 7:30 are source-sheet errors that later versions will correct).

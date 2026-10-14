@@ -156,6 +156,8 @@ const STRINGS = {
     matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
     dutySource: (code, date, only) => `班次來源：Duty Sheet ${code}（${only ? `只用於 ${date}` : `${date} 起`}）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
+    tripNo: (trip) => `車次 ${trip}`,
+    sheetTag: (code) => ` · Duty Sheet ${code ?? "不適用"}`,
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
@@ -613,7 +615,7 @@ function paintClock() {
     for (const run of state.runs) run.dir === "UP" ? (up += 1) : (down += 1)
     const m = state.measured ?? {}
     const mins = (sec) => (sec ? Math.round((sec / 60) * 10) / 10 : "—")
-    els.period.textContent = s.offTimetable(up, down, mins(m.UP), mins(m.DOWN))
+    els.period.textContent = s.offTimetable(up, down, mins(m.UP), mins(m.DOWN)) + sheetTag(s)
     els.period.dataset.peak = "0"
     els.period.title = s.offTimetableNote
   } else if (book) {
@@ -621,16 +623,24 @@ function paintClock() {
     const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
     if (!headway) {
       // Past the last headway band, the last trains may still be running.
-      els.period.textContent = state.runs.length ? s.lastTrains : s.offService
+      els.period.textContent = (state.runs.length ? s.lastTrains : s.offService) + sheetTag(s)
       els.period.dataset.peak = "0"
     } else {
       const peak = headway <= 210
       const mins = Math.round((headway / 60) * 10) / 10
-      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}`
+      els.period.textContent = `${book.kind === "special" ? s.dayType.special : (s.dayType[book.day] ?? s.dayType.special)} · ${peak ? s.peak : s.offPeak} · ${s.headway(mins)}${sheetTag(s)}`
       els.period.dataset.peak = peak ? "1" : "0"
       els.period.title = (book.source === "dutysheet" ? `${s.dutySource(book.dutysheet, book.effective, Boolean(book.dates))}\n` : "") + s.matchNote(state.matchedCount ?? 0, state.fallbackCount ?? 0)
     }
   }
+}
+
+// " · Duty Sheet 1101" (the sheet in use) or " · Duty Sheet 不適用", on the
+// header line; nothing while no timetable is loaded.
+function sheetTag(s) {
+  const book = timetables?.books[state.book]
+  if (!book) return ""
+  return s.sheetTag(sheetActive() ? book.dutysheet : null)
 }
 
 /* ---------------------------------------------------------------- diagram */
@@ -903,7 +913,18 @@ function showAlert(html) {
 
 // L trips (last trip of the day for that train, then to depot) are drawn dim.
 function isLastTrip(run) {
-  return run.kind === "sched" && run.trip.last
+  return run.kind === "sched" && run.trip.last && sheetActive()
+}
+
+// The Duty Sheet in use: the running book was built from one and the boards
+// still follow it. Run numbers, duties and L trips come only from a sheet, so
+// they show only while one is in use ("不適用" otherwise).
+function sheetActive() {
+  return timetables?.books[state.book]?.source === "dutysheet" && !state.offTimetable
+}
+
+function runsOn() {
+  return state.showRuns && sheetActive()
 }
 
 function isShortTrip(run) {
@@ -960,7 +981,7 @@ function syncTrains() {
       // The brand dot switches each train's Run number on in place of its
       // arrow. A train no timetable trip claims (countdown model) has no Run
       // number and shows a dash.
-      const reveal = state.showRuns
+      const reveal = runsOn()
       node.dataset.reveal = reveal ? "1" : "0"
       if (reveal) {
         const label = run.kind === "sched" ? String(run.trip.run) : "–"
@@ -1619,14 +1640,14 @@ function scheduledDeparture(run) {
 // from a Duty Sheet: duties are [duty, from station] pairs along the trip.
 // A relief still ahead is named after it.
 function dutyRow(run) {
-  const duties = run.kind === "sched" ? run.trip.duties : null
+  const duties = run.kind === "sched" && sheetActive() ? run.trip.duties : null
   if (!duties?.length) return ""
   const current = currentDuty(run)
   const next = duties[current + 1]
   const s = t()
   const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), escapeHtml(next[0]))}</span>` : ""
   // The link to the day's duty list only shows with Run numbers switched on.
-  const more = state.showRuns ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
+  const more = runsOn() ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
   return `<dt>${s.duty}</dt><dd>${escapeHtml(duties[current][0])}${later}${more}</dd>`
 }
 
@@ -1704,7 +1725,7 @@ function paintTrainSheet(first = false) {
     return
   }
   const now = Date.now()
-  const page = state.trainPage === 2 && state.showRuns && run.kind === "sched" ? 2 : 1
+  const page = state.trainPage === 2 && runsOn() && run.kind === "sched" ? 2 : 1
   const stops = page === 1 ? tracker.upcoming(run, now).slice(0, 8) : []
   const dirClass = run.dir === "UP" ? "up" : "down"
   const destName = network.name(run.dest, LANG)
@@ -1749,11 +1770,11 @@ function repaintKeepingFocus(html) {
 // Switched off, it is a plain direction triangle.
 function trainChip(run, s, page) {
   const dirClass = run.dir === "UP" ? "up" : "down"
-  if (state.showRuns && run.kind === "sched") {
+  if (runsOn() && run.kind === "sched") {
     return `<button type="button" class="train-chip run ${dirClass}" data-page="${page}" aria-pressed="${page === 2}" ` +
       `aria-label="${page === 2 ? s.dutyBack : s.dutyPlan(run.trip.run)}">${escapeHtml(String(run.trip.run))}</button>`
   }
-  const label = state.showRuns ? "–" : run.dir === "UP" ? "▲" : "▼"
+  const label = runsOn() ? "–" : run.dir === "UP" ? "▲" : "▼"
   return `<span class="train-chip ${dirClass}" aria-hidden="true">${label}</span>`
 }
 
@@ -1774,7 +1795,7 @@ function trainPage(run, s, stopRows) {
     dutyRow(run) +
     `</dl>` +
     `<p class="fine">${run.kind === "sched"
-      ? `${s.tripId(run.trip.run, run.trip.trip)} · ${s.basis.sched(run.readings)}`
+      ? `${sheetActive() ? s.tripId(run.trip.run, run.trip.trip) : s.tripNo(run.trip.trip)} · ${s.basis.sched(run.readings)}`
       : `${s.tripId(s.na, s.na)} · ${s.basis.model(run.readings)}`}</p>` +
     (stopRows ? `<div class="stops-head">${s.nextStops}</div><ol class="stops">${stopRows}</ol>` : "")
 }
@@ -1817,7 +1838,7 @@ function wireControls() {
   els.sheetBackdrop.addEventListener("click", closeSheet)
   els.sheet.addEventListener("click", (event) => {
     if (event.target.closest(".sheet-close")) closeSheet()
-    else if (state.showRuns && event.target.closest("button.train-chip, .duty-more")) {
+    else if (runsOn() && event.target.closest("button.train-chip, .duty-more")) {
       state.trainPage = state.trainPage === 2 ? 1 : 2
       paintTrainSheet()
     } else if (event.target.closest(".follow")) {

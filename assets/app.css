@@ -257,7 +257,7 @@ button {
   background: var(--panel-2);
 }
 .period[hidden] { display: none; }
-.sheet-tag { font: inherit; color: inherit; padding: 0; margin: 0; background: none; border: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sheet-tag { font: inherit; color: inherit; padding: 0; margin: 0; background: none; border: 0; cursor: pointer; text-decoration: none; }
 .sheet-tag:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
 .period[data-peak="1"] {
   color: #fff;

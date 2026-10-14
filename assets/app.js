@@ -158,7 +158,7 @@ const STRINGS = {
     dutySource: (code, date, only) => `班次來源：Duty Sheet ${code}（${only ? `只用於 ${date}` : `${date} 起`}）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
     tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
     tripNo: (trip) => `車次 ${trip}`,
-    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"} ›`,
+    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"}`,
     dsTitle: (code) => `Duty Sheet ${code ?? "不適用"}`,
     dsTabs: ["當值", "今日全部", "所有編號"],
     dsGroupAll: "全部",
@@ -687,8 +687,8 @@ function paintClock() {
   }
 }
 
-// The header line: the day's text, then a button " · Duty Sheet 1101 ›" (the
-// sheet in use) or " · Duty Sheet 不適用 ›" that opens the Duty Sheet card.
+// The header line: the day's text, then a button " · Duty Sheet 1101" (the
+// sheet in use) or " · Duty Sheet 不適用" that opens the Duty Sheet card.
 // The pieces are kept and only changed when their text changes, so the
 // button survives the once-a-second repaint (focus, a press in progress).
 function paintPeriod(text, s) {

@@ -6,7 +6,8 @@ release commits stamped in the page footer.
 ## v0.8.2 — 2026-10-14 (`9c80a89`)
 - Meal break is now the time from getting off a train to picking up the next one (1101165: 19:44 at KSR1 to 20:57 at KSR2, 1 h 13 min), not the printed MB row. The row only tells the parser which gap is the meal. `meal` in `data/duties/DS<code>.json` is `[from, to, placeFrom, placeTo]`; the card shows "KSR1 → KSR2" when the two places differ. Meals are therefore longer than before (median about 90 min).
 - 1101586 is no longer published (alongside 6091588 and 7091587), so 1101 has 154 duties. 1101107 and 1101131 show 6 h 30 min and 8 h (the printed 6:00 and 7:30 are source-sheet errors that later versions will correct).
-- The header line's Duty Sheet button takes the colour of the line (it was a separate orange).
+- The header line's Duty Sheet button looks like the rest of the line: same colour, no underline and no arrow (a hidden control; it still opens the card).
+- 8023586 and 8023585 (ETS DM): the MB row's own time is unreliable in the workbook (8023586 prints 18:41 between legs at 19:16 and 20:30), so the meal gap is taken from the MB row's position among the legs. 8023586 is 19:19 HUH2 to 20:30 HUH3, 8023585 20:26 HUH2 to 21:48 HUH3.
 - Shell cache renamed `v33`.
 
 ## v0.8.1 — 2026-10-14 (`0f434b8`)

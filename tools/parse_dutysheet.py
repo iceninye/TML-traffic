@@ -650,6 +650,8 @@ def main(argv):
                  "effective": meta["effective"], **({"dates": meta["dates"]} if meta.get("dates") else {}),
                  "source": "dutysheet", "base": base_entry["code"],
                  "revision": out["revision"], "sha256": meta["sha256"], "primary": primary}
+        if existing and existing.get("alsoOn"):
+            entry["alsoOn"] = existing["alsoOn"]  # extra dates announced by hand
         index["timetables"] = [e for e in index["timetables"] if e["code"] != out["timetable"]] + [entry]
         print(f"  registered, primary={primary}")
     if not args.dry_run:

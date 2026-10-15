@@ -859,3 +859,27 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 
 /* A duty number on the train card that opens its Duty Sheet card. */
 .duty-open.link { color: inherit; font-size: inherit; font-variant-numeric: tabular-nums; text-decoration: none; }
+
+/* My roster card: opened from the 我的更表 button. */
+.sheet[data-kind="me"] { min-height: 46vh; }
+.me-nav { display: flex; gap: 8px; margin: 0 0 8px; }
+.me-nav .btn[disabled] { opacity: 0.45; }
+.me-code { font-size: 13px; font-variant-numeric: tabular-nums; }
+.me-foot { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+.me-edit, .me-setup { display: grid; gap: 8px; margin: 0 0 10px; }
+.me-edit label, .me-setup label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.me-edit input, .me-setup input, .me-setup textarea, .me-export-box {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+}
+.me-setup textarea, .me-export-box { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.me-edit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.me-edit-row .meta { color: var(--muted); font-size: 11.5px; }
+.me-msg { margin: 0; min-height: 1em; font-size: 12.5px; color: var(--muted); }

@@ -19,6 +19,7 @@ import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
 import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
+import { addDays, classify, cleanRoster, dayEntry, mondayOf, newRoster, parseRoster, rowLabelFor, setOverride, normaliseCode, weekDates, weekdayIndex } from "../lib/tml-roster.js"
 import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -27,6 +28,7 @@ const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
 // The brand dot toggles Run numbers on the train dots; remembered.
 const RUNS_KEY = "tml-traffic-show-runs"
+const ROSTER_KEY = "tml-traffic-roster"
 // Hop-time calibration learned from the feed, kept so a reload starts warm.
 // v2: corrections are now relative to the working timetable's own hop
 // times; v1 values were relative to the old single-table model.
@@ -52,7 +54,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.8", commit: "a498664" }
+const BUILD = { version: "0.9.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -208,6 +210,51 @@ const STRINGS = {
       off: (clock, place) => `${clock} 下班（${place}）`,
     },
     dsNextLabel: "之後",
+    me: {
+      button: "我的更表",
+      title: "我的更表",
+      week: (a, b) => `${a} – ${b}`,
+      row: (n) => `第 ${n} 行`,
+      prev: "‹ 上週",
+      next: "下週 ›",
+      thisWeek: "本週",
+      today: "今日",
+      changed: "已改",
+      settings: "設定",
+      back: "‹ 返回",
+      weekdays: ["週一", "週二", "週三", "週四", "週五", "週六", "週日"],
+      dateLabel: (m, d) => `${m}/${d}`,
+      status: { RD: "休息日", AL: "年假", SH: "法定假日", HC: "待定" },
+      spare: (code) => `後備更 ${code}`,
+      spareNote: "後備更沒有上下班時間",
+      other: (code) => code,
+      noCard: "此更份暫時沒有上下班資料",
+      noSheet: (id) => `找不到更份 ${id} 所屬的 Duty Sheet 資料`,
+      loading: "讀取更份資料中…",
+      on: "上班",
+      off: "下班",
+      meal: "用膳",
+      editLabel: "改呢日嘅更份",
+      editHint: "更份編號（例如 8022131）或 RD、AL、SH、HC、HSP1、KSP3",
+      save: "儲存",
+      reset: "還原預設",
+      defaultIs: (code) => `預設：${code}`,
+      badCode: "格式唔啱：請輸入 7 位更份編號或 RD、AL、SH、HC、HSP1、KSP3 之類代號",
+      setupTitle: "設定我的更表",
+      setupIntro: "貼上你嘅 roster（每行一星期，週一至週日 7 格，可以連行號；CSV、Tab 分隔都得）。更表只存喺呢部機嘅瀏覽器，唔會上傳，其他人睇唔到。",
+      pasteLabel: "Roster 內容",
+      pasteKeep: "留空就保留現有更表；貼上新內容會取代，但保留你手動改過嘅日子",
+      rowLabel: (monday) => `本週（${monday} 起）係第幾行`,
+      rowBad: (nums) => `呢個行號喺 roster 入面搵唔到（有 ${nums}）`,
+      saved: "已儲存",
+      notStored: "已讀入，但呢部機儲存唔到，關閉頁面後會冇咗",
+      export: "匯出備份",
+      exportNote: "複製下面內容存好；之後可以貼返入上面欄位還原。",
+      clear: "清除我的更表",
+      clearAsk: "清除之後要重新貼上 roster，確定？",
+      noRoster: "未有 roster",
+      badBackup: "備份內容讀唔到",
+    },
     basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
     band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
     headway: (m) => `班距約 ${m} 分`,
@@ -244,6 +291,7 @@ const els = {
   mapFallback: document.getElementById("map-fallback"),
   viewSeg: document.getElementById("view-seg"),
   pauseBtn: document.getElementById("pause-btn"),
+  meBtn: document.getElementById("me-btn"),
   colLegend: document.getElementById("col-legend"),
   sheet: document.getElementById("sheet"),
   sheetBody: document.getElementById("sheet-body"),
@@ -271,6 +319,8 @@ const state = {
   // Duty Sheet card (header tag): page 1 on duty now, 2 the day's duties,
   // 3 every sheet's duties; detail = {sheet, id} is a duty's full card.
   duty: { page: 1, group: "all", cls: null, query: "", detail: null },
+  // My roster card: page week | detail | setup; monday = week shown, date = day opened.
+  me: { page: "week", monday: null, date: null, message: "", exportText: "" },
   sheetKind: null,
   station: null,
 }
@@ -1120,6 +1170,9 @@ function loop(stamp) {
   } else if (state.sheetKind === "duty" && stamp - lastSheetPaint > 1000) {
     lastSheetPaint = stamp
     paintDutyBody()
+  } else if (state.sheetKind === "me" && stamp - lastSheetPaint > 1000) {
+    lastSheetPaint = stamp
+    paintMeData()
   }
 }
 
@@ -1937,6 +1990,7 @@ function dutyBook(code) {
       })
       .finally(() => {
         if (state.sheetKind === "duty") paintDutyBody()
+        else if (state.sheetKind === "me") paintMeData()
       })
   }
   return entry
@@ -2115,7 +2169,7 @@ function mealMatesHtml(duty, duties, sheet) {
     `<span class="meta"> ${hhmm(from)}–${hhmm(to)}（${Math.round((to - from) / 60)} 分）</span>`).join("<br>")}</span>`
 }
 
-function dutyDetailHtml({ sheet, id }) {
+function dutyDetailHtml({ sheet, id }, liveOn = true) {
   const s = t()
   const book = dutyBook(sheet)
   if (book.status === "loading") return `<p class="empty">${s.dsLoading}</p>`
@@ -2125,7 +2179,7 @@ function dutyDetailHtml({ sheet, id }) {
   const source = s.dsSource(sheet, duty.tab, entry.issued, entry.dates?.join("、"), s.dsClass[entry.class] ?? entry.class, Boolean(duty.on))
   if (!duty.on) return `<p class="empty">${s.dsNoCards(sheet)}</p><dl class="kv"><dt>${s.duty}</dt><dd>${id} · ${duty.group}</dd></dl><p class="fine">${source}</p>`
   const tau = serviceSeconds(Date.now())
-  const live = sheet === todaySheet() ? dutyState(duty, tau) : null
+  const live = liveOn && sheet === todaySheet() ? dutyState(duty, tau) : null
   let nowBox = ""
   if (live) {
     const train = live.run != null && live.phase === "drive"
@@ -2178,6 +2232,268 @@ function handleDutyClick(event) {
   els.sheet.scrollTop = 0
 }
 
+/* ------------------------------------------------------------ my roster */
+
+// The person's own roster (see lib/tml-roster.js). It lives only in this
+// browser's localStorage: nothing is uploaded and the repo never holds it.
+let roster = null
+let rosterLoaded = false
+let meShown = ""
+
+function loadRoster() {
+  if (rosterLoaded) return roster
+  rosterLoaded = true
+  try {
+    const raw = readPref(ROSTER_KEY)
+    roster = raw ? cleanRoster(JSON.parse(raw)) : null
+  } catch {
+    roster = null
+  }
+  return roster
+}
+
+// Keep the roster; false when the browser would not store it.
+function saveRoster(next) {
+  roster = next
+  rosterLoaded = true
+  const json = JSON.stringify(next)
+  writePref(ROSTER_KEY, json)
+  return readPref(ROSTER_KEY) === json
+}
+
+function clearRoster() {
+  roster = null
+  rosterLoaded = true
+  try {
+    localStorage.removeItem(ROSTER_KEY)
+  } catch {
+    // Storage blocked: there was nothing stored to remove.
+  }
+}
+
+function openMe() {
+  const me = state.me
+  loadRoster()
+  me.date = null
+  me.message = ""
+  me.exportText = ""
+  me.page = roster ? "week" : "setup"
+  me.monday = mondayOf(serviceDate(Date.now()))
+  openSheet("", "me")
+  paintMe()
+  dutyIndexPromise()
+}
+
+const meDate = (date) => {
+  const [, m, d] = date.split("-").map(Number)
+  return t().me.dateLabel(m, d)
+}
+
+// A cell as the week list and the day page show it:
+// { label, duty, status: ok | loading | nosheet | noduty | nocard | none }.
+function meCell(code) {
+  const s = t().me
+  const c = classify(code)
+  if (c.kind === "status") return { label: `${s.status[c.code]} ${c.code}`, status: "none" }
+  if (c.kind === "spare") return { label: s.spare(c.code), status: "none", note: s.spareNote }
+  if (c.kind === "other") return { label: s.other(c.code), status: "none" }
+  const book = dutyBook(c.sheet)
+  if (book.status === "loading") return { label: c.id, status: "loading", c }
+  if (book.status !== "ok") return { label: c.id, status: "nosheet", c }
+  const duty = book.data.duties.find((item) => item.id === c.id)
+  if (!duty) return { label: c.id, status: "noduty", c }
+  return { label: `${c.id} · ${duty.group}`, status: duty.on ? "ok" : "nocard", duty, c }
+}
+
+function meSummary(cell) {
+  const s = t().me
+  if (cell.status === "loading") return s.loading
+  if (cell.status === "nosheet" || cell.status === "noduty") return s.noSheet(cell.c.id)
+  if (cell.status === "nocard") return s.noCard
+  if (cell.status !== "ok") return cell.note ?? ""
+  const d = cell.duty
+  return `${s.on} ${hhmm(d.on[0])} ${placeName(d.on[1])} → ${s.off} ${hhmm(d.off[0])} ${placeName(d.off[1])}` +
+    (d.meal ? ` · ${s.meal} ${hhmm(d.meal[0])}` : "")
+}
+
+function paintMe() {
+  const s = t().me
+  const me = state.me
+  const close = `<button class="sheet-close" aria-label="${t().close}">✕</button>`
+  meShown = ""
+  if (me.page === "setup") {
+    els.sheetBody.innerHTML = close + meSetupHtml()
+    return
+  }
+  if (me.page === "detail") {
+    const entry = dayEntry(roster, me.date)
+    const weekday = s.weekdays[weekdayIndex(me.date)]
+    els.sheetBody.innerHTML = close +
+      `<div class="duty-head"><button type="button" class="btn me-back">${s.back}</button><h2>${weekday} ${meDate(me.date)}</h2></div>` +
+      `<form class="me-edit" autocomplete="off"><label>${s.editLabel}` +
+      `<input name="code" value="${escapeHtml(entry.code)}" maxlength="10" autocapitalize="characters" spellcheck="false" aria-label="${s.editHint}" placeholder="${s.editHint}"></label>` +
+      `<div class="me-edit-row"><button type="submit" class="btn">${s.save}</button>` +
+      `${entry.source === "override" ? `<button type="button" class="btn me-reset">${s.reset}</button>` : ""}` +
+      `<span class="meta">${s.defaultIs(entry.defaultCode)}</span></div>` +
+      `<p class="me-msg" role="status">${escapeHtml(me.message)}</p></form><div id="me-data"></div>`
+    paintMeData()
+    return
+  }
+  const dates = weekDates(me.monday)
+  const label = rowLabelFor(roster, me.monday)
+  const current = mondayOf(serviceDate(Date.now()))
+  els.sheetBody.innerHTML = close +
+    `<div class="duty-head"><h2>${s.title}</h2></div>` +
+    `<div class="me-nav"><button type="button" class="btn me-prev">${s.prev}</button>` +
+    `<button type="button" class="btn me-this" ${me.monday === current ? "disabled" : ""}>${s.thisWeek}</button>` +
+    `<button type="button" class="btn me-next">${s.next}</button></div>` +
+    `<div class="duty-sum"><b>${s.week(meDate(dates[0]), meDate(dates[6]))}</b> <span class="meta">${s.row(label)}</span></div>` +
+    `<div id="me-data"></div><div class="me-foot"><button type="button" class="btn me-settings">${s.settings}</button></div>`
+  paintMeData()
+}
+
+// The part that depends on loaded duty data or the clock: repainted when a
+// sheet finishes loading and once a second, never touching the form fields.
+function paintMeData() {
+  const box = document.getElementById("me-data")
+  const me = state.me
+  if (!box || state.sheetKind !== "me" || !roster) return
+  const s = t().me
+  let html
+  if (me.page === "detail") {
+    const entry = dayEntry(roster, me.date)
+    const cell = meCell(entry.code)
+    const today = me.date === serviceDate(Date.now())
+    if (cell.status === "none") html = `<p class="empty">${escapeHtml(cell.label)}${cell.note ? ` · ${cell.note}` : ""}</p>`
+    else if (cell.status === "loading") html = `<p class="empty">${s.loading}</p>`
+    else if (cell.status === "nosheet") html = `<p class="empty">${s.noSheet(cell.c.id)}</p>`
+    else html = dutyDetailHtml({ sheet: cell.c.sheet, id: cell.c.id }, today)
+  } else {
+    const today = serviceDate(Date.now())
+    html = `<ul class="duty-list">${weekDates(me.monday).map((date) => {
+      const entry = dayEntry(roster, date)
+      const cell = meCell(entry.code)
+      const badges = (date === today ? ` <span class="badge now">${s.today}</span>` : "") +
+        (entry.source === "override" ? ` <span class="badge plain">${s.changed}</span>` : "")
+      return `<li><button type="button" class="duty-row me-day" data-date="${date}">` +
+        `<span class="duty-no">${s.weekdays[weekdayIndex(date)]} ${meDate(date)}${badges}</span>` +
+        `<span class="me-code">${escapeHtml(cell.label)}</span>` +
+        `<span class="meta">${escapeHtml(meSummary(cell))}</span></button></li>`
+    }).join("")}</ul>`
+  }
+  if (html === meShown) return
+  meShown = html
+  box.innerHTML = html
+}
+
+function meSetupHtml() {
+  const s = t().me
+  const me = state.me
+  const monday = mondayOf(serviceDate(Date.now()))
+  const row = roster ? rowLabelFor(roster, monday) : ""
+  return `<div class="duty-head"><h2>${s.setupTitle}</h2></div>` +
+    `<form class="me-setup" autocomplete="off"><p class="fine">${s.setupIntro}</p>` +
+    `<label>${s.pasteLabel}<textarea name="text" rows="6" spellcheck="false" placeholder="${roster ? s.pasteKeep : ""}"></textarea></label>` +
+    `<label>${s.rowLabel(monday)}<input name="row" type="number" inputmode="numeric" min="1" value="${row}" required></label>` +
+    `<div class="me-edit-row"><button type="submit" class="btn">${s.save}</button>` +
+    `${roster ? `<button type="button" class="btn me-back">${s.back}</button>` : ""}</div>` +
+    `<p class="me-msg" role="status">${escapeHtml(me.message)}</p></form>` +
+    (roster
+      ? `<div class="me-foot"><button type="button" class="btn me-export">${s.export}</button> ` +
+        `<button type="button" class="btn me-clear">${s.clear}</button></div>` +
+        (me.exportText ? `<p class="fine">${s.exportNote}</p><textarea class="me-export-box" readonly rows="5">${escapeHtml(me.exportText)}</textarea>` : "")
+      : "")
+}
+
+function submitMeSetup(form) {
+  const s = t().me
+  const me = state.me
+  const text = form.elements.text.value.trim()
+  const row = Number(form.elements.row.value)
+  const monday = mondayOf(serviceDate(Date.now()))
+  let next = null
+  if (text.startsWith("{")) {
+    try {
+      next = cleanRoster(JSON.parse(text))
+    } catch {
+      next = null
+    }
+    if (!next) me.message = s.badBackup
+  } else if (text) {
+    const parsed = parseRoster(text)
+    if (parsed.issues.length || !parsed.rows.length) {
+      me.message = parsed.issues.slice(0, 4).join("；") || s.noRoster
+    } else if (!parsed.numbers.includes(row)) {
+      me.message = s.rowBad(`${parsed.numbers[0]}–${parsed.numbers[parsed.numbers.length - 1]}`)
+    } else {
+      next = newRoster(parsed, { row, monday })
+      next.overrides = roster?.overrides ?? {}
+    }
+  } else if (roster) {
+    if (!roster.numbers.includes(row)) me.message = s.rowBad(`${roster.numbers[0]}–${roster.numbers[roster.numbers.length - 1]}`)
+    else next = { ...roster, anchor: { row, monday } }
+  } else {
+    me.message = s.noRoster
+  }
+  if (next) {
+    me.message = saveRoster(next) ? s.saved : s.notStored
+    me.page = "week"
+    me.monday = monday
+  }
+  paintMe()
+}
+
+function submitMeEdit(form) {
+  const s = t().me
+  const me = state.me
+  const raw = form.elements.code.value.trim()
+  const code = normaliseCode(raw)
+  if (!code) {
+    me.message = s.badCode
+    return paintMe()
+  }
+  me.message = saveRoster(setOverride(roster, me.date, code)) ? s.saved : s.notStored
+  paintMe()
+}
+
+function handleMeClick(event) {
+  const me = state.me
+  const target = event.target
+  if (target.closest(".sheet-close")) return closeSheet()
+  const mate = target.closest(".duty-mate")
+  if (mate) return openDutyCard(mate.dataset.sheet, mate.dataset.duty)
+  const train = target.closest(".duty-train")
+  if (train) return openTrain(train.dataset.run)
+  const day = target.closest(".me-day")
+  if (day) {
+    me.page = "detail"
+    me.date = day.dataset.date
+    me.message = ""
+  } else if (target.closest(".me-back")) {
+    me.page = roster ? "week" : "setup"
+    me.message = ""
+  } else if (target.closest(".me-prev")) me.monday = addDays(me.monday, -7)
+  else if (target.closest(".me-next")) me.monday = addDays(me.monday, 7)
+  else if (target.closest(".me-this")) me.monday = mondayOf(serviceDate(Date.now()))
+  else if (target.closest(".me-settings")) {
+    me.page = "setup"
+    me.message = ""
+    me.exportText = ""
+  } else if (target.closest(".me-reset")) {
+    me.message = saveRoster(setOverride(roster, me.date, null)) ? t().me.saved : t().me.notStored
+  } else if (target.closest(".me-export")) {
+    me.exportText = JSON.stringify(roster)
+  } else if (target.closest(".me-clear")) {
+    if (!window.confirm(t().me.clearAsk)) return
+    clearRoster()
+    me.page = "setup"
+    me.message = ""
+    me.exportText = ""
+  } else return
+  paintMe()
+  els.sheet.scrollTop = 0
+}
+
 /* -------------------------------------------------------------- controls */
 
 function wireControls() {
@@ -2206,6 +2522,13 @@ function wireControls() {
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)
   els.periodTag.addEventListener("click", openDutySheet)
+  els.meBtn.addEventListener("click", openMe)
+  els.sheet.addEventListener("submit", (event) => {
+    if (state.sheetKind !== "me") return
+    event.preventDefault()
+    if (event.target.matches(".me-setup")) submitMeSetup(event.target)
+    else if (event.target.matches(".me-edit")) submitMeEdit(event.target)
+  })
   els.sheet.addEventListener("input", (event) => {
     if (state.sheetKind !== "duty" || !event.target.matches(".duty-search")) return
     state.duty.query = event.target.value
@@ -2213,6 +2536,7 @@ function wireControls() {
   })
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
+    else if (state.sheetKind === "me") handleMeClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
     else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")

@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.9.0 — 2026-10-15 (`dev`)
+- New 我的更表 button beside the view switch. Paste your own roster once (one row per week, Monday to Sunday, 7 cells, optionally with a row number; CSV, tab or space separated) and say which row this week is; it then follows the cycle week by week and goes back to the first row after the last. A week page lists each day's duty with book on/off, place and meal; tap a day for the full duty card (live state on today). Change a single day (a special sheet such as 8022131, or RD, AL, SH, HC, HSP1, KSP3) or put it back to the cycle's cell. Spare duties and leave show their label only.
+- The roster is stored only in this browser (localStorage `tml-traffic-roster`); nothing is uploaded and no roster is in the repo. 匯出備份 gives a JSON text to paste back in; 清除我的更表 deletes it.
+- `lib/tml-roster.js` holds the pure logic; `node tools/validate_roster.mjs` checks it on a made-up roster.
+- Shell cache renamed `v40`.
+
 ## v0.8.8 — 2026-10-15 (`a498664`)
 - Monday 19 Oct 2026 runs Duty Sheet 7091 (Sunday's sheet), so the header reads "Duty Sheet 7091" instead of 不適用 and Run numbers, 更份 and the Duty Sheet card work that day. The date is the `alsoOn` list on the DS7091 entry in `data/timetables/index.json`: add a date there to run that sheet on another day (the service day still changes at 04:00). 24 Oct (DS8022) and 25 Oct (DS8023) are unchanged. Other days are unchanged.
 - Shell cache renamed `v39`.

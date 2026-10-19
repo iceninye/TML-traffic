@@ -4,7 +4,7 @@
 
 🔗 **https://tml-traffic.iceninye.workers.dev**（Cloudflare Workers；GitHub Pages 備用：https://iceninye.github.io/TML-traffic/）
 
-目前版本 v0.8.8，每版改動見 [`CHANGELOG.md`](CHANGELOG.md)。
+最新版本見頁腳或 [`CHANGELOG.md`](CHANGELOG.md)。
 
 港鐵**冇公開列車位置 API**，只公佈「下一班幾分鐘後到」。本專案由各站到站倒數
 **反推列車位置**，引擎抽取自 [keithligh/hk-traffic-intelligence](https://github.com/keithligh/hk-traffic-intelligence)（MIT），
@@ -53,16 +53,19 @@ data/tml-network.json 27 站
 data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 生成）
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
 data/timetables/       工作時間表（index.json 清單 + 每份一個 <代號>.json）
+data/duties/           更份卡片（index.json + DS<代號>.json）
 tools/                資料解析、驗證同 probe 腳本
 docs/                 演算法、模型、App 設計文件
 ```
 
-## 本地跑
+## 快速開始
 
 ```bash
 python3 -m http.server 8790 --bind 127.0.0.1
 # 開 http://127.0.0.1:8790/
 ```
+
+冇 build step。部署（Cloudflare Workers／GitHub Pages）、`wrangler.jsonc`、發佈新版嘅版本號三處、驗證腳本同已知限制，見 [`docs/SETUP.md`](docs/SETUP.md)。
 
 ## 新增／更新時間表
 
@@ -82,11 +85,12 @@ App 會自動讀清單，唔使改程式。
 
 ### 用 Duty Sheet 更新（時間表 PDF 未出時）
 
-營運端拎到最新 Duty Sheet（司機更表）但官方時間表 PDF 未出時：
+營運端拎到最新 Duty Sheet（司機更表）但官方時間表 PDF 未出時（要 `pip install pdfplumber openpyxl`；**只支援 PDF 同 `.xlsx`，不支援 CSV**）：
 
 ```bash
 python3 tools/parse_dutysheet.py DutySheet.pdf            # 自動揀同日類型、日期最近嘅時間表做底
 python3 tools/parse_dutysheet.py DutySheet.pdf --dry-run  # 只檢查，唔寫檔
+python3 tools/parse_dutysheet.py TML_duty_sheet_8022.xlsx # Excel 版（有指定行車日）
 ```
 
 Duty Sheet 係司機更表，只有每班車嘅 Run、更份編號、總站開出時間、錦上路／大圍接班時間同到站分鐘，**冇逐站時間、冇車次號**。
@@ -95,7 +99,7 @@ Duty Sheet 係司機更表，只有每班車嘅 Run、更份編號、總站開�
 另外由 `tools/dutycards.py`（PDF 同 Excel 都讀）寫 `data/duties/DS<代號>.json`（更份卡片：上下班、工時、用膳、每腿 Run 同時間，畫面右上「· Duty Sheet 1101」（冇底線同箭嘴，撳落去開）開）；
 冇司機姓名同備註原文；Duty Sheet 源檔（PDF／Excel）本身唔入 repo（`.gitignore` 已排除 `*.pdf`）。如果同底表一模一樣（底表時間更準），就唔寫檔。
 App 只會優先用「生效日已到、比底表新而且有差異」嘅 Duty Sheet（`index.json` 入面 `primary: true`），時段列嘅提示（滑鼠停喺「平日 · 繁忙 · 班距」嗰行）會註明來源 Duty Sheet。
-詳見 `docs/DUTYSHEET.md`。
+**完整操作步驟**（檔案格式、`.xlsx`／PDF 支援、**唔支援 CSV**、指定日期用邊份 Duty Sheet）見 [`docs/DUTYSHEET.md`](docs/DUTYSHEET.md) 嘅「操作指南」。
 
 ## 重建資料
 
@@ -107,8 +111,9 @@ python3 tools/build_data.py --no-track   # 只重建時間表
 ## 部署同發佈
 
 - 網站：Cloudflare Workers 靜態資源（`wrangler.jsonc`），`main` 更新後由 Cloudflare 自動建置；`gh-pages` 分支嘅 GitHub Pages 為備用。
-- 發佈新版要同時改三處：`assets/app.js` 嘅 `BUILD`（version、commit）、`CHANGELOG.md` 最新一項、`sw.js` 嘅 `tml-traffic-shell-vNN` cache 名（令已安裝嘅用戶換走舊殼層）。
+- 發佈新版要同時改三處：`assets/app.js` 嘅 `BUILD`、`CHANGELOG.md` 最新一項、`sw.js` 嘅 `tml-traffic-shell-vNN`。
 - 本地檢查 Workers 設定：`npx wrangler deploy --dry-run`。
+- 逐步設定見 [`docs/SETUP.md`](docs/SETUP.md)。
 
 ## 驗證
 
@@ -118,6 +123,7 @@ node tools/probe-runs.mjs    # 動畫層平滑度
 node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀數）
 node tools/validate_duties.mjs     # 更份卡片資料同當值判斷（真資料）
 node tools/validate_position.mjs   # 被扣列車嘅列車點位置（合成讀數）
+node tools/validate_feed_errors.mjs  # 連唔到 API 時錯誤原因分類
 node --check assets/app.js   # 無 bundler，逐檔 parse
 ```
 
@@ -141,11 +147,18 @@ probe-runs: snapshot 1/2 -> 37 runs each, tracked 37, dropped 0
 
 - [`CHANGELOG.md`](CHANGELOG.md) — 版本紀錄
 - [`docs/ALGORITHM.md`](docs/ALGORITHM.md) — 位置演算法完整流程、延誤計法、準確度實測
-- [`docs/DUTYSHEET.md`](docs/DUTYSHEET.md) — Duty Sheet 格式同解析器
+- [`docs/SETUP.md`](docs/SETUP.md) — 設定、部署（Workers／GitHub Pages）、發佈、驗證腳本、已知限制
+- [`docs/DATA.md`](docs/DATA.md) — `data/`、`data/duties/` 資料檔案結構
+- [`docs/DUTYSHEET.md`](docs/DUTYSHEET.md) — Duty Sheet 操作指南、格式同解析器
 - [`docs/MODEL.md`](docs/MODEL.md) — 位置模型：資料來源、算法、實測數字、已知限制
 - [`docs/APP.md`](docs/APP.md) — App 層：視覺形式決定 (B4)、架構、實測、已知取捨、手動檢查清單
 - [`docs/EXTRACTION.md`](docs/EXTRACTION.md) — 引擎抽取報告：反推機制、常數、驗證數字
 - [`NOTICE.md`](NOTICE.md) — 第三方授權
+
+## 已知限制
+
+- 用 VPN／代理（例如 Shadowrocket）時，要將 `data.gov.hk` 設為直連，否則班次 API 會逾時或顯示「網絡錯誤」。
+- 位置係由倒數反推，非官方；其餘見 [`docs/SETUP.md`](docs/SETUP.md) 「已知限制」。
 
 ## 資料同私隱
 

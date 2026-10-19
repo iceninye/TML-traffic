@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.9 — 2026-10-19 (`e7689e1`)
+- "網絡錯誤" is now only reported when the request itself fails (offline, blocked, refused by CORS, DNS). Before, any exception while reading a reply that did arrive (a parser bug, an unexpected payload) was also labelled "網絡錯誤", which hid the real cause; it now shows "資料無法讀取". `AbortError` counts as 逾時. `lib/mtr-feed.js`; checked by `tools/validate_feed_errors.mjs`.
+- Shell cache renamed `v40`.
+
 ## v0.8.8 — 2026-10-15 (`a498664`)
 - Monday 19 Oct 2026 runs Duty Sheet 7091 (Sunday's sheet), so the header reads "Duty Sheet 7091" instead of 不適用 and Run numbers, 更份 and the Duty Sheet card work that day. The date is the `alsoOn` list on the DS7091 entry in `data/timetables/index.json`: add a date there to run that sheet on another day (the service day still changes at 04:00). 24 Oct (DS8022) and 25 Oct (DS8023) are unchanged. Other days are unchanged.
 - Shell cache renamed `v39`.

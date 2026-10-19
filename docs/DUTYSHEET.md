@@ -1,5 +1,83 @@
 # Duty Sheet 數據源
 
+## 操作指南：準備同加入新 Duty Sheet
+
+### 1. 檔案格式
+
+| 格式 | 支援 | 備註 |
+|---|---|---|
+| `.xlsx`（Excel） | ✅ | 新式 Duty Sheet。需要工作表 `KSR`、`TAW`、`HHS`、`ETS DM`（至少其一），第一張工作表頂部要有 `TML Duty Sheet <4 位代號> (<日類型>)` 標題；表內嘅行車日期、Issue Date 會自動讀出。讀嘅係 Excel 儲存咗嘅計算結果（唔會重新計算），所以請喺 Excel 開過、儲存過先交 |
+| `.pdf` | ✅ | 舊式 PDF Duty Sheet（1101、6091、7091 係呢種）。冇指定日期，按 `effective`（發出日）同日類型用 |
+| `.csv` | ❌ 不支援 | `parse_dutysheet.py` 唔識讀 CSV：非 `.xlsx` 嘅檔案一律當 PDF，傳 CSV 會以 `Is this really a PDF?` 報錯。CSV 冇工作表同儲存格結構，唔夠解析更表；請用原本嘅 `.xlsx` 或 PDF。（個人更表 CSV 屬另一個專案，唔喺呢個 repo） |
+
+### 2. 準備
+
+```bash
+pip install pdfplumber openpyxl     # PDF 同 xlsx 都要（parse_dutysheet.py 一開始就載入 pdfplumber）
+```
+
+- 檔名隨意，代號、日期都喺檔案內容入面讀（4 位代號；首位 1／5 平日、6 星期六、7 星期日，其他當特別日，例如 8022、8023）。
+- **原始 Duty Sheet 唔好 commit**（`.gitignore` 只排除 `*.pdf`，Excel 要自己小心，因為 repo 係公開嘅）。將檔案放喺 repo 外面，例如 `~/Downloads/`。
+- 官方底表（`data/timetables/` 入面同日類型、生效日唔新過 Duty Sheet 嘅正常時間表）需要已經存在，解析器用佢做模板。
+
+### 3. 解析、驗證、寫檔
+
+```bash
+# 先試跑：解析 + 驗證，唔寫任何檔
+python3 tools/parse_dutysheet.py ~/Downloads/TML_duty_sheet_8022.xlsx --dry-run
+
+# 確認冇問題後正式寫入（可一次傳多個檔）
+python3 tools/parse_dutysheet.py ~/Downloads/TML_duty_sheet_8022.xlsx ~/Downloads/TML_duty_sheet_8023.xlsx
+
+# 指定底表（預設：同日類型、最新而唔新過 Duty Sheet 嘅正常時間表）
+python3 tools/parse_dutysheet.py sheet.pdf --base TML1100B
+
+# 同底表一模一樣都照寫
+python3 tools/parse_dutysheet.py sheet.pdf --keep-redundant
+```
+
+做咗乜：
+
+1. 解析 → 經 `tools/validate_dutysheet.py` 驗證，**通過先寫** `data/timetables/DS<代號>.json` 並登記到 `data/timetables/index.json`；唔通過會列出原因，唔會寫檔。工作表名對唔上等問題會直接報錯（例如 `none of the sheets (…) in the workbook`）。
+2. 同時由 `tools/dutycards.py` 寫 `data/duties/DS<代號>.json` 同 `data/duties/index.json`（更份卡片）。
+3. 如果結果同底表完全一樣（底表時間更準），預設唔寫（`--keep-redundant` 可覆蓋）。
+
+只想補更份卡片、或某張 Duty Sheet 冇卡片時列出編號：
+
+```bash
+python3 tools/dutycards.py file.xlsx [file.pdf ...] [--dry-run]
+python3 tools/dutycards.py --stubs      # 有時間表但冇卡片嘅 Duty Sheet，印編號清單
+```
+
+### 4. 驗證輸出
+
+```bash
+python3 tools/validate_dutysheet.py data/timetables/DS8022.json   # 單份時間表，exit 0 = 通過
+node tools/validate_duties.mjs                                    # 更份卡片同當值判斷
+node tools/validate_matching.mjs                                  # 班次對應（合成讀數）
+```
+
+### 5. 指定「呢個日期用邊份 Duty Sheet」
+
+| 情況 | 做法 |
+|---|---|
+| Excel Duty Sheet（有指定行車日） | 全自動：`index.json` 項目帶 `dates: ["YYYY-MM-DD"]`，只喺該行車日載入，其他日子唔受影響 |
+| 平日／假日要借用另一份（例如 2026-10-19 用星期日 7091） | 手動喺 `data/timetables/index.json` 嗰份 Duty Sheet 項目加／改 `alsoOn: ["2026-10-19"]`；解析器重新登記時會保留。例子見 `DS7091` |
+| 日常平日／星期六／星期日 | 唔使設定：最新、已生效、`primary: true` 嘅 Duty Sheet 自動優先 |
+| 冇 Duty Sheet 嘅日子 | 唔使設定：header 顯示「Duty Sheet 不適用」，Run 編號同更份功能隱藏 |
+
+行車日喺凌晨 4 點換日。`alsoOn` 目前只喺 `index.json` 手動維護；更份卡片 (`data/duties/index.json`) 嘅 `dates` 只記錄 Excel 內嘅行車日。
+
+### 6. 開 PR
+
+1. 改動只應該有 `data/timetables/`、`data/duties/`（同需要時 `docs/`）。
+2. 加入新資料即係改變 App 行為，要按 [`SETUP.md`](SETUP.md)「發佈新版」同時改版本號三處（`assets/app.js` 嘅 `BUILD`、`CHANGELOG.md`、`sw.js` 嘅 cache 名）。
+3. 跑上面驗證指令同 `node --check assets/app.js`，再開 PR。
+
+資料結構見 [`DATA.md`](DATA.md)。
+
+---
+
 ## 內容（三份樣本 6091 星期六、7091 星期日、1101 平日）
 
 Duty Sheet 係司機更表。每張更表（7 位編號：4 位代號 + 3 位序號）有一串「腿」：

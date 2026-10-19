@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.9 — 2026-10-19
+## v0.8.9 — 2026-10-19 (`e7689e1`)
 - "網絡錯誤" is now only reported when the request itself fails (offline, blocked, refused by CORS, DNS). Before, any exception while reading a reply that did arrive (a parser bug, an unexpected payload) was also labelled "網絡錯誤", which hid the real cause; it now shows "資料無法讀取". `AbortError` counts as 逾時. `lib/mtr-feed.js`; checked by `tools/validate_feed_errors.mjs`.
 - Shell cache renamed `v40`.
 

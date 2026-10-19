@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.9", commit: "e7689e1" }
+const BUILD = { version: "0.8.10", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -90,7 +90,7 @@ const STRINGS = {
     updated: (s) => (s < 60 ? `${s} 秒前更新` : `${Math.floor(s / 60)} 分鐘前更新`),
     loading: "讀取中…",
     feedDown: (r, why) => `暫時連唔到港鐵班次資料${why ? `（${why}）` : ""}，${r} 秒後自動重試`,
-    feedWhy: { timeout: "逾時", network: "網絡錯誤", data: "資料無法讀取", app: "程式錯誤" },
+    feedWhy: { timeout: "逾時", network: "網絡錯誤，如用緊 VPN／代理，請將 data.gov.hk 設為直連", data: "資料無法讀取", app: "程式錯誤" },
     mtrPaused: (r) => `港鐵暫停提供實時班次，${r} 秒後再試`,
     mtrNotice: "港鐵通告",
     mtrNoticeNone: "港鐵暫停提供實時班次資料",

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.13 — 2026-10-21 (`PENDING`)
+## v0.8.13 — 2026-10-21 (`db6558f`)
 - Audit of what the parser takes from the Duty Sheet workbooks (8022, 8023, 8027, 7091M). The duty lists, every leg (Run, places, times, meal) and the date were already complete. The one useful thing left out was the workbook's own `timetable` sheet: the official train-by-train times with trip numbers. The parser now reads it and puts those times on every matched train, so all 437 (8022), 417 (8023), 537 (8027) and 380 of 382 (7091M) trips now carry the workbook's exact times and no longer depend on estimates from the base timetable.
 - What moved: 8022 had 7 trips changed (up to 108 s), 8027 15 trips (up to 66 s), 7091M 6 trips (up to 38 s), 8023 none. Trips the parser had to rebuild now have their trip number (86 in 8022 and 8027, 7 in 8023, 379 in 7091M).
 - Not taken, on purpose: the `platform sheet` (platform numbers; the app has no platform field), and the empty-train movements between depot and terminus (trip numbers 3xxxx and 4xxxx, flagged N), which are not passenger trips.

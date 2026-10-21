@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.12", commit: "0eb3672" }
+const BUILD = { version: "0.8.13", commit: "5124eae" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -111,7 +111,7 @@ const STRINGS = {
     waiting: (a) => `${a} 即將開出`,
     waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
     duty: "更份",
-    relief: (place, duty) => `（${place}換 ${duty}）`,
+    relief: (place, duty) => `（${place} 換 ${duty}）`,
     dutyAll: "全日更份 ›",
     dutyPlan: (run) => `Run ${run} 全日更份`,
     dutyPickUp: "接車",
@@ -1702,8 +1702,9 @@ function scheduledDeparture(run) {
 }
 
 // Duty number (更份) driving the train now, when the loaded timetable came
-// from a Duty Sheet: duties are [duty, from station] pairs along the trip.
-// A relief still ahead is named after it.
+// from a Duty Sheet: duties are [duty, from station, platform] along the trip
+// (the platform only where the sheet names one, e.g. KSR1). A relief still
+// ahead is named after its platform.
 function dutyRow(run) {
   const duties = run.kind === "sched" && sheetActive() ? run.trip.duties : null
   if (!duties?.length) return ""
@@ -1711,7 +1712,7 @@ function dutyRow(run) {
   const next = duties[current + 1]
   const s = t()
   const sheet = timetables?.books[state.book]?.dutysheet
-  const later = next ? ` <span class="meta">${s.relief(network.name(next[1], LANG), dutyLink(next[0], sheet))}</span>` : ""
+  const later = next ? ` <span class="meta">${s.relief(placeName(next[2] ?? next[1]), dutyLink(next[0], sheet))}</span>` : ""
   // The link to the day's duty list only shows with Run numbers switched on.
   const more = runsOn() ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
   return `<dt>${s.duty}</dt><dd>${dutyLink(duties[current][0], sheet)}${later}${more}</dd>`
@@ -1749,18 +1750,18 @@ function dutyPlan(run) {
   const rows = []
   for (const trip of trips) {
     const codes = trip.stops.map((st) => st.code)
-    trip.duties.forEach(([duty, from], i) => {
+    trip.duties.forEach(([duty, from, plat], i) => {
       const a = Math.max(0, codes.indexOf(from))
-      const nextFrom = trip.duties[i + 1]?.[1]
+      const [, nextFrom, nextPlat] = trip.duties[i + 1] ?? []
       const b = nextFrom && codes.indexOf(nextFrom) > a ? codes.indexOf(nextFrom) : codes.length - 1
-      const off = { code: codes[b], at: trip.stops[b].arr, depot: trip.last && b === codes.length - 1 }
+      const off = { code: codes[b], plat: b === codes.indexOf(nextFrom) ? nextPlat : undefined, at: trip.stops[b].arr, depot: trip.last && b === codes.length - 1 }
       const prev = rows[rows.length - 1]
       if (prev && prev.duty === duty && prev.off.code === codes[a]) {
         prev.off = off
         prev.keys.push(`${trip.id}#${i}`)
         return
       }
-      rows.push({ duty, pick: { code: codes[a], at: trip.stops[a].dep }, off, keys: [`${trip.id}#${i}`] })
+      rows.push({ duty, pick: { code: codes[a], plat, at: trip.stops[a].dep }, off, keys: [`${trip.id}#${i}`] })
     })
   }
   const now = `${run.trip.id}#${currentDuty(run)}`
@@ -1775,8 +1776,8 @@ function dutyPage(run) {
   const hhmm = (sec) => secClock(sec).slice(0, 5)
   const rows = plan.rows.map((row) =>
     `<li data-now="${row.now ? 1 : 0}"><span class="duty-no">${dutyLink(row.duty, plan.sheet)}${row.now ? ` <span class="badge now">${s.dutyNow}</span>` : ""}</span>` +
-    `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${network.name(row.pick.code, LANG)} ${secClock(row.pick.at)}</span>` +
-    `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${network.name(row.off.code, LANG)} ${hhmm(row.off.at)}` +
+    `<span class="duty-leg"><span class="meta">${s.dutyPickUp}</span> ${placeName(row.pick.plat ?? row.pick.code)} ${secClock(row.pick.at)}</span>` +
+    `<span class="duty-leg"><span class="meta">${s.dutyRelief}</span> ${placeName(row.off.plat ?? row.off.code)} ${hhmm(row.off.at)}` +
     `${row.off.depot ? ` <span class="badge plain">${s.toDepot}</span>` : ""}</span></li>`).join("")
   return `<div class="stops-head">${s.dutyPlan(run.trip.run)}</div><ol class="duties">${rows}</ol>` +
     `<p class="fine">${s.dutyNote(escapeHtml(plan.sheet ?? ""))}</p>`

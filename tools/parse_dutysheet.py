@@ -309,6 +309,7 @@ def parse_xlsx(path):
     if len(dates) != 1:
         raise ValueError(f"expected one service date in the workbook, found {sorted(dates) or 'none'}")
     date = next(iter(dates))
+    tt_code, tt_trips = read_timetable(path)
     meta = {
         "code": code_m.group(1),
         "title_day": code_m.group(2).strip(),
@@ -317,11 +318,116 @@ def parse_xlsx(path):
         # service date in the sheet is the day it runs.
         "effective": date,
         "dates": [date],
+        "timetable": tt_trips,
+        "timetableCode": tt_code,
         "reliefExact": True,  # Excel relief times are to the second, not the arrival minute
         "sha256": digest,
         "pages": len(sheets),
     }
     return meta, legs, stats
+
+
+def read_timetable(path):
+    """The workbook's `timetable` sheet: the official working timetable the
+    Duty Sheet runs, one row per trip with the Run, the trip number and the
+    time at every station (UP block I:AZ, DOWN block CD:DU). Returns
+    (timetable code, [{dir, run, trip, times: [(station, "arr"|"dep", seconds)]}])
+    or (None, []) when the sheet is not there."""
+    import openpyxl
+    from openpyxl.utils import column_index_from_string as col
+
+    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    if "timetable" not in wb.sheetnames:
+        return None, []
+    rows = [tuple(r) for r in wb["timetable"].iter_rows(values_only=True)]
+    if len(rows) < 4:
+        return None, []
+    head, kind = rows[1], rows[2]
+    blocks = []
+    for name, run_c, trip_c, first, last in (("UP", "D", "E", "I", "AZ"), ("DOWN", "BY", "BZ", "CD", "DU")):
+        cs = [(j, str(head[j]).strip(), kind[j]) for j in range(col(first) - 1, min(col(last), len(head)))
+              if head[j] is not None and kind[j] in ("arr", "dep")]
+        blocks.append((name, col(run_c) - 1, col(trip_c) - 1, cs))
+    code = None
+    trips = []
+    for r in rows[3:]:
+        for name, run_i, trip_i, cs in blocks:
+            if len(r) <= max(j for j, _, _ in cs):
+                continue
+            if code is None:
+                label = next((str(c) for c in r[:3] if isinstance(c, str) and re.fullmatch(r"TML\w+", c)), None)
+                code = label
+            run = r[run_i]
+            if not isinstance(run, (int, float)) and not (isinstance(run, str) and run.isdigit()):
+                continue
+            times, off, prev, plats = [], 0, None, {}
+            for j, station, k in cs:
+                note = re.fullmatch(r"\((\w+?)(\d) (?:arr|dep)\)", str(r[j] or "").strip())
+                if note and note.group(1) in STATIONS:
+                    plats[note.group(1)] = note.group(1) + note.group(2)  # "(HOM3 arr)"
+                v = cell_secs(r[j])
+                if v is None:
+                    continue
+                if prev is not None and v + off < prev - 6 * 3600:
+                    off += 86400
+                times.append((station, k, v + off))
+                prev = v + off
+            if times and times[0][2] < 3 * 3600:
+                times = [(c, k, v + 86400) for c, k, v in times]
+            if times:
+                trips.append({"dir": name, "run": int(run), "trip": re.sub(r"\s+", "", str(r[trip_i] or "")),
+                              "times": times, "platforms": plats})
+    return code, trips
+
+
+def apply_timetable(trips, sheet_trips):
+    """Overwrites the stop times of the trips with the working timetable's own
+    (the base timetable can be a different one, and rebuilt trips are
+    estimates). Dwell at a station is kept where the sheet lists only the
+    departure. A trip is left as it was when the result would not run forward.
+    Returns counts."""
+    by_run = {}
+    for st in sheet_trips:
+        by_run.setdefault((st["run"], st["dir"]), []).append(st)
+    done = {"matched": 0, "changed": 0, "skipped": 0, "unmatched": 0, "numbered": 0}
+    for t in trips:
+        first = t["stops"][0]
+        st = next((c for c in by_run.get((t["run"], t["dir"]), [])
+                   if any(s == first[0] and k == "dep" and v == first[2] for s, k, v in c["times"])), None)
+        if not st:
+            done["unmatched"] += 1
+            continue
+        dep = {s: v for s, k, v in st["times"] if k == "dep"}
+        arr = {s: v for s, k, v in st["times"] if k == "arr"}
+        stops = []
+        for code, a, d, *rest in t["stops"]:
+            na, nd = a, d
+            if code in dep and d is not None:
+                nd = dep[code]
+                if a is not None and code not in arr:
+                    na = a + (nd - d)
+            if code in arr and a is not None:
+                na = arr[code]
+                if code not in dep and d is not None:
+                    nd = d + (na - a)
+            stops.append([code, na, nd, *rest])  # rest: the empty-stop flag
+        times = [x for s in stops for x in s[1:3] if x is not None]
+        if times != sorted(times):
+            done["skipped"] += 1
+            continue
+        done["matched"] += 1
+        if stops != [list(x) for x in t["stops"]]:
+            done["changed"] += 1
+        t["stops"] = stops
+        t["precision"] = "exact"
+        plats = {c: p for c, p in st["platforms"].items() if any(x[0] == c for x in stops)}
+        if plats:
+            t["platforms"] = plats
+            done["platforms"] = done.get("platforms", 0) + 1
+        if st["trip"] and t.get("trip") != st["trip"]:
+            t["trip"] = st["trip"]
+            done["numbered"] += 1
+    return done
 
 
 STATIONS = [
@@ -473,7 +579,7 @@ def stop_time(stop):
 
 
 def duties_for(stops, run, legs_by_run):
-    """[[duty, station], ...]: who drives the trip from which stop, from the
+    """[[duty, station(, platform)], ...]: who drives the trip from which stop, from the
     legs of the same run. A leg covers its pick-up second to the end of its
     relief minute (a leg with no relief time, such as a depot move, to the
     duty's next pick-up); where two overlap (a relief), the later pick-up wins."""
@@ -486,9 +592,12 @@ def duties_for(stops, run, legs_by_run):
         cover = [l for l in legs if l["end"] is not None and l["t"] - 5 <= t < l["end"]]
         if not cover:
             return None
-        duty = max(cover, key=lambda l: l["t"])["duty"]
-        if not out or out[-1][0] != duty:
-            out.append([duty, stop[0]])
+        leg = max(cover, key=lambda l: l["t"])
+        if not out or out[-1][0] != leg["duty"]:
+            # the platform the driver takes over on, when the sheet names one
+            # (KSR1, TAW4, HUH2 ...); terminus legs only give the station
+            plat = leg["place"] if re.fullmatch(stop[0] + r"\d", leg["place"] or "") else None
+            out.append([leg["duty"], stop[0], plat] if plat else [leg["duty"], stop[0]])
     return out or None
 
 
@@ -559,6 +668,21 @@ def build(meta, legs, stats, base_entry, base):
         trips.append({"dir": t["dir"], "run": t["run"], "trip": "", "notes": notes,
                       "duties": duties_for(stops, t["run"], legs_by_run), "stops": stops,
                       "src": "duty", "precision": prec})
+    if meta.get("timetable"):
+        stats["timetableSheet"] = apply_timetable(trips, meta["timetable"])
+        # duties were matched on the base's times; a base trip that runs later
+        # than the workbook's own can miss its driver, so try again on those
+        redone = 0
+        for t in trips:
+            d = None if t.get("duties") else duties_for(t["stops"], t["run"], legs_by_run)
+            if d:
+                t["duties"] = d
+                redone += 1
+        stats["timetableSheet"]["dutiesRedone"] = redone
+        # rebuilt trips that now carry the working timetable's times count as exact
+        precision = {"exact": sum(1 for t in trips if t["precision"] == "exact"),
+                     "anchored": sum(1 for t in trips if t["precision"] == "anchored"),
+                     "terminal": sum(1 for t in trips if t["precision"] == "terminal")}
     trips.sort(key=lambda t: stop_time(t["stops"][0]))
     out = {
         "schema": "dutysheet/1",
@@ -570,6 +694,7 @@ def build(meta, legs, stats, base_entry, base):
         "effective": meta["effective"],
         **({"dates": meta["dates"]} if meta.get("dates") else {}),
         "base": base_entry["code"],
+        **({"timetableSheet": meta["timetableCode"]} if meta.get("timetable") else {}),
         "source": {"sha256": meta["sha256"], "pages": meta["pages"], "parser": PARSER_VERSION,
                    "legs": stats["legs"], "unparsed": len(stats["unparsed"])},
         "coverage": {"trips": len(trips), "runs": len({t["run"] for t in trips}), **precision},
@@ -643,6 +768,8 @@ def main(argv):
             print(f"  · {n}")
         for e in errors[:20]:
             print(f"  ✗ {e}")
+        if stats.get("timetableSheet"):
+            print(f"  · timetable sheet overlay: {stats['timetableSheet']}")
         if stats["unparsed"]:
             print(f"  · unparsed rows ({len(stats['unparsed'])}), first: {stats['unparsed'][0]}")
         if errors:

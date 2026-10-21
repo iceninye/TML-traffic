@@ -3,11 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.11 — unreleased
+## v0.8.11 — 2026-10-21 (`8837f6d`)
 - Duty data now lives in one place: this repo. `data/duty-basic.json` (book-on/off, place and hours of every duty, spare duties included, from the Duty workbook's Index sheet), `data/duty-hours-fixes.json`, `tools/index-to-basic.py` and `tools/validate-hours.mjs` moved here from tml-roster. tml-roster stops keeping copies and reads `data/` from this site at run time, so a new Duty Sheet or Index is imported here only.
 - `_headers`: `data/*` answers cross-origin GETs (`Access-Control-Allow-Origin: *`) so tml-roster can read it on Cloudflare Workers.
 - `.gitignore` also skips `*.xlsx`, so a raw Duty Sheet or Duty workbook is not committed by accident.
-- No change to the diagram itself. Shell cache renamed `v42`.
+- Duty Sheet 8027 (KTSP event timetable) runs on Friday 30 Oct 2026 (the date is in the workbook). Duty Sheet 8022 also runs on Saturday 31 Oct, besides 24 Oct (`alsoOn` on its entry in `data/timetables/index.json`; `entriesForDate` now keeps a dated sheet on its `alsoOn` days too). The 8022 workbook sent again is byte-identical to the one already ingested, so its data is unchanged. Other days are unchanged.
+- Shell cache renamed `v43`.
 
 ## v0.8.10 — 2026-10-19 (`ca9e7bc`)
 - When the request itself fails, the status line adds a hint: "網絡錯誤，如用緊 VPN／代理，請將 data.gov.hk 設為直連". Reported by Ice: with Shadowrocket on, the MTR feed (`rt.data.gov.hk`) fails with 網絡錯誤 while the page itself loads. The app cannot change how the device resolves or routes that host.

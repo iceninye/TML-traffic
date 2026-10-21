@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.15 — 2026-10-21 (`dev`)
+- 更份: a failed read of the Duty index or a sheet is no longer kept for the session. The index used to turn into an empty list (「冇符合」) and a sheet stayed 「讀取更份資料失敗」 until a reload; now both are read again when the network comes back or the page is shown again.
+- Shell cache renamed `v48`.
+
 ## v0.8.14 — 2026-10-21 (`58eb59b`)
 - Place names for the depot, siding and turn-back codes on the Duty Sheets, confirmed by Ice: OS 外放車 (where trains stand outside service hours), PHD 八鄉車廠（東）, PMC 八鄉車廠（西）, PKTA／PKTD 八鄉車廠側線 A／D, ENT／EXT 大圍車廠出入口, HHS 紅磡廠, CIOT 第一城側線, KATS 啟德側線, TWWS 荃灣西側線, TIST 天水圍側線, AUP 柯士甸側線, TB1 大圍調頭位置 (about 300 m before 大圍 platform 3／顯徑 platform 1). They live in `data/tml-network.json` under `places`, so tml-roster reads the same names; the 更份 card shows 「外放車」 instead of 「OS」.
 - `data/duties/index.json` now carries `alsoOn` like `data/timetables/index.json`: 8022 also runs on 31 Oct and 7091 on 19 Oct. tml-roster reads only the duty index to pick a day's sheet. `tools/dutycards.py` copies `alsoOn` from the timetables index whenever it writes the duty index.

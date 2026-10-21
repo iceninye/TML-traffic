@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.12 — 2026-10-21 (`dev`)
+## v0.8.12 — 2026-10-21 (`0eb3672`)
 - The Marathon timetable of Sunday 1 Nov 2026 (the updated 7091 workbook, "Northern Metropolis Marathon Timetable") runs on that day only, as Duty Sheet **7091M**: the header reads "Duty Sheet 7091M" on 1 Nov, and every other Sunday (and 19 Oct) keeps the regular 7091. It has the same 360 trips as the regular Sunday timetable plus four early trains from Wu Kai Sha at 04:38, 04:53, 05:08 and 05:23 that end at Tai Wai (from the workbook's `overnight` sheet), and different duty numbers on 208 trips (Tai Wai duties are 7091401 and up, Hung Hom 7091601 and up).
 - `tools/parse_dutysheet.py`: `--code` registers a workbook under another code (7091M), `--force` rewrites an already registered workbook, and the `overnight` sheet is read. A trip handed over at Tai Wai or Kowloon Station to an empty train (to a depot or siding) now ends there; before, it was drawn to the far terminus. Excel relief times are to the second, so the 30-second round-up meant for PDF minutes is no longer added: 8022, 8023 and 8027 were written again, which moves only their rebuilt trips (20, 7 and 40), by at most 39 seconds. The first-departure check accepts 04:00 onwards, and the fifth digit check accepts 4 and 7 (Tai Wai) and 6 (Hung Hom) too.
 - Known: `tools/validate-hours.mjs` reports 8027107 (card 6.5 h, official Index 6 h) and 8027131 (card 8 h, Index 7.5 h). The cards follow the sheet's own book on/off times and meal; the official hours need a driver to confirm before going into `data/duty-hours-fixes.json`.

@@ -128,7 +128,7 @@
    ],
    "source": "dutysheet",
    "base": "TML6090A",
-   "revision": 2,
+   "revision": 3,
    "sha256": "4320938de630a8d98c89934ece50417ce17bff7f96fda6502198236def022049",
    "primary": true,
    "alsoOn": [
@@ -146,7 +146,7 @@
    ],
    "source": "dutysheet",
    "base": "TML709CB",
-   "revision": 2,
+   "revision": 3,
    "sha256": "69384c7edaf93200cedd7c2786d5647ca819e81e80eb0aba16801b1976c373c8",
    "primary": true
   },
@@ -161,7 +161,7 @@
    ],
    "source": "dutysheet",
    "base": "TML1100B",
-   "revision": 2,
+   "revision": 3,
    "sha256": "d6c54e70dfda811b543370c4f38a4eb907023ef7129a98a01f94a0158fc12701",
    "primary": true
   },
@@ -176,7 +176,7 @@
    ],
    "source": "dutysheet",
    "base": "TML7090",
-   "revision": 1,
+   "revision": 2,
    "sha256": "a901addf6ba1ea2fc9f39e4c08bfbd11ce3eeae70f27d0750613d032b1fe1eb4",
    "primary": true
   }

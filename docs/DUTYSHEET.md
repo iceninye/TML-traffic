@@ -131,7 +131,7 @@ Run 同秒數全部一樣，KSR／TAW 接班時間等於時間表嘅開出時間
 
 ## 指定日期嘅 Duty Sheet（Excel）
 
-新式 Duty Sheet 係 `.xlsx`（工作表 KSR、TAW、HHS、ETS DM，接班同離班時間都到秒），表內有指定行車日期。`python3 tools/parse_dutysheet.py file.xlsx` 讀出後，`index.json` 項目帶 `dates: ["2026-10-24"]`：只喺該行車日（凌晨 4 點換日）載入同優先使用，其他日子完全唔受影響。底表由同日類型（普通或特別）入面揀 Duty Sheet 總站開出班次最吻合嗰份（例如 8023 活動日用 TML709CB）。現有：DS8022（2026-10-24，星期六）、DS8023（2026-10-25，星期日，啟德體育園活動）。
+新式 Duty Sheet 係 `.xlsx`（工作表 KSR、TAW、HHS、ETS DM，接班同離班時間都到秒），表內有指定行車日期。`python3 tools/parse_dutysheet.py file.xlsx` 讀出後（另外會讀工作表 `timetable` 嘅逐班官方時間同班次編號，覆蓋到每班對得上嘅車；`platform sheet` 月台號碼同空車調動 3xxxx／4xxxx 唔讀），`index.json` 項目帶 `dates: ["2026-10-24"]`：只喺該行車日（凌晨 4 點換日）載入同優先使用，其他日子完全唔受影響。底表由同日類型（普通或特別）入面揀 Duty Sheet 總站開出班次最吻合嗰份（例如 8023 活動日用 TML709CB）。現有：DS8022（2026-10-24，星期六）、DS8023（2026-10-25，星期日，啟德體育園活動）。
 
 ## 選用規則
 

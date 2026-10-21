@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.13 — 2026-10-21 (`PENDING`)
+- Audit of what the parser takes from the Duty Sheet workbooks (8022, 8023, 8027, 7091M). The duty lists, every leg (Run, places, times, meal) and the date were already complete. The one useful thing left out was the workbook's own `timetable` sheet: the official train-by-train times with trip numbers. The parser now reads it and puts those times on every matched train, so all 437 (8022), 417 (8023), 537 (8027) and 380 of 382 (7091M) trips now carry the workbook's exact times and no longer depend on estimates from the base timetable.
+- What moved: 8022 had 7 trips changed (up to 108 s), 8027 15 trips (up to 66 s), 7091M 6 trips (up to 38 s), 8023 none. Trips the parser had to rebuild now have their trip number (86 in 8022 and 8027, 7 in 8023, 379 in 7091M).
+- Not taken, on purpose: the `platform sheet` (platform numbers; the app has no platform field), and the empty-train movements between depot and terminus (trip numbers 3xxxx and 4xxxx, flagged N), which are not passenger trips.
+- `tools/parse_dutysheet.py`: `read_timetable` and `apply_timetable`; the data files record the timetable sheet in `timetableSheet`.
+- Shell cache renamed `v45`.
+
 ## v0.8.12 — 2026-10-21 (`0eb3672`)
 - The Marathon timetable of Sunday 1 Nov 2026 (the updated 7091 workbook, "Northern Metropolis Marathon Timetable") runs on that day only, as Duty Sheet **7091M**: the header reads "Duty Sheet 7091M" on 1 Nov, and every other Sunday (and 19 Oct) keeps the regular 7091. It has the same 360 trips as the regular Sunday timetable plus four early trains from Wu Kai Sha at 04:38, 04:53, 05:08 and 05:23 that end at Tai Wai (from the workbook's `overnight` sheet), and different duty numbers on 208 trips (Tai Wai duties are 7091401 and up, Hung Hom 7091601 and up).
 - `tools/parse_dutysheet.py`: `--code` registers a workbook under another code (7091M), `--force` rewrites an already registered workbook, and the `overnight` sheet is read. A trip handed over at Tai Wai or Kowloon Station to an empty train (to a depot or siding) now ends there; before, it was drawn to the far terminus. Excel relief times are to the second, so the 30-second round-up meant for PDF minutes is no longer added: 8022, 8023 and 8027 were written again, which moves only their rebuilt trips (20, 7 and 40), by at most 39 seconds. The first-departure check accepts 04:00 onwards, and the fifth digit check accepts 4 and 7 (Tai Wai) and 6 (Hung Hom) too.

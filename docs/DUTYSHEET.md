@@ -54,6 +54,7 @@ python3 tools/dutycards.py --stubs      # 有時間表但冇卡片嘅 Duty Sheet
 ```bash
 python3 tools/validate_dutysheet.py data/timetables/DS8022.json   # 單份時間表，exit 0 = 通過
 node tools/validate_duties.mjs                                    # 更份卡片同當值判斷
+node tools/validate-hours.mjs                                     # 官表（duty-basic.json）同更份卡片工時
 node tools/validate_matching.mjs                                  # 班次對應（合成讀數）
 ```
 
@@ -68,9 +69,24 @@ node tools/validate_matching.mjs                                  # 班次對應
 
 行車日喺凌晨 4 點換日。`alsoOn` 目前只喺 `index.json` 手動維護；更份卡片 (`data/duties/index.json`) 嘅 `dates` 只記錄 Excel 內嘅行車日。
 
-### 6. 開 PR
+### 6. Duty 總表（Index 工作表）→ `data/duty-basic.json`
 
-1. 改動只應該有 `data/timetables/`、`data/duties/`（同需要時 `docs/`）。
+每個更份（包括後備更 KSP／HSP）嘅上落班時間、地點同工時，由 Duty 總表 Excel 嘅 `Index` 工作表抽出：
+
+```bash
+python3 tools/index-to-basic.py ~/Downloads/Duty.xlsx   # 寫 data/duty-basic.json
+node tools/validate-hours.mjs                           # 官表工時同更份卡片要對得上
+```
+
+官表印錯嘅工時寫喺 `data/duty-hours-fixes.json`，每次重新產生都會套用。只保留時間、地點、工時同 DE/DL，唔抄備註。
+
+### 7. tml-roster 直接讀呢度
+
+[tml-roster](https://github.com/iceninye/tml-roster)（我的更表、編更）唔再存副本，開頁時直接讀呢個網站嘅 `data/duties/`、`data/duty-basic.json` 同 `data/tml-network.json`（`_headers` 開放 `data/*` 跨網域讀取；讀唔到就讀 GitHub `main` 嘅 raw 檔）。所以 **Duty Sheet 同總表只喺呢個 repo 匯入**，merge 落 `main`、Cloudflare 部署完，tml-roster 下次開頁就用新資料，唔使同步、唔使改 tml-roster。改檔名或欄位格式前要先睇 tml-roster 有冇用到。
+
+### 8. 開 PR
+
+1. 改動只應該有 `data/timetables/`、`data/duties/`、`data/duty-basic.json`、`data/duty-hours-fixes.json`（同需要時 `docs/`）。
 2. 加入新資料即係改變 App 行為，要按 [`SETUP.md`](SETUP.md)「發佈新版」同時改版本號三處（`assets/app.js` 嘅 `BUILD`、`CHANGELOG.md`、`sw.js` 嘅 cache 名）。
 3. 跑上面驗證指令同 `node --check assets/app.js`，再開 PR。
 

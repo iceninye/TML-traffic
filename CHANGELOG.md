@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.15 — 2026-10-21 (`dev`)
+## v0.8.15 — 2026-10-21 (`c72ec32`)
 - 更份: a failed read of the Duty index or a sheet is no longer kept for the session. The index used to turn into an empty list (「冇符合」) and a sheet stayed 「讀取更份資料失敗」 until a reload; now both are read again when the network comes back or the page is shown again.
 - Shell cache renamed `v48`.
 

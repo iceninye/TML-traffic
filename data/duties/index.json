@@ -49,6 +49,17 @@
    "issued": "2026-07-12",
    "duties": 117,
    "sha256": "69384c7edaf93200cedd7c2786d5647ca819e81e80eb0aba16801b1976c373c8"
+  },
+  {
+   "code": "8027",
+   "file": "DS8027.json",
+   "class": "special",
+   "dates": [
+    "2026-10-30"
+   ],
+   "issued": "2026-09-16",
+   "duties": 166,
+   "sha256": "d6c54e70dfda811b543370c4f38a4eb907023ef7129a98a01f94a0158fc12701"
   }
  ]
 }

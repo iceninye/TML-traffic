@@ -229,7 +229,7 @@ def read_card_left(card, words):
         card["stage"] = 4
 
 
-XLSX_SHEETS = ("KSR", "TAW", "HHS", "ETS DM")
+XLSX_SHEETS = ("KSR", "TAW", "HHS", "ETS DM", "overnight")
 
 
 def cell_secs(value):
@@ -317,6 +317,7 @@ def parse_xlsx(path):
         # service date in the sheet is the day it runs.
         "effective": date,
         "dates": [date],
+        "reliefExact": True,  # Excel relief times are to the second, not the arrival minute
         "sha256": digest,
         "pages": len(sheets),
     }
@@ -350,19 +351,24 @@ def trips_from_legs(legs):
             if key in seen:
                 continue
             seen.add(key)
-            anchors, cur = [], leg
+            anchors, cur, ended = [], leg, False
             while cur["relPlace"][:3] in ("KSR", "TAW"):
                 nxt = next((n for n in ls if n["place"] == cur["relPlace"] and cur["rel"] - 60 <= n["t"] <= cur["rel"] + 150
                             and n is not cur and n.get("rel") is not None), None)
                 if not nxt:
                     break
+                if "N" in nxt["flag"] or (nxt.get("relPlace") or "")[:3] not in STATIONS:
+                    # The train goes empty (to a depot or siding) from here:
+                    # the trip ends at this relief point, it is not a full run.
+                    ended = True
+                    break
                 anchors.append((nxt["place"][:3], nxt["t"]))
                 cur = nxt
             end = cur["relPlace"][:3]
             trips.append({"run": run, "dir": "DOWN" if leg["place"] == "TUM" else "UP", "origin": leg["place"],
-                          "dest": end if end in STATIONS and end not in ("KSR", "TAW") else TERMINI[leg["place"]],
+                          "dest": end if end in STATIONS and (ended or end not in ("KSR", "TAW")) else TERMINI[leg["place"]],
                           "dep": leg["t"], "anchors": anchors,
-                          "arrival": cur["rel"] if end not in ("KSR", "TAW") else None,
+                          "arrival": cur["rel"] if ended or end not in ("KSR", "TAW") else None,
                           "lastLeg": "L" in cur["flag"]})
     trips.sort(key=lambda t: t["dep"])
     return trips
@@ -422,7 +428,7 @@ def interp(x, xs, ys):
     return y0 + (y1 - y0) * (x - x0) / (x1 - x0) if x1 != x0 else y0
 
 
-def rebuild(trip, templates):
+def rebuild(trip, templates, relief_round=RELIEF_ROUND):
     """Stops for one trip: the nearest template trip, shifted to the Duty
     Sheet's departure and stretched between its anchors."""
     cands = templates[trip["dir"]]
@@ -441,7 +447,7 @@ def rebuild(trip, templates):
         if (code, "d") in ax and ax[(code, "d")] > points[-1][0] and t - trip["dep"] > points[-1][1]:
             points.append((ax[(code, "d")], t - trip["dep"]))
     if trip["arrival"] is not None and (trip["dest"], "a") in ax:
-        x, y = ax[(trip["dest"], "a")], trip["arrival"] - trip["dep"] + RELIEF_ROUND
+        x, y = ax[(trip["dest"], "a")], trip["arrival"] - trip["dep"] + relief_round
         if x > points[-1][0] and y > points[-1][1]:
             points.append((x, y))
     xs, ys = [p[0] for p in points], [p[1] for p in points]
@@ -544,7 +550,7 @@ def build(meta, legs, stats, base_entry, base):
     for key, t in sheet.items():
         if key in used:
             continue
-        rebuilt = rebuild(t, templates)
+        rebuilt = rebuild(t, templates, 0 if meta.get("reliefExact") else RELIEF_ROUND)
         if not rebuilt:
             continue
         stops, prec = rebuilt
@@ -581,6 +587,9 @@ def main(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdf", nargs="+", help="Duty Sheet PDFs or .xlsx workbooks")
     ap.add_argument("--base", help="base timetable code (default: latest same-day normal one not newer than the sheet)")
+    ap.add_argument("--code", help="register the sheet under this code instead of its own (a second version of "
+                    "a sheet, e.g. 7091M for the 7091 of one event day); only with a single workbook")
+    ap.add_argument("--force", action="store_true", help="write again even when the same workbook is already registered")
     ap.add_argument("--dry-run", action="store_true", help="parse and validate, write nothing")
     ap.add_argument("--keep-redundant", action="store_true",
                     help="also write a sheet identical to its base timetable (normally skipped: the base is exact)")
@@ -600,12 +609,18 @@ def main(argv):
             print(f"{path}: {e}")
             failed = True
             continue
+        if args.code:
+            if len(args.pdf) > 1:
+                sys.exit("--code needs exactly one workbook")
+            meta["code"] = args.code
         import dutycards
 
         if path.lower().endswith(".xlsx"):
             info, duties, card_stats = dutycards.read_cards(path)
         else:
             info, duties, card_stats = dutycards.cards_from_pdf(meta, legs, stats)
+        if args.code:
+            info["code"] = args.code
         missing = [w for w in card_stats["warnings"] if w.startswith("MISSING")]
         for w in missing:
             print(f"{path}: {w}")
@@ -639,7 +654,7 @@ def main(argv):
             print("  · not written: the base timetable already has these trips (use --keep-redundant to write it anyway)")
             continue
         existing = next((e for e in index["timetables"] if e["code"] == out["timetable"]), None)
-        if existing and existing.get("sha256") == meta["sha256"]:
+        if existing and existing.get("sha256") == meta["sha256"] and not args.force:
             print("  · same PDF already registered, nothing to do")
             continue
         out["revision"] = (existing or {}).get("revision", 0) + 1

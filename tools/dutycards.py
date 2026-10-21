@@ -28,8 +28,10 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "data")
-CARD_SHEETS = {"KSR": "KSR", "TAW": "TAD", "HHS": "HHS", "ETS DM": "HHS"}
-GROUP_BY_DIGIT = {"1": "KSR", "3": "TAD", "5": "HHS"}
+CARD_SHEETS = {"KSR": "KSR", "TAW": "TAD", "HHS": "HHS", "ETS DM": "HHS", "overnight": "TAD"}
+# Fifth digit of a duty number -> crew group. 4/6 are the marathon 7091M's Tai Wai and
+# Hung Hom numbers, 7 its overnight (Tai Wai) duties.
+GROUP_BY_DIGIT = {"1": "KSR", "3": "TAD", "4": "TAD", "5": "HHS", "6": "HHS", "7": "TAD"}
 DUTY = re.compile(r"^\d{7}$")
 DAY_WORDS = {"weekday": "weekday", "saturday": "saturday", "sunday": "sunday"}
 SCHEMA = "dutycards/1"

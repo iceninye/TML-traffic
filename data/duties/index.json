@@ -29,6 +29,17 @@
    "sha256": "69d59970242b0a029ad9e2504ca4bde6dbab31a7aac9a40938161d9428a101bd"
   },
   {
+   "code": "7091M",
+   "file": "DS7091M.json",
+   "class": "special",
+   "dates": [
+    "2026-11-01"
+   ],
+   "issued": "2026-11-01",
+   "duties": 106,
+   "sha256": "a901addf6ba1ea2fc9f39e4c08bfbd11ce3eeae70f27d0750613d032b1fe1eb4"
+  },
+  {
    "code": "8022",
    "file": "DS8022.json",
    "class": "special",

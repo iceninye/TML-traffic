@@ -64,6 +64,7 @@ node tools/validate_matching.mjs                                  # 班次對應
 |---|---|
 | Excel Duty Sheet（有指定行車日） | 全自動：`index.json` 項目帶 `dates: ["YYYY-MM-DD"]`，只喺該行車日載入，其他日子唔受影響 |
 | 平日／假日要借用另一份（例如 2026-10-19 用星期日 7091） | 手動喺 `data/timetables/index.json` 嗰份 Duty Sheet 項目加／改 `alsoOn: ["2026-10-19"]`；解析器重新登記時會保留。例子見 `DS7091` |
+| 同一個編號出咗另一個版本（例如 7091 嘅 2026-11-01 馬拉松版，行車日只得一日） | 用 `--code` 另起編號登記：`python3 tools/parse_dutysheet.py file.xlsx --code 7091M`。時間表同更份卡片都寫成 `DS7091M`，標題行顯示「Duty Sheet 7091M」，只喺 `dates` 嗰日載入；原本嘅 7091 其他星期日照用 |
 | 日常平日／星期六／星期日 | 唔使設定：最新、已生效、`primary: true` 嘅 Duty Sheet 自動優先 |
 | 冇 Duty Sheet 嘅日子 | 唔使設定：header 顯示「Duty Sheet 不適用」，Run 編號同更份功能隱藏 |
 
@@ -93,6 +94,10 @@ node tools/validate-hours.mjs                           # 官表工時同更份�
 資料結構見 [`DATA.md`](DATA.md)。
 
 ---
+
+- 工作表 `overnight`（活動日通宵／早班加車，如 7091M 嘅 7091701-704，04:38 起由 WKS 開往大圍）同 KSR、TAW、HHS、ETS DM 一樣讀入。
+- 同一份 Excel 再傳一次，登記時預設跳過；解析器改過要重寫就加 `--force`。
+- Excel 嘅離班時間係到站秒數，中途站推算唔再加 PDF 版嘅 30 秒；接班接到 `N`（空車入廠）或非正線地點嘅班次，行程就喺該接班站（例如大圍）完結，唔會當成行晒全線。
 
 ## 內容（三份樣本 6091 星期六、7091 星期日、1101 平日）
 

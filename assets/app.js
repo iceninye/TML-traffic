@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.13", commit: "5124eae" }
+const BUILD = { version: "0.8.14", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -322,6 +322,7 @@ async function boot() {
     fetchJson("data/timetables/index.json").catch(() => ({ timetables: [] })),
   ])
   network = createNetwork(netJson)
+  places = netJson.places ?? {}
   model = createModel(timetable, track)
   timetables = createTimetables({}, model)
   // The calendar's timetable first, so the first trains appear quickly; the
@@ -1896,10 +1897,15 @@ let dutyBodyShown = ""
 // the sheet's own "duty list" page (read from it, not from MTR documents).
 const DEPOT_NAMES = { TAD: "大圍廠", HHS: "紅磡廠", TT: "大圍廠", W1A: "八鄉廠", W1C: "八鄉廠", W1F: "八鄉廠", LT1: "紅磡廠", LT2: "紅磡廠", E3A: "錦上路", E3C: "錦上路" }
 
+// Sidings, depot gates and turn-back points (OS, PHD, CIOT, TB1 ...), named in
+// data/tml-network.json "places" (names confirmed by Ice).
+let places = {}
+
 // "KSR2" is platform 2 of 錦上路; a code that is no station keeps its letters.
 function placeName(code) {
   if (!code) return "—"
   if (DEPOT_NAMES[code]) return `${DEPOT_NAMES[code]} ${code}`
+  if (places[code]?.tc) return places[code].tc
   const base = code.replace(/\d$/, "")
   const name = network.name(base, LANG)
   return name === base ? code : `${name}${base === code ? "" : ` ${code.slice(base.length)}`}`

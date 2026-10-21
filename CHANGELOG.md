@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.14 — 2026-10-21 (`dev`)
+- Place names for the depot, siding and turn-back codes on the Duty Sheets, confirmed by Ice: OS 外放車 (where trains stand outside service hours), PHD 八鄉車廠（東）, PMC 八鄉車廠（西）, PKTA／PKTD 八鄉車廠側線 A／D, ENT／EXT 大圍車廠出入口, HHS 紅磡廠, CIOT 第一城側線, KATS 啟德側線, TWWS 荃灣西側線, TIST 天水圍側線, AUP 柯士甸側線, TB1 大圍調頭位置 (about 300 m before 大圍 platform 3／顯徑 platform 1). They live in `data/tml-network.json` under `places`, so tml-roster reads the same names; the 更份 card shows 「外放車」 instead of 「OS」.
+- `data/duties/index.json` now carries `alsoOn` like `data/timetables/index.json`: 8022 also runs on 31 Oct and 7091 on 19 Oct. tml-roster reads only the duty index to pick a day's sheet. `tools/dutycards.py` copies `alsoOn` from the timetables index whenever it writes the duty index.
+- `tools/validate_duties.mjs`: the days of each sheet agree between the two indexes, and every place a card names has a name.
+- Shell cache renamed `v47`.
+
 ## v0.8.13 — 2026-10-21 (`5124eae`)
 - Audit of what the parser takes from the Duty Sheet workbooks (8022, 8023, 8027, 7091M), sheet by sheet. The workbook's own `timetable` sheet (the official train-by-train times with trip numbers) was not read before; it is now, and its times go on every matched train: 437/437 (8022), 417/417 (8023), 537/537 (8027) and 380/382 (7091M) trips now carry the workbook's exact times. 8022 had 7 trips changed (up to 108 s), 8027 15 (up to 66 s), 7091M 6 (up to 38 s), 8023 none. Rebuilt trips now have their trip number (86 in 8022 and 8027, 7 in 8023, 379 in 7091M).
 - Platform numbers: each 更份 on a trip now carries the platform the driver takes over on when the sheet names one (KSR1, KSR2, TAW3, TAW4, HUH2, HUH3, TWW2, HOM3, ...), as a third item `[duty, station, platform]`; terminus pick-ups at TUM and WKS stay `[duty, station]` because the sheets give no platform there. All seven Duty Sheets (1101, 6091, 7091 too) were written again for it. The train card reads 「錦上路 1 換 8027115」 and the 全日更份 page 「接車 錦上路 2」, 「交車 紅磡 3」. A trip the timetable sheet routes to a named platform (「(HUH3 arr)」) keeps it in `platforms`. The `platform sheet` tab was checked against the data: every relief and time on it matches (its platforms are fixed by direction: UP TAW3, HUH3, KSR1; DOWN KSR2, HUH2, TAW4).

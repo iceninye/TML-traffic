@@ -4,7 +4,7 @@
 
 ```
 data/
-  tml-network.json        27 站、2 條方向 route（抽取自上游，MIT）
+  tml-network.json        27 站、2 條方向 route（抽取自上游，MIT）；places = 車廠、側線、調頭位置嘅中文名（Ice 確認）
   tml-segments.json       站間距離／行車時間（tools/build-segments.mjs 生成）
   tml-timetable.json      站距、行車、停站、時段模型（tools/build_data.py 生成）
   tml-track.json          OSM 真實走綫座標（tools/build_data.py 生成，ODbL）

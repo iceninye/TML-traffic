@@ -174,6 +174,67 @@
    "lat": 22.429236
   }
  },
+ "places": {
+  "note": "Depots, sidings and turn-back points the Duty Sheets name (codes that are not passenger stations). Names confirmed by Ice, 2026-10-21. Sidings can stable trains or turn them back.",
+  "OS": {
+   "tc": "外放車",
+   "en": "Stabled out",
+   "note": "非服務時間擺放列車嘅位置"
+  },
+  "PHD": {
+   "tc": "八鄉車廠（東）",
+   "en": "Pat Heung Depot (East)"
+  },
+  "PMC": {
+   "tc": "八鄉車廠（西）",
+   "en": "Pat Heung Depot (West)"
+  },
+  "PKTA": {
+   "tc": "八鄉車廠側線 A",
+   "en": "Pat Heung Pocket A"
+  },
+  "PKTD": {
+   "tc": "八鄉車廠側線 D",
+   "en": "Pat Heung Pocket D"
+  },
+  "ENT": {
+   "tc": "大圍車廠出入口 ENT",
+   "en": "Tai Wai Depot entrance ENT"
+  },
+  "EXT": {
+   "tc": "大圍車廠出入口 EXT",
+   "en": "Tai Wai Depot entrance EXT"
+  },
+  "HHS": {
+   "tc": "紅磡廠",
+   "en": "Hung Hom Sidings"
+  },
+  "CIOT": {
+   "tc": "第一城側線",
+   "en": "City One pocket track"
+  },
+  "KATS": {
+   "tc": "啟德側線",
+   "en": "Kai Tak siding"
+  },
+  "TWWS": {
+   "tc": "荃灣西側線",
+   "en": "Tsuen Wan West loop track"
+  },
+  "TIST": {
+   "tc": "天水圍側線",
+   "en": "Tin Shui Wai pocket"
+  },
+  "AUP": {
+   "tc": "柯士甸側線",
+   "en": "Austin pocket"
+  },
+  "TB1": {
+   "tc": "大圍調頭位置",
+   "en": "Turn Back 1",
+   "note": "大圍 3 號月台／顯徑 1 號月台前約 300 米"
+  }
+ },
  "routes": [
   {
    "id": "TML-DT",

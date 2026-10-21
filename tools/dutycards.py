@@ -302,6 +302,15 @@ def day_class(info, dated):
     return next((v for k, v in DAY_WORDS.items() if k in word), "special")
 
 
+def also_on(code):
+    """The extra dates a sheet runs on ("alsoOn" on its DS<code> entry in
+    data/timetables/index.json), copied to the duty index so pages that read
+    only data/duties/ (tml-roster) pick the right sheet on those days too."""
+    with open(os.path.join(DATA, "timetables", "index.json"), encoding="utf8") as fh:
+        books = json.load(fh)["timetables"]
+    return next((b.get("alsoOn") for b in books if b["code"] == f"DS{code}"), None)
+
+
 def write_duties(path, info, duties, issued_iso, dated=True, dry_run=False):
     folder = os.path.join(DATA, "duties")
     index_path = os.path.join(folder, "index.json")
@@ -321,6 +330,8 @@ def write_duties(path, info, duties, issued_iso, dated=True, dry_run=False):
         fh.write("\n")
     entry = {"code": info["code"], "file": file, "class": cls, "dates": out["dates"], "issued": issued_iso,
              "duties": len(duties), "sha256": info["sha256"]}
+    if also_on(info["code"]):
+        entry["alsoOn"] = also_on(info["code"])
     index["sheets"] = sorted([e for e in index["sheets"] if e["code"] != info["code"]] + [entry], key=lambda e: e["code"])
     with open(index_path, "w", encoding="utf8") as fh:
         json.dump(index, fh, ensure_ascii=False, indent=1)
@@ -356,7 +367,7 @@ def write_stubs():
             json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
             fh.write("\n")
         index["sheets"].append({"code": code, "file": file, "class": b["day"], "dates": None, "issued": book.get("issued"),
-                                "duties": len(duties), "cards": False})
+                                "duties": len(duties), "cards": False, **({"alsoOn": b["alsoOn"]} if b.get("alsoOn") else {})})
         print(f"DS{code}: {len(duties)} duty numbers only (no cards)")
     index["sheets"].sort(key=lambda e: e["code"])
     with open(index_path, "w", encoding="utf8") as fh:

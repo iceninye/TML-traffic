@@ -11,6 +11,30 @@ const check = (ok, what) => {
 const load = (code) => JSON.parse(readFileSync(new URL(`../data/duties/DS${code}.json`, import.meta.url), "utf8"))
 const index = JSON.parse(readFileSync(new URL("../data/duties/index.json", import.meta.url), "utf8"))
 
+// tml-roster reads only data/duties/index.json to pick a day's sheet, so its dates
+// must agree with the timetables index (dates and alsoOn of each DS entry).
+const books = JSON.parse(readFileSync(new URL("../data/timetables/index.json", import.meta.url), "utf8")).timetables
+const days = (e) => [...(e?.dates ?? []), ...(e?.alsoOn ?? [])].sort().join(",")
+for (const entry of index.sheets) {
+  const book = books.find((b) => b.code === `DS${entry.code}`)
+  check(!book || days(book) === days(entry), `DS${entry.code}: days in duty index (${days(entry) || "any"}) match timetables index`)
+}
+
+// Every place a card names is a station or has a name in tml-network.json "places".
+const network = JSON.parse(readFileSync(new URL("../data/tml-network.json", import.meta.url), "utf8"))
+const DEPOTS = ["TAD", "HHS", "TT", "W1A", "W1C", "W1F", "LT1", "LT2", "E3A", "E3C"]
+const unnamed = new Set()
+for (const entry of index.sheets) {
+  for (const d of load(entry.code).duties) {
+    const codes = [d.on?.[1], d.off?.[1], d.meal?.[2], d.meal?.[3], ...(d.legs ?? []).flatMap((l) => [l[2], l[4]])]
+    for (const code of codes) {
+      if (typeof code !== "string" || !code) continue
+      if (!network.stations[code.replace(/\d$/, "")] && !DEPOTS.includes(code) && !network.places?.[code]?.tc) unnamed.add(code)
+    }
+  }
+}
+check(unnamed.size === 0, `every place on a card has a name${unnamed.size ? ` (missing: ${[...unnamed].join(" ")})` : ""}`)
+
 for (const entry of index.sheets) {
   const book = load(entry.code)
   check(book.duties.length === entry.duties, `DS${entry.code}: index count ${entry.duties} matches ${book.duties.length}`)

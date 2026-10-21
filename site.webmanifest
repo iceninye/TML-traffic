@@ -1,0 +1,30 @@
+{
+  "name": "屯馬綫列車動態圖 · Tuen Ma Line Live",
+  "short_name": "屯馬綫動態圖",
+  "description": "屯馬綫 27 站實時列車位置圖，由港鐵公開到站倒數推算，可切換路綫圖與地圖。Tuen Ma Line live train diagram, estimated from MTR arrival countdowns.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12203a",
+  "theme_color": "#070b14",
+  "orientation": "any",
+  "lang": "zh-HK",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "android-chrome-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

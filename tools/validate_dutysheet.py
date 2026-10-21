@@ -68,7 +68,8 @@ def validate(data, base=None, base_entry=None, today=None):
         duties = t.get("duties")
         if duties is None:
             no_duty.append(label)
-        elif not duties or any(len(d) != 2 or not re.fullmatch(r"\d{7}", str(d[0])) or d[1] not in codes for d in duties):
+        elif not duties or any(len(d) not in (2, 3) or not re.fullmatch(r"\d{7}", str(d[0])) or d[1] not in codes
+                                     or (len(d) == 3 and not re.fullmatch(re.escape(d[1]) + r"\d", str(d[2]))) for d in duties):
             errors.append(f"{label}: malformed duty numbers {duties}")
 
     notes.append(f"duty numbers on {len(trips) - len(no_duty)}/{len(trips)} trips")

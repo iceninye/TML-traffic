@@ -3,11 +3,14 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.13 — 2026-10-21 (`db6558f`)
-- Audit of what the parser takes from the Duty Sheet workbooks (8022, 8023, 8027, 7091M). The duty lists, every leg (Run, places, times, meal) and the date were already complete. The one useful thing left out was the workbook's own `timetable` sheet: the official train-by-train times with trip numbers. The parser now reads it and puts those times on every matched train, so all 437 (8022), 417 (8023), 537 (8027) and 380 of 382 (7091M) trips now carry the workbook's exact times and no longer depend on estimates from the base timetable.
-- What moved: 8022 had 7 trips changed (up to 108 s), 8027 15 trips (up to 66 s), 7091M 6 trips (up to 38 s), 8023 none. Trips the parser had to rebuild now have their trip number (86 in 8022 and 8027, 7 in 8023, 379 in 7091M).
-- Not taken, on purpose: the `platform sheet` (platform numbers; the app has no platform field), and the empty-train movements between depot and terminus (trip numbers 3xxxx and 4xxxx, flagged N), which are not passenger trips.
-- `tools/parse_dutysheet.py`: `read_timetable` and `apply_timetable`; the data files record the timetable sheet in `timetableSheet`.
+## v0.8.13 — 2026-10-21 (`PENDING`)
+- Audit of what the parser takes from the Duty Sheet workbooks (8022, 8023, 8027, 7091M), sheet by sheet. The workbook's own `timetable` sheet (the official train-by-train times with trip numbers) was not read before; it is now, and its times go on every matched train: 437/437 (8022), 417/417 (8023), 537/537 (8027) and 380/382 (7091M) trips now carry the workbook's exact times. 8022 had 7 trips changed (up to 108 s), 8027 15 (up to 66 s), 7091M 6 (up to 38 s), 8023 none. Rebuilt trips now have their trip number (86 in 8022 and 8027, 7 in 8023, 379 in 7091M).
+- Platform numbers: each 更份 on a trip now carries the platform the driver takes over on when the sheet names one (KSR1, KSR2, TAW3, TAW4, HUH2, HUH3, TWW2, HOM3, ...), as a third item `[duty, station, platform]`; terminus pick-ups at TUM and WKS stay `[duty, station]` because the sheets give no platform there. All seven Duty Sheets (1101, 6091, 7091 too) were written again for it. The train card reads 「錦上路 1 換 8027115」 and the 全日更份 page 「接車 錦上路 2」, 「交車 紅磡 3」. A trip the timetable sheet routes to a named platform (「(HUH3 arr)」) keeps it in `platforms`. The `platform sheet` tab was checked against the data: every relief and time on it matches (its platforms are fixed by direction: UP TAW3, HUH3, KSR1; DOWN KSR2, HUH2, TAW4).
+- Fixed: 8027 Run 67 19:48 from Tuen Mun had no 更份 (the base timetable ran it later than the workbook, so its driver 8027153 was missed); duties are matched again on the workbook's own times. The workbook overlay no longer drops the "empty stop" mark on the first stop of trains coming out of a depot.
+- 8027107 is 6.5 h and 8027131 is 8 h (confirmed by Ice; the Index sheet had 6 h and 7.5 h): added to `data/duty-hours-fixes.json` and `data/duty-basic.json`.
+- 1101, 6091 and 7091: four last trips that end service at Tai Wai and go to the depot now carry the L mark (from the v0.8.12 parser), the same as the dated sheets.
+- Not taken: empty-train movements between depot and terminus (trip numbers 3xxxx and 4xxxx, flagged N), and the timetable sheet's note symbols ((#), (~), (W), (K), (29)(30)) whose legend is not in the workbook; for passenger trips the base timetable's full notes are kept.
+- `tools/parse_dutysheet.py`: `read_timetable` and `apply_timetable`; the data files record the timetable sheet's code in `timetableSheet` (8027 is built on TML110CB, 8022 on TML609CB, 8023 on TML709CB, 7091M on TML709MB).
 - Shell cache renamed `v45`.
 
 ## v0.8.12 — 2026-10-21 (`0eb3672`)

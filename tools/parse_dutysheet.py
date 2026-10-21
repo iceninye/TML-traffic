@@ -360,8 +360,11 @@ def read_timetable(path):
             run = r[run_i]
             if not isinstance(run, (int, float)) and not (isinstance(run, str) and run.isdigit()):
                 continue
-            times, off, prev = [], 0, None
+            times, off, prev, plats = [], 0, None, {}
             for j, station, k in cs:
+                note = re.fullmatch(r"\((\w+?)(\d) (?:arr|dep)\)", str(r[j] or "").strip())
+                if note and note.group(1) in STATIONS:
+                    plats[note.group(1)] = note.group(1) + note.group(2)  # "(HOM3 arr)"
                 v = cell_secs(r[j])
                 if v is None:
                     continue
@@ -373,7 +376,7 @@ def read_timetable(path):
                 times = [(c, k, v + 86400) for c, k, v in times]
             if times:
                 trips.append({"dir": name, "run": int(run), "trip": re.sub(r"\s+", "", str(r[trip_i] or "")),
-                              "times": times})
+                              "times": times, "platforms": plats})
     return code, trips
 
 
@@ -397,7 +400,7 @@ def apply_timetable(trips, sheet_trips):
         dep = {s: v for s, k, v in st["times"] if k == "dep"}
         arr = {s: v for s, k, v in st["times"] if k == "arr"}
         stops = []
-        for n, (code, a, d) in enumerate((x[0], x[1], x[2]) for x in t["stops"]):
+        for code, a, d, *rest in t["stops"]:
             na, nd = a, d
             if code in dep and d is not None:
                 nd = dep[code]
@@ -407,16 +410,20 @@ def apply_timetable(trips, sheet_trips):
                 na = arr[code]
                 if code not in dep and d is not None:
                     nd = d + (na - a)
-            stops.append([code, na, nd])
+            stops.append([code, na, nd, *rest])  # rest: the empty-stop flag
         times = [x for s in stops for x in s[1:3] if x is not None]
         if times != sorted(times):
             done["skipped"] += 1
             continue
         done["matched"] += 1
-        if stops != [list(x[:3]) for x in t["stops"]]:
+        if stops != [list(x) for x in t["stops"]]:
             done["changed"] += 1
         t["stops"] = stops
         t["precision"] = "exact"
+        plats = {c: p for c, p in st["platforms"].items() if any(x[0] == c for x in stops)}
+        if plats:
+            t["platforms"] = plats
+            done["platforms"] = done.get("platforms", 0) + 1
         if st["trip"] and t.get("trip") != st["trip"]:
             t["trip"] = st["trip"]
             done["numbered"] += 1
@@ -572,7 +579,7 @@ def stop_time(stop):
 
 
 def duties_for(stops, run, legs_by_run):
-    """[[duty, station], ...]: who drives the trip from which stop, from the
+    """[[duty, station(, platform)], ...]: who drives the trip from which stop, from the
     legs of the same run. A leg covers its pick-up second to the end of its
     relief minute (a leg with no relief time, such as a depot move, to the
     duty's next pick-up); where two overlap (a relief), the later pick-up wins."""
@@ -585,9 +592,12 @@ def duties_for(stops, run, legs_by_run):
         cover = [l for l in legs if l["end"] is not None and l["t"] - 5 <= t < l["end"]]
         if not cover:
             return None
-        duty = max(cover, key=lambda l: l["t"])["duty"]
-        if not out or out[-1][0] != duty:
-            out.append([duty, stop[0]])
+        leg = max(cover, key=lambda l: l["t"])
+        if not out or out[-1][0] != leg["duty"]:
+            # the platform the driver takes over on, when the sheet names one
+            # (KSR1, TAW4, HUH2 ...); terminus legs only give the station
+            plat = leg["place"] if re.fullmatch(stop[0] + r"\d", leg["place"] or "") else None
+            out.append([leg["duty"], stop[0], plat] if plat else [leg["duty"], stop[0]])
     return out or None
 
 
@@ -660,6 +670,15 @@ def build(meta, legs, stats, base_entry, base):
                       "src": "duty", "precision": prec})
     if meta.get("timetable"):
         stats["timetableSheet"] = apply_timetable(trips, meta["timetable"])
+        # duties were matched on the base's times; a base trip that runs later
+        # than the workbook's own can miss its driver, so try again on those
+        redone = 0
+        for t in trips:
+            d = None if t.get("duties") else duties_for(t["stops"], t["run"], legs_by_run)
+            if d:
+                t["duties"] = d
+                redone += 1
+        stats["timetableSheet"]["dutiesRedone"] = redone
         # rebuilt trips that now carry the working timetable's times count as exact
         precision = {"exact": sum(1 for t in trips if t["precision"] == "exact"),
                      "anchored": sum(1 for t in trips if t["precision"] == "anchored"),

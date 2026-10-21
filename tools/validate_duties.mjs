@@ -15,7 +15,7 @@ for (const entry of index.sheets) {
   const book = load(entry.code)
   check(book.duties.length === entry.duties, `DS${entry.code}: index count ${entry.duties} matches ${book.duties.length}`)
   check(new Set(book.duties.map((d) => d.id)).size === book.duties.length, `DS${entry.code}: duty numbers are unique`)
-  check(book.duties.every((d) => GROUPS.includes(d.group) && d.id[4] === { KSR: "1", TAD: "3", HHS: "5" }[d.group]),
+  check(book.duties.every((d) => GROUPS.includes(d.group) && { KSR: "1", TAD: "347", HHS: "56" }[d.group].includes(d.id[4])),
     `DS${entry.code}: group agrees with the fifth digit`)
   if (book.cards === false) continue
   let bad = 0

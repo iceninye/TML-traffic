@@ -29,7 +29,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from validate_timetable import INDEX, hm  # noqa: E402
 
-DAY_FIRST = (5 * 3600, 7 * 3600)
+DAY_FIRST = (4 * 3600, 7 * 3600)  # an event day may add trains from 04:30
 MIN_GAP = 90  # seconds between departures from one terminus, one direction
 
 
@@ -104,7 +104,7 @@ def validate(data, base=None, base_entry=None, today=None):
             continue
         notes.append(f"{code}: first {hm(times[0])}, last {hm(times[-1])}")
         if not DAY_FIRST[0] <= times[0] <= DAY_FIRST[1]:
-            errors.append(f"{code} first departure {hm(times[0])} outside 05:00-07:00")
+            errors.append(f"{code} first departure {hm(times[0])} outside 04:00-07:00")
         if times[-1] < 23 * 3600:
             errors.append(f"{code} last departure {hm(times[-1])} before 23:00")
         close = sum(1 for a, b in zip(times, times[1:]) if b - a < MIN_GAP)

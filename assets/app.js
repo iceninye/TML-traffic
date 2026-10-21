@@ -52,7 +52,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.14", commit: "58eb59b" }
+const BUILD = { version: "0.8.15", commit: "c72ec32" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -1891,6 +1891,9 @@ const dutyBooks = new Map()
 let dutyIndex = null
 // The sheets listed in data/duties/index.json (null until it has loaded).
 let dutySheets = null
+// A failed read of the index is not kept: retryDuty() reads it again when the
+// network comes back or the page is shown again.
+let dutyIndexFailed = false
 let dutyBodyShown = ""
 
 // Depot and siding codes as the sheets print them, named after the places on
@@ -1918,10 +1921,22 @@ function dutyIndexPromise() {
       return index
     })
     .catch(() => {
-      dutySheets = []
+      dutyIndexFailed = true
       return null
     })
   return dutyIndex
+}
+
+// Read again what failed to load (the index, sheets), then repaint an open Duty Sheet.
+function retryDuty() {
+  if (dutyIndexFailed) {
+    dutyIndexFailed = false
+    dutyIndex = null
+  }
+  for (const [code, entry] of dutyBooks) if (entry.status === "error") dutyBooks.delete(code)
+  if (state.sheetKind !== "duty") return
+  paintDutySheet()
+  dutyIndexPromise().then(() => state.sheetKind === "duty" && paintDutySheet())
 }
 
 function dutyBook(code) {
@@ -2057,7 +2072,7 @@ function dutyAllSheetsHtml(tau) {
   const s = t()
   const d = state.duty
   const cls = dutyClass()
-  if (!dutySheets) return `<p class="empty">${s.dsLoading}</p>`
+  if (!dutySheets) return `<p class="empty">${dutyIndexFailed ? s.dsFailed : s.dsLoading}</p>`
   const sheets = dutySheets.filter((sheet) => sheet.class === cls)
   if (!sheets.length) return `<p class="empty">${s.dsNoMatch}</p>`
   const today = todaySheet()
@@ -2237,9 +2252,14 @@ function wireControls() {
     if (event.key === "Escape") closeSheet()
   })
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) refresh(false)
+    if (document.hidden) return
+    refresh(false)
+    retryDuty()
   })
-  window.addEventListener("online", () => refresh(false))
+  window.addEventListener("online", () => {
+    refresh(false)
+    retryDuty()
+  })
   // A manual scroll in the diagram ends following.
   for (const type of ["wheel", "touchmove"]) {
     window.addEventListener(type, () => {

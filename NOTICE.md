@@ -77,4 +77,5 @@ MIT 授權全文見上游 repo 的 `LICENSE`。使用或再分發時請保留本
 
 - 本專案原創程式碼以 MIT License 發佈，見根目錄 [`LICENSE`](LICENSE)；上文第 1、2、6 節嘅第三方內容維持各自授權，MIT 並不覆蓋。
 - `data/timetables/` 嘅時間表（包括由 Duty Sheet 解析、只含 Run、更份編號同時間嘅檔案）源自港鐵公佈嘅工作時間表同 Duty Sheet。本專案**無法確認**港鐵有否准許公開再授權，故 MIT **不適用於**呢批資料，其權利屬原發佈者。本專案同港鐵並無關係，亦非港鐵官方產品。
+- `data/duty-basic.json` 係由 Duty 總表（Index 工作表）抽出嘅各更份上下班時間、地點同工時，只含呢幾項，唔含備註原文；權利同上。
 - Duty Sheet PDF 本身唔入 repo，亦不包含司機姓名或其他人手資料。

@@ -64,8 +64,12 @@ data/
 - `legs`：`[類別, Run, 接班地點, 接班時間, 離班地點, 離班時間]`；類別 `drive` 載客、`empty` 空車、`park` 泊車、`prep` 出車準備、`ride` 乘搭、`wait` 待命／休息、`other`。
 - **公開欄位只有整理過嘅資料**；司機姓名同備註原文不寫入。原始 Duty Sheet（PDF／Excel）亦不入 repo。
 
+## `data/duty-basic.json`、`data/duty-hours-fixes.json`
+
+`duty-basic.json` 由 `tools/index-to-basic.py` 讀 Duty 總表 `Index` 工作表寫出：`duties` 係 `{ 更份: [上班秒, 上班地點, 下班秒, 下班地點, 工時, "DE"|"DL"] }`，包括冇卡片嘅後備更（KSP1–4、HSP1、HSP3）；過咗午夜收工嘅下班秒數會超過 86400。`duty-hours-fixes.json` 嘅 `hours` 係官表印錯嘅工時修正（`{ 更份: 小時 }`），產生時套用。兩個檔都係俾 tml-roster 用（本站 App 唔讀）。
+
 ## 其他
 
 - `lib/maplibre/`：vendored MapLibre GL JS（BSD-3-Clause），見 [`NOTICE.md`](../NOTICE.md)。
 - 重建模型檔：`python3 tools/build_data.py`（會向 Overpass 攞 OSM 走綫，要網絡）；`--no-track` 只重建 `tml-timetable.json`；`node tools/build-segments.mjs` 重建 `tml-segments.json`。
-- 授權：`data/timetables/` 同 `data/duties/` 源自港鐵公佈資料，MIT 不適用（見 [`NOTICE.md`](../NOTICE.md) §7）。
+- 授權：`data/timetables/`、`data/duties/` 同 `data/duty-basic.json` 源自港鐵公佈資料，MIT 不適用（見 [`NOTICE.md`](../NOTICE.md) §7）。

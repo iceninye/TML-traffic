@@ -1,2 +1,4 @@
 *.pdf
+# 原始 Duty Sheet／Duty 總表 Excel 唔入 repo（repo 係公開嘅）
+*.xlsx
 __pycache__/

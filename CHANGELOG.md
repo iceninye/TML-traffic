@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.11 — unreleased
+- Duty data now lives in one place: this repo. `data/duty-basic.json` (book-on/off, place and hours of every duty, spare duties included, from the Duty workbook's Index sheet), `data/duty-hours-fixes.json`, `tools/index-to-basic.py` and `tools/validate-hours.mjs` moved here from tml-roster. tml-roster stops keeping copies and reads `data/` from this site at run time, so a new Duty Sheet or Index is imported here only.
+- `_headers`: `data/*` answers cross-origin GETs (`Access-Control-Allow-Origin: *`) so tml-roster can read it on Cloudflare Workers.
+- `.gitignore` also skips `*.xlsx`, so a raw Duty Sheet or Duty workbook is not committed by accident.
+- No change to the diagram itself. Shell cache renamed `v42`.
+
 ## v0.8.10 — 2026-10-19 (`ca9e7bc`)
 - When the request itself fails, the status line adds a hint: "網絡錯誤，如用緊 VPN／代理，請將 data.gov.hk 設為直連". Reported by Ice: with Shadowrocket on, the MTR feed (`rt.data.gov.hk`) fails with 網絡錯誤 while the page itself loads. The app cannot change how the device resolves or routes that host.
 - Shell cache renamed `v41`.

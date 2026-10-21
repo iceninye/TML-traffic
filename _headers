@@ -1,0 +1,4 @@
+# Cloudflare Workers static assets: tml-roster (another origin) reads the duty
+# data straight from this site, so data/ allows cross-origin GETs. Not served.
+/data/*
+  Access-Control-Allow-Origin: *

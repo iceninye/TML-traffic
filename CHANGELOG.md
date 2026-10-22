@@ -3,6 +3,9 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.17 — dfadc00
+- iPhone Home Screen app: the header now pads below the status bar / notch (`env(safe-area-inset-*)`), so the top-left Run switch can be tapped again and the status-bar area is no longer a blurred, see-through strip (the header is opaque). The bottom sheet also clears the home indicator. Shell cache renamed `v50`.
+
 ## v0.8.16 — unreleased
 - Offline: the service worker now caches the Duty cards (`data/duties/*`) and `duty-basic.json` when it installs (report T9), and answers from the cache when a page file takes more than 3 seconds, updating it in the background (D5).
 - `lib/tml-duties.js`: `reliefOf` (take-over / hand-over between duties) moved here from tml-roster so both repos hold the same file (T8).

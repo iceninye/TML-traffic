@@ -79,6 +79,34 @@
    "effective": "2025-05-12"
   },
   {
+   "code": "TML110CB",
+   "file": "TML110CB.json",
+   "day": "weekday",
+   "kind": "special",
+   "effective": "2026-09-16"
+  },
+  {
+   "code": "TML1110A",
+   "file": "TML1110A.json",
+   "day": "weekday",
+   "kind": "normal",
+   "effective": "2026-10-26"
+  },
+  {
+   "code": "TML709S",
+   "file": "TML709S.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-10-01"
+  },
+  {
+   "code": "TML711CA",
+   "file": "TML711CA.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-10-25"
+  },
+  {
    "code": "DS1101",
    "file": "DS1101.json",
    "day": "weekday",

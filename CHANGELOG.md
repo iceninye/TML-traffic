@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.16 — unreleased
+- Offline: the service worker now caches the Duty cards (`data/duties/*`) and `duty-basic.json` when it installs (report T9), and answers from the cache when a page file takes more than 3 seconds, updating it in the background (D5).
+- `lib/tml-duties.js`: `reliefOf` (take-over / hand-over between duties) moved here from tml-roster so both repos hold the same file (T8).
+- CI: `.github/workflows/test.yml` runs the data check and all node checks on every pull request (T7); new `tools/validate_data.mjs` checks every JSON parses, each sheet's card exists with the same sha256 and duty count as the index, duty numbers are 7 digits and unique, every duty has book-on/off times, and the two indexes agree on the days.
+- `.DS_Store` files removed from the repo (they were already in `.gitignore`) (T5).
+- Shell cache renamed `v49`.
+
 ## v0.8.15 — 2026-10-21 (`c72ec32`)
 - 更份: a failed read of the Duty index or a sheet is no longer kept for the session. The index used to turn into an empty list (「冇符合」) and a sheet stayed 「讀取更份資料失敗」 until a reload; now both are read again when the network comes back or the page is shown again.
 - Shell cache renamed `v48`.

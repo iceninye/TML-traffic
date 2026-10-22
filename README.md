@@ -123,6 +123,7 @@ python3 tools/build_data.py --no-track   # 只重建時間表
 node tools/probe-tml.mjs     # 列車位置（v0.1 引擎）
 node tools/probe-runs.mjs    # 動畫層平滑度
 node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀數）
+node tools/validate_data.mjs       # 全部 JSON 讀得通、index 同卡片 sha256／數量一致（CI 都行）
 node tools/validate_duties.mjs     # 更份卡片資料同當值判斷（真資料）
 node tools/validate-hours.mjs      # 官表（duty-basic.json）同更份卡片工時一致
 node tools/validate_position.mjs   # 被扣列車嘅列車點位置（合成讀數）

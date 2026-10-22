@@ -1,0 +1,33 @@
+# Runs the checks on every pull request and every push to main.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Data
+        run: node tools/validate_data.mjs
+      - name: Duty cards and hours
+        run: |
+          node tools/validate_duties.mjs
+          node tools/validate-hours.mjs
+      - name: Train matching and feed
+        run: |
+          node tools/validate_matching.mjs
+          node tools/validate_position.mjs
+          node tools/validate_feed_errors.mjs
+      - name: Parse every script
+        run: |
+          for f in assets/*.js lib/*.js sw.js; do node --check "$f"; done

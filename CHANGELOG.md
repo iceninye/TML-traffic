@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.18 — dev
+## v0.8.18 — 2026-10-22 (`ef28a28`)
 - Working timetables added (from the PDFs; parsed and checked by `tools/parse_timetables.py`): TML1110A (normal weekday from 2026-10-26; same 527 trips as TML1100B, recompiled for SMC 1.15.00), TML711CA (Sunday, KTSP concert, from 2026-10-25; same 410 trips as TML709CB), TML110CB (weekday, KTSP concert, from 2026-09-16) and TML709S (Sunday/PH, National Day fireworks, re-used from 2025). TML110SB re-parsed from the same PDF: no change. No Duty Sheet or Duty card changed.
 - Shell cache renamed `v51`.
 

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.19 — 2026-10-25 (`dev`)
+## v0.8.19 — 2026-10-25 (`af9665b`)
 - Fixed the "-" trains seen on Sunday 25/10 at 22:28 (Duty Sheet 8023). The Kai Tak event short workings "START SERVICE AT TWW AND END AT CIO" (and "START SERVICE AT KAT AND END AT MEF") have non-passenger trip numbers (3xxxx/4xxxx), so `tools/parse_timetables.py` flagged every stop empty. The app then had no trip to match their board readings to, and drew each real train (dashed circle, destination 第一城) as a countdown-model train without a Run number. The note now decides: stops from X to Y carry passengers. Data patched in DS8023, TML709CA/CB, TML711CA, TML110CB, TML709GA/GC, TML709UF (104 trips) by `tools/fix_start_service.py`; `tools/validate_data.mjs` now fails on such an all-empty trip. The synthetic matcher check had never put these trains on the boards, which is why it stayed clean.
 - Shell cache renamed `v52`.
 

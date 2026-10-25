@@ -57,6 +57,16 @@ for (const entry of books) {
     check(!m || t.stops.some((s) => !s[3]), `${entry.code}: Run ${t.run} 班次 ${t.trip} 寫明開始載客，但全部站都標咗空車`)
   }
 }
+// An all-empty trip that stops at every station like a passenger train (dwell of 20 s or more) is a revenue trip the
+// parser mistook for an empty move because of its 3xxxx/4xxxx numbers (TML709UF KAT to TIS, TAW to CIO)
+for (const entry of books) {
+  const book = read(`data/timetables/${entry.file}`)
+  for (const t of book.trips ?? []) {
+    if (t.stops.length < 3 || !t.stops.every((s) => s[3]) || (t.notes ?? []).some((n) => /^NON[ -]PASSENGER/.test(n))) continue
+    const dwell = t.stops.filter((s) => s[1] != null && s[2] != null).map((s) => s[2] - s[1])
+    check(dwell.length < 3 || dwell.filter((d) => d >= 20).length * 2 < dwell.length, `${entry.code}: Run ${t.run} 班次 ${t.trip} 全部標咗空車，但每站都似載客列車咁停站`)
+  }
+}
 check(Object.keys(basic).length > 0, "duty-basic.json 有更份")
 
 if (failed) {

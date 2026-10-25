@@ -367,8 +367,33 @@ def parse_section_h(pdf, section_a=None):
         })
 
     fill_arrivals(out, section_a or {})
+    revive_dwelling_trips(out)
     attach_platform_arrivals(out, positioning)
     return out
+
+
+def dwells_like_service(stops):
+    """True when most public stops show a passenger dwell (20 s or more).
+    Empty moves (depot runs, manual routes) pass stations without one."""
+    dwell = [s[2] - s[1] for s in stops if s[1] is not None and s[2] is not None]
+    return len(dwell) >= 3 and sum(d >= 20 for d in dwell) * 2 >= len(dwell)
+
+
+def revive_dwelling_trips(trips):
+    """A trip whose stops are all empty only because of its 3xxxx/4xxxx trip
+    numbers, yet which the timetable has stop at every station like a
+    passenger train (event extras: KAT to TIS, TAW to CIO), carries passengers.
+    The explicit NON-PASSENGER notes still win. Without this the live train
+    can match nothing and shows as a dashed "-" (see START SERVICE above)."""
+    for t in trips:
+        st = t["stops"]
+        if len(st) < 3 or not all(len(s) > 3 for s in st):
+            continue
+        if any(re.match(r"NON[ -]PASSENGER", n) for n in t["notes"]):
+            continue
+        if dwells_like_service(st):
+            for s in st:
+                del s[3:]
 
 
 def fill_arrivals(trips, section_a):

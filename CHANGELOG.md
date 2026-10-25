@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.20 — 2026-10-25 (`3744465`)
+- Audit of every timetable and Duty Sheet book for trips wrongly flagged empty (the cause of the "-" trains fixed in v0.8.19). All 21 books were checked against trip numbers, notes, dwell times and headway continuity. DS1101, DS6091, DS7091, DS7091M, DS8022, DS8023, DS8027 and the ordinary TML books are clean: their only all-empty trips are the two "MANUAL ROUTE SET BY TC" depot moves, and the partly empty ones match their "NON PASSENGER SERVICE FROM X TO Y" notes. One book was still wrong: TML709UF (Sunday event timetable, used only when the normal ones stop fitting) had 11 all-empty trips that stop at every station with passenger dwell times and interleave with the revenue short workings: 7 KAT to TIS ("END SERVICE AT TIS", Run 42-54) and 4 TAW to CIO (Run 40-43, no note). They are now passenger trips. Not confirmed against the source PDF, which is not in the repo.
+- `tools/parse_timetables.py` (`revive_dwelling_trips`) and `tools/fix_start_service.py` treat an all-empty trip with passenger dwell (20 s or more at most stops) and no NON-PASSENGER note as revenue. `tools/validate_data.mjs` fails on such a trip, so the same mistake cannot enter again through a new timetable.
+- Shell cache renamed `v53`.
+
 ## v0.8.19 — 2026-10-25 (`af9665b`)
 - Fixed the "-" trains seen on Sunday 25/10 at 22:28 (Duty Sheet 8023). The Kai Tak event short workings "START SERVICE AT TWW AND END AT CIO" (and "START SERVICE AT KAT AND END AT MEF") have non-passenger trip numbers (3xxxx/4xxxx), so `tools/parse_timetables.py` flagged every stop empty. The app then had no trip to match their board readings to, and drew each real train (dashed circle, destination 第一城) as a countdown-model train without a Run number. The note now decides: stops from X to Y carry passengers. Data patched in DS8023, TML709CA/CB, TML711CA, TML110CB, TML709GA/GC, TML709UF (104 trips) by `tools/fix_start_service.py`; `tools/validate_data.mjs` now fails on such an all-empty trip. The synthetic matcher check had never put these trains on the boards, which is why it stayed clean.
 - Shell cache renamed `v52`.

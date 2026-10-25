@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.21 — 2026-10-25 (`dev`)
+## v0.8.21 — 2026-10-25 (`0c066ce`)
 - Log-only measurement, no change to any position: `lib/tml-lagstats.js` records how many seconds a station board keeps reporting 0 for a train after that train's dot has left the platform (resolution about 20 s; last 500 samples; stored only in this browser's localStorage `tml-traffic-board-lag`, never sent anywhere). Tap the version line in the footer five times for a panel with the share of samples over 20/30/40/60/90 s, a per-station table and a copy-JSON button. The result decides whether "0 for longer than X s after the dot left means held" (docs/ALGORITHM.md §3j) can be used without moving on-time trains. `tools/validate_lagstats.mjs` checks the recorder and runs in CI.
 - Shell cache renamed `v54`.
 

@@ -170,6 +170,8 @@ function scenario(name, base, hold, lag = 20, slow = null) {
   const tracker = createTracker(model)
   let history = new Map()
   const errs = { hit: [], rest: [] }
+  const lastKm = new Map()
+  const back = { affected: 0, rest: 0 }
   let nextSnap = 0
   for (let s = 0; s <= RUN_SEC; s += 0.25) {
     const t = t0 + s
@@ -180,11 +182,11 @@ function scenario(name, base, hold, lag = 20, slow = null) {
       const res = matchReadings(bk, readings, ms, history)
       history = new Map([...res.trips].map(([id, e]) => [id, { readings: e.history, delay: e.delay }]))
       tracker.update({ matched: res.trips, fallback: [], headwayOf: () => 180 }, ms)
-      if (process.env.DEBUG === name && hold) {
-        const e = res.trips.get(hold.id)
-        const r = real.get(hold.id)
-        const own = readings.filter((x) => x.truth === hold.id).map((x) => `${x.station}:${x.ttnt}`).join(" ")
-        const run = tracker.runs.find((x) => x.id === hold.id)
+      if (process.env.DEBUG === name) {
+        const hid = hold?.id ?? slow.id; const e = res.trips.get(hid)
+        const r = real.get(hid)
+        const own = readings.filter((x) => x.truth === hid).map((x) => `${x.station}:${x.ttnt}`).join(" ")
+        const run = tracker.runs.find((x) => x.id === hid)
         console.log(`  +${s.toFixed(1).padStart(5)}s true late ${Math.round(t - tauOf(r, t)).toString().padStart(4)}  est ${e ? Math.round(e.delay).toString().padStart(4) : "   -"}  disp ${run ? Math.round(run.delayDisp).toString().padStart(4) : "   -"}  boards ${own}`)
       }
     }
@@ -194,6 +196,12 @@ function scenario(name, base, hold, lag = 20, slow = null) {
       if (run.kind !== "sched") continue
       const r = real.get(run.id)
       if (!r) continue
+      const prevKm = lastKm.get(run.id)
+      lastKm.set(run.id, run.pos.km)
+      if (prevKm != null) {
+        const moved = (run.pos.km - prevKm) * (r.trip.dir === "DOWN" ? 1 : -1) * 1000
+        if (moved < -1) back[affected.has(run.id) ? "affected" : "rest"] += -moved
+      }
       const truth = tripState(r.trip, tauOf(r, t), model)
       if (truth.phase === "before" || truth.phase === "done" || truth.phase === "arrived") continue
       const ahead = (run.pos.km - truth.km) * (r.trip.dir === "DOWN" ? 1 : -1) * 1000
@@ -217,7 +225,7 @@ function scenario(name, base, hold, lag = 20, slow = null) {
     const share = (n) => `${((100 * n) / xs.length).toFixed(1).padStart(4)}%`
     return `ahead p90 ${pct(ahead, 0.9).toFixed(0).padStart(4)} max ${Math.max(...ahead).toFixed(0).padStart(4)}, >300 m ${share(xs.filter((x) => x > 300).length)}, passed ${share(list.filter((x) => x.passed).length)}, early ${share(list.filter((x) => x.early).length)}, behind p90 ${pct(behind, 0.9).toFixed(0).padStart(4)}`
   }
-  console.log(`${name.padEnd(30)} affected: ${fmt(errs.hit)} | others: ${fmt(errs.rest)}`)
+  console.log(`${name.padEnd(30)} affected: ${fmt(errs.hit)} | others: ${fmt(errs.rest)} | backwards ${back.affected.toFixed(0)} m / ${back.rest.toFixed(0)} m`)
   return errs
 }
 
@@ -245,3 +253,7 @@ scenario("held TKW 120 s, queue behind", none, { id: target.id, code: "TKW", sec
   scenario("held UP NAC 150 s, queue behind", none, { id: u.id, code: "NAC", sec: 150 })
 }
 scenario("slow DOWN: 4 hops at 1.5x", none, null, 20, { id: target.id, code: "AUS", hops: 4, factor: 1.5 })
+scenario("slow DOWN: 4 hops at 1.25x", none, null, 20, { id: target.id, code: "AUS", hops: 4, factor: 1.25 })
+scenario("slow DOWN: 6 hops at 2x", none, null, 20, { id: target.id, code: "AUS", hops: 6, factor: 2 })
+scenario("slow DOWN: 2 hops at 3x", none, null, 20, { id: target.id, code: "AUS", hops: 2, factor: 3 })
+scenario("slow DOWN 1.5x, lag 40 s", none, null, 40, { id: target.id, code: "AUS", hops: 4, factor: 1.5 })

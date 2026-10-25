@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.21 — 2026-10-25 (`0c066ce`)
+- Log-only measurement, no change to any position: `lib/tml-lagstats.js` records how many seconds a station board keeps reporting 0 for a train after that train's dot has left the platform (resolution about 20 s; last 500 samples; stored only in this browser's localStorage `tml-traffic-board-lag`, never sent anywhere). Tap the version line in the footer five times for a panel with the share of samples over 20/30/40/60/90 s, a per-station table and a copy-JSON button. The result decides whether "0 for longer than X s after the dot left means held" (docs/ALGORITHM.md §3j) can be used without moving on-time trains. `tools/validate_lagstats.mjs` checks the recorder and runs in CI.
+- Shell cache renamed `v54`.
+
 ## v0.8.20 — 2026-10-25 (`3744465`)
 - Audit of every timetable and Duty Sheet book for trips wrongly flagged empty (the cause of the "-" trains fixed in v0.8.19). All 21 books were checked against trip numbers, notes, dwell times and headway continuity. DS1101, DS6091, DS7091, DS7091M, DS8022, DS8023, DS8027 and the ordinary TML books are clean: their only all-empty trips are the two "MANUAL ROUTE SET BY TC" depot moves, and the partly empty ones match their "NON PASSENGER SERVICE FROM X TO Y" notes. One book was still wrong: TML709UF (Sunday event timetable, used only when the normal ones stop fitting) had 11 all-empty trips that stop at every station with passenger dwell times and interleave with the revenue short workings: 7 KAT to TIS ("END SERVICE AT TIS", Run 42-54) and 4 TAW to CIO (Run 40-43, no note). They are now passenger trips. Not confirmed against the source PDF, which is not in the repo.
 - `tools/parse_timetables.py` (`revive_dwelling_trips`) and `tools/fix_start_service.py` treat an all-empty trip with passenger dwell (20 s or more at most stops) and no NON-PASSENGER note as revenue. `tools/validate_data.mjs` fails on such a trip, so the same mistake cannot enter again through a new timetable.

@@ -49,6 +49,14 @@ for (const entry of index.sheets) {
   const book = books.find((b) => b.code === `DS${entry.code}`)
   check(!book || days(book) === days(entry), `DS${entry.code}: 兩份 index 嘅運行日一致`)
 }
+// "START SERVICE AT X AND END AT Y" trips carry passengers; all-empty stops would hide them from every board (a "-" on the map)
+for (const entry of books) {
+  const book = read(`data/timetables/${entry.file}`)
+  for (const t of book.trips ?? []) {
+    const m = (t.notes ?? []).some((n) => /^START SERVICE AT \w+ AND END AT \w+/.test(n))
+    check(!m || t.stops.some((s) => !s[3]), `${entry.code}: Run ${t.run} 班次 ${t.trip} 寫明開始載客，但全部站都標咗空車`)
+  }
+}
 check(Object.keys(basic).length > 0, "duty-basic.json 有更份")
 
 if (failed) {

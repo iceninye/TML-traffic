@@ -27,6 +27,7 @@ jobs:
         run: |
           node tools/validate_matching.mjs
           node tools/validate_position.mjs
+          node tools/validate_lagstats.mjs
           node tools/validate_feed_errors.mjs
       - name: Parse every script
         run: |

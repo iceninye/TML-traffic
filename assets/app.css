@@ -862,3 +862,13 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 
 /* A duty number on the train card that opens its Duty Sheet card. */
 .duty-open.link { color: inherit; font-size: inherit; font-variant-numeric: tabular-nums; text-decoration: none; }
+
+/* Hidden board-lag log (tap the version line five times). */
+#lag-panel { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 45%); }
+#lag-panel .lag-box { max-width: 420px; max-height: 80vh; overflow: auto; padding: 14px 16px; font-size: 13px; background: var(--bg, #fff); color: inherit; border-radius: 12px; }
+#lag-panel h2 { margin: 0 0 6px; font-size: 15px; }
+#lag-panel table { width: 100%; margin: 8px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#lag-panel th, #lag-panel td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--edge); }
+#lag-panel th:first-child, #lag-panel td:first-child { text-align: left; }
+#lag-panel .lag-btns { display: flex; gap: 8px; justify-content: flex-end; }
+#lag-panel button { font: inherit; padding: 6px 10px; }

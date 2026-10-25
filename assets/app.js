@@ -18,8 +18,9 @@ import { createNetwork } from "../lib/mtr-network.js"
 import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
+import { createLagStats } from "../lib/tml-lagstats.js"
 import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
-import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceSeconds } from "../lib/tml-timetable.js"
+import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
 const LANG = "tc"
@@ -31,6 +32,7 @@ const RUNS_KEY = "tml-traffic-show-runs"
 // v2: corrections are now relative to the working timetable's own hop
 // times; v1 values were relative to the old single-table model.
 const LEARN_KEY = "tml-traffic-learned-v2"
+const LAG_KEY = "tml-traffic-board-lag"
 // The feed only re-reads a station once it is 20 s old, so refresh just after
 // that: every pass then reads all 27 (at 18 s each station was read every 36 s).
 const REFRESH_EVERY_MS = 20_500
@@ -52,7 +54,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.20", commit: "3744465" }
+const BUILD = { version: "0.8.21", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -565,6 +567,75 @@ function placeTrains(snapshot, now) {
   // boards, never against a timetable.
   const runs = tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
   state.owners = ownReadings(snapshot.boards ?? [], matched, runs, now)
+  recordBoardLag(matched, runs, now)
+}
+
+// Log-only (lib/tml-lagstats.js): how long boards keep a 0 after the dot
+// left. Never read back by the diagram; a failure here must not stop a refresh.
+let lagStats = null
+function recordBoardLag(matched, runs, now) {
+  try {
+    if (!lagStats) {
+      let saved = []
+      try {
+        saved = JSON.parse(readPref(LAG_KEY) ?? "[]")
+      } catch {
+        // Unreadable: start empty.
+      }
+      lagStats = createLagStats(Array.isArray(saved) ? saved : [])
+    }
+    const delays = new Map(runs.filter((r) => r.kind === "sched").map((r) => [r.id, r.delayDisp]))
+    lagStats.observe({ matched, delayOf: (id) => delays.get(id), dayStart: serviceDayStart(now), now })
+    if (lagStats.takeChanged()) writePref(LAG_KEY, JSON.stringify(lagStats.samples()))
+  } catch (error) {
+    console.warn("board lag log", error)
+  }
+}
+
+// Hidden panel: tap the version line five times.
+let footTaps = []
+function onFootTap(event) {
+  if (!event.target.closest("#build")) return
+  const now = Date.now()
+  footTaps = [...footTaps.filter((t) => now - t < 4000), now]
+  if (footTaps.length >= 5) {
+    footTaps = []
+    showLagPanel()
+  }
+}
+
+function showLagPanel() {
+  document.getElementById("lag-panel")?.remove()
+  if (!lagStats) recordBoardLag(new Map(), [], Date.now())
+  const sum = lagStats?.summary() ?? { n: 0, over: [], stations: [] }
+  const pct = (x) => `${(x * 100).toFixed(0)}%`
+  const rows = sum.stations.slice(0, 20).map((x) => `<tr><td>${escapeHtml(x.code)}</td><td>${x.n}</td><td>${x.median}</td><td>${x.p90}</td></tr>`).join("")
+  const panel = document.createElement("div")
+  panel.id = "lag-panel"
+  panel.setAttribute("role", "dialog")
+  panel.innerHTML =
+    `<div class="lag-box"><h2>站牌「0」持續時間（只記錄）</h2>` +
+    `<p>光點開出月台後，該站站牌仲報 0 嘅秒數（解像度約 20 秒）。樣本 ${sum.n} 個。</p>` +
+    `<p>${sum.over.map((x) => `&gt;${x.sec} 秒 ${pct(x.share)}`).join(" · ")}</p>` +
+    `<table><thead><tr><th>站</th><th>樣本</th><th>中位</th><th>P90</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<div class="lag-btns"><button data-act="copy">複製 JSON</button><button data-act="clear">清除</button><button data-act="close">關閉</button></div></div>`
+  panel.addEventListener("click", async (event) => {
+    const act = event.target.closest("button")?.dataset.act
+    if (event.target === panel || act === "close") panel.remove()
+    else if (act === "clear") {
+      lagStats.clear()
+      writePref(LAG_KEY, "[]")
+      panel.remove()
+    } else if (act === "copy") {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify({ version: BUILD.version, summary: sum, samples: lagStats.samples() }))
+        event.target.textContent = "已複製"
+      } catch {
+        event.target.textContent = "複製失敗"
+      }
+    }
+  })
+  document.body.append(panel)
 }
 
 // Which drawn train each board reading belongs to: a matched reading by its
@@ -625,6 +696,8 @@ function applyStrings() {
     `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
 }
+
+els.foot.addEventListener("click", onFootTap)
 
 function paintRunsToggle() {
   els.brandDot.dataset.on = state.showRuns ? "1" : "0"

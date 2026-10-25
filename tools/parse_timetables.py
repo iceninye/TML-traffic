@@ -289,6 +289,17 @@ def parse_section_h(pdf, section_a=None):
             m = re.match(r"NON[ -]PASSENGER SERVICE FROM (\w+) TO (\w+)", n)
             if m:
                 np_until = m.group(2)
+        # "START SERVICE AT X AND END AT Y" (event-day short workings such as
+        # TWW to CIO, KAT to MEF): the train carries passengers from X to Y
+        # although its trip numbers are non-passenger ones (3xxxx/4xxxx).
+        start_at = end_to = None
+        for n in t["notes"]:
+            m = re.match(r"START SERVICE AT (\w+) AND END AT (\w+)", n)
+            if m:
+                start_at, end_to = m.group(1), m.group(2)
+        if start_at:
+            whole_np = False
+            np_until = start_at
         # Empty leg first (e.g. 40023/20044: depot -> ... -> passenger): public
         # stops before the depot point are empty. When the passenger leg comes
         # first (20204/40239), the empty tail is found by "END SERVICE AT".
@@ -308,6 +319,8 @@ def parse_section_h(pdf, section_a=None):
             m = re.match(r"END SERVICE AT (\w+)", n)
             if m:
                 end_at = m.group(1)
+        if end_to:
+            end_at = end_to
         public = {}
         order = []
         empty = set()

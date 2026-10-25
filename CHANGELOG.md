@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.19 — 2026-10-25 (`af9665b`)
+- Fixed the "-" trains seen on Sunday 25/10 at 22:28 (Duty Sheet 8023). The Kai Tak event short workings "START SERVICE AT TWW AND END AT CIO" (and "START SERVICE AT KAT AND END AT MEF") have non-passenger trip numbers (3xxxx/4xxxx), so `tools/parse_timetables.py` flagged every stop empty. The app then had no trip to match their board readings to, and drew each real train (dashed circle, destination 第一城) as a countdown-model train without a Run number. The note now decides: stops from X to Y carry passengers. Data patched in DS8023, TML709CA/CB, TML711CA, TML110CB, TML709GA/GC, TML709UF (104 trips) by `tools/fix_start_service.py`; `tools/validate_data.mjs` now fails on such an all-empty trip. The synthetic matcher check had never put these trains on the boards, which is why it stayed clean.
+- Shell cache renamed `v52`.
+
 ## v0.8.18 — 2026-10-22 (`ef28a28`)
 - Working timetables added (from the PDFs; parsed and checked by `tools/parse_timetables.py`): TML1110A (normal weekday from 2026-10-26; same 527 trips as TML1100B, recompiled for SMC 1.15.00), TML711CA (Sunday, KTSP concert, from 2026-10-25; same 410 trips as TML709CB), TML110CB (weekday, KTSP concert, from 2026-09-16) and TML709S (Sunday/PH, National Day fireworks, re-used from 2025). TML110SB re-parsed from the same PDF: no change. No Duty Sheet or Duty card changed.
 - Shell cache renamed `v51`.

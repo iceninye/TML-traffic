@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.22 — unreleased
+- Data only (Ice 2026-10-27): `data/duty-codes.json` holds the hours and book-on/off of leave, training, spare and special codes (AL, GH, SH, SSL, KSP1, HSP3, TRG, OJT*, S, OF, OD ...) from Ice's duty no. table; NIL = no fixed time (null). The table has no staff data. `tools/duty-codes.py` rebuilds it from the pasted table (a code listed twice keeps the last row, so S/OF/OD end 15:45/23:00; SPT11/SPT12 stay 10 h). `tools/validate-duty-codes.mjs` runs in CI. tml-roster's 編更 uses it to fill hours/times a pasted roster lacks; pasted data wins.
+- Shell cache renamed `v55`.
+
 ## v0.8.21 — 2026-10-25 (`0c066ce`)
 - Log-only measurement, no change to any position: `lib/tml-lagstats.js` records how many seconds a station board keeps reporting 0 for a train after that train's dot has left the platform (resolution about 20 s; last 500 samples; stored only in this browser's localStorage `tml-traffic-board-lag`, never sent anywhere). Tap the version line in the footer five times for a panel with the share of samples over 20/30/40/60/90 s, a per-station table and a copy-JSON button. The result decides whether "0 for longer than X s after the dot left means held" (docs/ALGORITHM.md §3j) can be used without moving on-time trains. `tools/validate_lagstats.mjs` checks the recorder and runs in CI.
 - Shell cache renamed `v54`.

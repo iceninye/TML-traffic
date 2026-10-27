@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v54"
+const CACHE = "tml-traffic-shell-v55"
 const SHELL = [
   "./",
   "index.html",
@@ -44,7 +44,7 @@ async function cacheDuties(cache) {
       return response
     }
     const index = await (await get("data/duties/index.json")).json()
-    await Promise.all([get("data/duty-basic.json"), ...index.sheets.map((sheet) => get(`data/duties/${sheet.file}`))])
+    await Promise.all([get("data/duty-basic.json"), get("data/duty-codes.json"), ...index.sheets.map((sheet) => get(`data/duties/${sheet.file}`))])
   } catch {
     // the page fetches them itself when online
   }

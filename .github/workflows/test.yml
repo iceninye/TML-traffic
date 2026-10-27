@@ -23,6 +23,7 @@ jobs:
         run: |
           node tools/validate_duties.mjs
           node tools/validate-hours.mjs
+          node tools/validate-duty-codes.mjs
       - name: Train matching and feed
         run: |
           node tools/validate_matching.mjs

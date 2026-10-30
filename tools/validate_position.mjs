@@ -79,7 +79,12 @@ function simulate(base, hold, slow) {
       const front = i > 0 ? real.get(trips[i - 1].id) : null
       const d0 = base.get(trip.id) ?? 0
       const from = slow?.id === trip.id ? trip.stops.findIndex((x) => x.code === slow.code) : -1
-      const slowBy = (k) => (from >= 0 && k >= from && k < from + slow.hops ? slow.factor : 1)
+      // slow.all: every train, every section that starts after slow.after
+      // (rain: a lower brake rate; or trains regulated to even out gaps),
+      // and slow.dwell extra seconds at each platform.
+      const slowBy = (k) => (slow?.all ? (trip.stops[k].dep + d0 >= (slow.after ?? -Infinity) ? slow.factor : 1)
+        : from >= 0 && k >= from && k < from + slow.hops ? slow.factor : 1)
+      const dwellAdd = (k) => (slow?.all && trip.stops[k].arr + d0 >= (slow.after ?? -Infinity) ? slow.dwell ?? 0 : 0)
       const arr = []
       const dep = []
       trip.stops.forEach((s, k) => {
@@ -93,7 +98,7 @@ function simulate(base, hold, slow) {
           a += wait
         }
         arr.push(a)
-        let d = Math.max(a + (s.dep - s.arr), s.dep + d0)
+        let d = Math.max(a + (s.dep - s.arr) + (k > 0 ? dwellAdd(k) : 0), s.dep + d0)
         if (hold && hold.id === trip.id && hold.code === s.code) d = Math.max(d, s.dep + d0 + hold.sec)
         dep.push(d)
       })
@@ -256,4 +261,7 @@ scenario("slow DOWN: 4 hops at 1.5x", none, null, 20, { id: target.id, code: "AU
 scenario("slow DOWN: 4 hops at 1.25x", none, null, 20, { id: target.id, code: "AUS", hops: 4, factor: 1.25 })
 scenario("slow DOWN: 6 hops at 2x", none, null, 20, { id: target.id, code: "AUS", hops: 6, factor: 2 })
 scenario("slow DOWN: 2 hops at 3x", none, null, 20, { id: target.id, code: "AUS", hops: 2, factor: 3 })
+scenario("whole line 1.15x from start", none, null, 20, { all: true, factor: 1.15, after: t0 })
+scenario("whole line 1.15x +10 s dwell", none, null, 20, { all: true, factor: 1.15, dwell: 10, after: t0 })
+scenario("whole line 1.3x from start", none, null, 20, { all: true, factor: 1.3, after: t0 })
 scenario("slow DOWN 1.5x, lag 40 s", none, null, 40, { id: target.id, code: "AUS", hops: 4, factor: 1.5 })

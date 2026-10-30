@@ -19,6 +19,7 @@ import { createFeed } from "../lib/mtr-feed.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
 import { createLagStats } from "../lib/tml-lagstats.js"
+import { createRideLog } from "../lib/tml-ridelog.js"
 import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
 import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
@@ -33,6 +34,7 @@ const RUNS_KEY = "tml-traffic-show-runs"
 // times; v1 values were relative to the old single-table model.
 const LEARN_KEY = "tml-traffic-learned-v2"
 const LAG_KEY = "tml-traffic-board-lag"
+const RIDE_KEY = "tml-traffic-ride-log"
 // The feed only re-reads a station once it is 20 s old, so refresh just after
 // that: every pass then reads all 27 (at 18 s each station was read every 36 s).
 const REFRESH_EVERY_MS = 20_500
@@ -54,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.22", commit: "dev" }
+const BUILD = { version: "0.8.23", commit: "d6ec179" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -592,6 +594,125 @@ function recordBoardLag(matched, runs, now) {
   }
 }
 
+// Ride log (lib/tml-ridelog.js): taps and location fixes on board, with
+// where the chosen train's dot was at that moment. Log-only.
+let lastPicked = null
+let ride = null
+let rideWatch = null
+function rideLog() {
+  if (!ride) {
+    let saved = []
+    try {
+      saved = JSON.parse(readPref(RIDE_KEY) ?? "[]")
+    } catch {
+      // Unreadable: start empty.
+    }
+    ride = createRideLog(saved)
+  }
+  return ride
+}
+
+// The chosen train as drawn now; at a terminus its Run carries on as the
+// next trip, so follow the Run number to the nearest sched run.
+function rideDot() {
+  const cur = rideLog().current
+  if (!cur) return null
+  const runs = state.runs ?? []
+  let run = runs.find((r) => r.id === cur.runId)
+  if (!run && cur.label != null) {
+    run = runs.filter((r) => r.kind === "sched" && String(r.trip.run) === cur.label)[0] ?? null
+    if (run) rideLog().follow(run.id)
+  }
+  return run ?? null
+}
+
+function startRide() {
+  const run = (state.runs ?? []).find((r) => r.id === (state.selected ?? lastPicked))
+  if (!run) {
+    window.alert("請先開你搭緊嗰架車嘅列車卡（撳列車），再開始乘車記錄。")
+    return
+  }
+  const label = run.kind === "sched" ? String(run.trip.run) : null
+  rideLog().start(run.id, label, Date.now())
+  rideAdd("note")
+  if (navigator.geolocation) {
+    rideWatch = navigator.geolocation.watchPosition(
+      (p) => {
+        const fix = rideFix(p)
+        if (fix) rideAdd("gps", fix)
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+    )
+  }
+  paintRideBar()
+}
+
+// A location fix worth keeping, after the checks mtr-app uses: inside Hong
+// Kong, not (0, 0), accuracy reported and no worse than 1 km. In the tunnel
+// half of the line there is no satellite fix; the phone may answer with an
+// old fix or a coarse Wi-Fi / cell one, so fixes older than 10 s are dropped
+// and the accuracy is kept with each so they can be told apart later. The
+// 到站 / 開車 taps are the record that works underground.
+const RIDE_MAX_ACC_M = 1000
+const RIDE_MAX_FIX_AGE_MS = 10_000
+function rideFix(p) {
+  const lat = p?.coords?.latitude
+  const lon = p?.coords?.longitude
+  const acc = p?.coords?.accuracy
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat === 0 || lon === 0) return null
+  if (lat < 22 || lat > 22.7 || lon < 113.8 || lon > 114.5) return null
+  if (!Number.isFinite(acc) || acc > RIDE_MAX_ACC_M) return null
+  if (Number.isFinite(p.timestamp) && Date.now() - p.timestamp > RIDE_MAX_FIX_AGE_MS) return null
+  return { lat: Number(lat.toFixed(6)), lon: Number(lon.toFixed(6)), acc: Math.round(acc) }
+}
+
+function stopRide() {
+  if (rideWatch != null) navigator.geolocation?.clearWatch(rideWatch)
+  rideWatch = null
+  rideLog().stop()
+  writePref(RIDE_KEY, JSON.stringify(rideLog().rides()))
+  document.getElementById("ride-bar")?.remove()
+}
+
+let rideUnsaved = 0
+function rideAdd(kind, extra) {
+  try {
+    if (!rideLog().add(kind, Date.now(), rideDot(), extra)) return
+    rideUnsaved += 1
+    if (kind !== "gps" || rideUnsaved >= 6) {
+      writePref(RIDE_KEY, JSON.stringify(rideLog().rides()))
+      rideUnsaved = 0
+    }
+    paintRideBar()
+  } catch (error) {
+    console.warn("ride log", error)
+  }
+}
+
+function paintRideBar() {
+  const cur = rideLog().current
+  let bar = document.getElementById("ride-bar")
+  if (!cur) {
+    bar?.remove()
+    return
+  }
+  if (!bar) {
+    bar = document.createElement("div")
+    bar.id = "ride-bar"
+    bar.innerHTML = `<span class="ride-info"></span><button data-act="arr">到站</button><button data-act="dep">開車</button><button data-act="stop">停止</button>`
+    bar.addEventListener("click", (event) => {
+      const act = event.target.closest("button")?.dataset.act
+      if (act === "stop") stopRide()
+      else if (act === "arr" || act === "dep") rideAdd(act)
+    })
+    document.body.append(bar)
+  }
+  const gps = cur.entries.filter((e) => e.kind === "gps").length
+  const taps = cur.entries.filter((e) => e.kind === "arr" || e.kind === "dep").length
+  bar.querySelector(".ride-info").textContent = `乘車記錄 ${cur.label ? `Run ${cur.label}` : ""} · 撳 ${taps} · 定位 ${gps}`
+}
+
 // Hidden panel: tap the version line five times.
 let footTaps = []
 function onFootTap(event) {
@@ -617,18 +738,25 @@ function showLagPanel() {
     `<div class="lag-box"><h2>站牌「0」持續時間（只記錄）</h2>` +
     `<p>光點開出月台後，該站站牌仲報 0 嘅秒數（解像度約 20 秒）。樣本 ${sum.n} 個。</p>` +
     `<p>${sum.over.map((x) => `&gt;${x.sec} 秒 ${pct(x.share)}`).join(" · ")}</p>` +
+    (sum.arrival ? `<p>站牌開始報 0 減光點到站：中位 ${sum.arrival.median} 秒（P10 ${sum.arrival.p10}，P90 ${sum.arrival.p90}，${sum.arrival.n} 個）</p>` : "") +
+    `<p>乘車記錄 ${rideLog().rides().length} 次。先開你搭緊嗰架車嘅列車卡，再按「開始乘車記錄」。</p>` +
     `<table><thead><tr><th>站</th><th>樣本</th><th>中位</th><th>P90</th></tr></thead><tbody>${rows}</tbody></table>` +
-    `<div class="lag-btns"><button data-act="copy">複製 JSON</button><button data-act="clear">清除</button><button data-act="close">關閉</button></div></div>`
+    `<div class="lag-btns"><button data-act="ride">開始乘車記錄</button><button data-act="copy">複製 JSON</button><button data-act="clear">清除</button><button data-act="close">關閉</button></div></div>`
   panel.addEventListener("click", async (event) => {
     const act = event.target.closest("button")?.dataset.act
     if (event.target === panel || act === "close") panel.remove()
     else if (act === "clear") {
       lagStats.clear()
       writePref(LAG_KEY, "[]")
+      rideLog().clear()
+      writePref(RIDE_KEY, "[]")
       panel.remove()
+    } else if (act === "ride") {
+      panel.remove()
+      startRide()
     } else if (act === "copy") {
       try {
-        await navigator.clipboard.writeText(JSON.stringify({ version: BUILD.version, summary: sum, samples: lagStats.samples() }))
+        await navigator.clipboard.writeText(JSON.stringify({ version: BUILD.version, summary: sum, samples: lagStats.samples(), rides: rideLog().rides() }))
         event.target.textContent = "已複製"
       } catch {
         event.target.textContent = "複製失敗"
@@ -1859,6 +1987,7 @@ function dutyPage(run) {
 
 function openTrain(runId) {
   state.selected = runId
+  lastPicked = runId
   state.sheetKind = "train"
   state.trainPage = 1
   paintTrainSheet(true)

@@ -872,3 +872,8 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 #lag-panel th:first-child, #lag-panel td:first-child { text-align: left; }
 #lag-panel .lag-btns { display: flex; gap: 8px; justify-content: flex-end; }
 #lag-panel button { font: inherit; padding: 6px 10px; }
+
+/* Ride log bar (hidden panel → 開始乘車記錄). */
+#ride-bar { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 40; display: flex; gap: 8px; align-items: center; padding: 8px 10px; font-size: 13px; background: var(--bg); border: 1px solid var(--edge); border-radius: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 30%); }
+#ride-bar .ride-info { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ride-bar button { font: inherit; padding: 10px 12px; border-radius: 8px; }

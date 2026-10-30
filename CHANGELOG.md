@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.23 — 2026-10-30 (`dev`)
+- Dots on a slowing line (rain with a lower brake rate, trains regulated to even out gaps) no longer reach platforms before their trains as often. `lib/tml-motion.js` measures how fast each train's delay estimate grows (slope over the last 4 minutes) and aims the dot's clock ahead by that rate: the direction's median rate for every train, a train's own rate when above 0.15 s/s. Never negative. Synthetic check (`tools/validate_position.mjs`, new "whole line 1.15x / 1.3x" scenarios, 4 timetables): dot ahead p90 roughly halved, "early" (dot at a platform before the train) 2.5-5.7% down to 0.4-2.3%, more than 300 m ahead 2-10% down to 0-1.2%; on-time trains: behind p90 +5 m. Held trains unchanged (an information limit, docs/ALGORITHM.md §3j, §3k).
+- Board-lag log: each sample also records the board's first 0 minus the dot's arrival (`arr`), shown in the hidden panel.
+- Ride log (hidden panel, 「開始乘車記錄」): open your train's card, start, then tap 到站 / 開車; the phone's location is sampled where it has a fix. Each entry keeps where that train's dot was drawn. Stored only in this browser; included in 複製 JSON. `lib/tml-ridelog.js`.
+- Shell cache renamed `v56`.
+
 ## v0.8.22 — unreleased
 - Data only (Ice 2026-10-27): `data/duty-codes.json` holds the hours and book-on/off of leave, training, spare and special codes (AL, GH, SH, SSL, KSP1, HSP3, TRG, OJT*, S, OF, OD ...) from Ice's duty no. table; NIL = no fixed time (null). The table has no staff data. `tools/duty-codes.py` rebuilds it from the pasted table (a code listed twice keeps the last row, so S/OF/OD end 15:45/23:00; SPT11/SPT12 stay 10 h). `tools/validate-duty-codes.mjs` runs in CI. tml-roster's 編更 uses it to fill hours/times a pasted roster lacks; pasted data wins.
 - Shell cache renamed `v55`.

@@ -637,12 +637,34 @@ function startRide() {
   rideAdd("note")
   if (navigator.geolocation) {
     rideWatch = navigator.geolocation.watchPosition(
-      (p) => rideAdd("gps", { lat: Number(p.coords.latitude.toFixed(6)), lon: Number(p.coords.longitude.toFixed(6)), acc: Math.round(p.coords.accuracy) }),
+      (p) => {
+        const fix = rideFix(p)
+        if (fix) rideAdd("gps", fix)
+      },
       () => {},
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
     )
   }
   paintRideBar()
+}
+
+// A location fix worth keeping, after the checks mtr-app uses: inside Hong
+// Kong, not (0, 0), accuracy reported and no worse than 1 km. In the tunnel
+// half of the line there is no satellite fix; the phone may answer with an
+// old fix or a coarse Wi-Fi / cell one, so fixes older than 10 s are dropped
+// and the accuracy is kept with each so they can be told apart later. The
+// 到站 / 開車 taps are the record that works underground.
+const RIDE_MAX_ACC_M = 1000
+const RIDE_MAX_FIX_AGE_MS = 10_000
+function rideFix(p) {
+  const lat = p?.coords?.latitude
+  const lon = p?.coords?.longitude
+  const acc = p?.coords?.accuracy
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat === 0 || lon === 0) return null
+  if (lat < 22 || lat > 22.7 || lon < 113.8 || lon > 114.5) return null
+  if (!Number.isFinite(acc) || acc > RIDE_MAX_ACC_M) return null
+  if (Number.isFinite(p.timestamp) && Date.now() - p.timestamp > RIDE_MAX_FIX_AGE_MS) return null
+  return { lat: Number(lat.toFixed(6)), lon: Number(lon.toFixed(6)), acc: Math.round(acc) }
 }
 
 function stopRide() {

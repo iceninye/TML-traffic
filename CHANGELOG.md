@@ -3,6 +3,10 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.24 — 2026-11-03 (`6cf6c5a`)
+- Duty card: new 「交機」 row under 飯腳. It shows the duties of the same group that finish (放工) or get off for the meal (Meal) on the same platform where this duty's last train ends, up to 3, within the next hour (strictly after, nearest first), as `duty (放工 hh:mm)` buttons to that duty's card. Counted only when the last train is the duty's final leg: parking, relief, depot or other tasks after getting off do not count. Hidden when there are none. Example: 1101101 ends 11:17 KSR1 → 1101103 (放工 11:35), 1101140 (Meal 11:53), 1101143 (Meal 12:05). `handoverMates` in `lib/tml-duties.js`.
+- Shell cache renamed `v57`.
+
 ## v0.8.23 — 2026-10-30 (`d6ec179`)
 - Dots on a slowing line (rain with a lower brake rate, trains regulated to even out gaps) no longer reach platforms before their trains as often. `lib/tml-motion.js` measures how fast each train's delay estimate grows (slope over the last 4 minutes) and aims the dot's clock ahead by that rate: the direction's median rate for every train, a train's own rate when above 0.15 s/s. Never negative. Synthetic check (`tools/validate_position.mjs`, new "whole line 1.15x / 1.3x" scenarios, 4 timetables): dot ahead p90 roughly halved, "early" (dot at a platform before the train) 2.5-5.7% down to 0.4-2.3%, more than 300 m ahead 2-10% down to 0-1.2%; on-time trains: behind p90 +5 m. Held trains unchanged (an information limit, docs/ALGORITHM.md §3j, §3k).
 - Board-lag log: each sample also records the board's first 0 minus the dot's arrival (`arr`), shown in the hidden panel.

@@ -92,4 +92,18 @@ check(!d1101.some((d) => d.id === "1101586") && d1101.find((d) => d.id === "1101
 check(dutyState(d101, at(13, 15)) === null && dutyState(d101, at(4, 44)) === null, "8022101 is off duty before 04:45 and from 13:15")
 const late = load("8022").duties.find((d) => d.id === "8022509")
 check(dutyState(late, at(0, 10) + 86400) !== null && dutyState(late, at(0, 30) + 86400) === null, "8022509 crosses midnight and ends 00:26")
+
+// 交機
+{
+  const { handoverMates } = await import("../lib/tml-duties.js")
+  const mk = (id, endAt, place, extra = {}) => ({ id, group: "KSR", on: [0, "KSR"], legs: [["drive", 1, "WKS", endAt - 600, place, endAt]], ...extra })
+  const me = mk("a", 1000, "KSR1")
+  const list = [me, mk("b", 1000 + 3600, "KSR1"), mk("c", 1000 + 3601, "KSR1"), mk("d", 1000, "KSR1"), mk("e", 1500, "KSR2"),
+    mk("f", 1200, "KSR1", { group: "HHS" }), mk("g", 900, "KSR1", { meal: [1300, 4000, "KSR1", "KSR1"] }),
+    mk("h", 1100, "KSR1", { legs: [["drive", 1, "WKS", 400, "KSR1", 1100], ["park", null, "KSR1", 1150, "DEP", 1300]] })]
+  const r = handoverMates(me, list)
+  check(r.mates.map((m) => `${m.duty.id}:${m.kind}`).join() === "g:meal,b:off", `交機: same platform only, within 1 h after, same group, final leg only: ${r.mates.map((m) => m.duty.id)}`)
+  check(handoverMates({ id: "z", legs: [["park", null, "A", 1, "B", 2]] }, list) === null, "交機: hidden when the duty does not end on a train")
+}
+
 process.exit(failed ? 1 : 0)

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.24 — 2026-11-03
+## v0.8.24 — 2026-11-03 (`6cf6c5a`)
 - Duty card: new 「交機」 row under 飯腳. It shows the duties of the same group that finish (放工) or get off for the meal (Meal) on the same platform where this duty's last train ends, up to 3, within the next hour (strictly after, nearest first), as `duty (放工 hh:mm)` buttons to that duty's card. Counted only when the last train is the duty's final leg: parking, relief, depot or other tasks after getting off do not count. Hidden when there are none. Example: 1101101 ends 11:17 KSR1 → 1101103 (放工 11:35), 1101140 (Meal 11:53), 1101143 (Meal 12:05). `handoverMates` in `lib/tml-duties.js`.
 - Shell cache renamed `v57`.
 

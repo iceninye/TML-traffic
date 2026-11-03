@@ -20,7 +20,7 @@ import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
 import { createLagStats } from "../lib/tml-lagstats.js"
 import { createRideLog } from "../lib/tml-ridelog.js"
-import { GROUPS, CLASSES, dutyState, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
+import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
 import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -56,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.23", commit: "d6ec179" }
+const BUILD = { version: "0.8.24", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -181,6 +181,8 @@ const STRINGS = {
     dsOff: "下班",
     dsMeal: "用膳",
     dsMates: "飯腳",
+    dsHandover: "交機",
+    dsHandoverKind: { off: "放工", meal: "Meal" },
     dsMatesNone: "冇（同車站重疊未夠 45 分鐘）",
     dsWork: "工時",
     dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
@@ -2339,6 +2341,17 @@ function mealMatesHtml(duty, duties, sheet) {
     `<span class="meta"> ${hhmm(from)}–${hhmm(to)}（${Math.round((to - from) / 60)} 分）</span>`).join("<br>")}</span>`
 }
 
+// 交機: duties finishing or eating at the platform where this duty's last train ends,
+// within the next hour; nothing at all when there are none.
+function handoverHtml(duty, duties, sheet) {
+  const s = t()
+  const h = handoverMates(duty, duties)
+  if (!h?.mates.length) return ""
+  return `<dt>${s.dsHandover}</dt><dd><span class="duty-mates">${h.mates.map(({ duty: other, kind, at }) =>
+    `<button type="button" class="link duty-mate" data-duty="${other.id}" data-sheet="${sheet}">${other.id}</button>` +
+    `<span class="meta">（${s.dsHandoverKind[kind]} ${hhmm(at)}）</span>`).join("<br>")}</span></dd>`
+}
+
 function dutyDetailHtml({ sheet, id }) {
   const s = t()
   const book = dutyBook(sheet)
@@ -2377,6 +2390,7 @@ function dutyDetailHtml({ sheet, id }) {
     (duty.work != null ? `<dt>${s.dsWork}</dt><dd>${s.dsWorkMin(duty.work)}</dd>` : "") +
     (duty.meal ? `<dt>${s.dsMeal}</dt><dd>${hhmm(duty.meal[0])}–${hhmm(duty.meal[1])} ${mealPlace(duty.meal)}</dd>` +
       `<dt>${s.dsMates}</dt><dd>${mealMatesHtml(duty, book.data.duties, sheet)}</dd>` : "") +
+    handoverHtml(duty, book.data.duties, sheet) +
     `</dl>${nowBox}<div class="stops-head">${s.dsLegs}</div><ol class="duty-legs">` +
     rows.map((row) => `<li data-now="${row.now ? 1 : 0}">${row.html}</li>`).join("") + `</ol><p class="fine">${source}</p>`
 }

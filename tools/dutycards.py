@@ -217,6 +217,22 @@ def read_cards(path):
         missing = sorted(listed - {d["id"] for d in duties})
         if missing:
             stats["warnings"].append(f"MISSING: in the duty list but no card: {missing}")
+    # A card repeated under another tab with the same number (8024135 and
+    # 8024322 in the 8024 workbook: HUH ETS DM shuttle blocks that carry a
+    # KSR/TAD duty's number) is not that duty: keep the card whose tab matches
+    # the number's group digit, as for the skipped shuttle cards above.
+    by_id = {}
+    for d in duties:
+        by_id.setdefault(d["id"], []).append(d)
+    for duty_id, same in by_id.items():
+        if len(same) < 2:
+            continue
+        home = [d for d in same if GROUP_BY_DIGIT.get(duty_id[4]) == d["group"]]
+        if len(home) == 1:
+            for d in same:
+                if d is not home[0]:
+                    duties.remove(d)
+                    stats["warnings"].append(f"{d['tab']}!{duty_id}: same number as the {home[0]['tab']} card, dropped (shuttle block)")
     ids = [d["id"] for d in duties]
     if len(ids) != len(set(ids)):
         stats["warnings"].append("duplicate duty numbers")

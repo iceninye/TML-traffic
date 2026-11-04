@@ -179,21 +179,6 @@
    "primary": true
   },
   {
-   "code": "DS8027",
-   "file": "DS8027.json",
-   "day": "weekday",
-   "kind": "normal",
-   "effective": "2026-10-30",
-   "dates": [
-    "2026-10-30"
-   ],
-   "source": "dutysheet",
-   "base": "TML1100B",
-   "revision": 3,
-   "sha256": "d6c54e70dfda811b543370c4f38a4eb907023ef7129a98a01f94a0158fc12701",
-   "primary": true
-  },
-  {
    "code": "DS7091M",
    "file": "DS7091M.json",
    "day": "sunday",
@@ -206,6 +191,51 @@
    "base": "TML7090",
    "revision": 2,
    "sha256": "a901addf6ba1ea2fc9f39e4c08bfbd11ce3eeae70f27d0750613d032b1fe1eb4",
+   "primary": true
+  },
+  {
+   "code": "DS8024",
+   "file": "DS8024.json",
+   "day": "saturday",
+   "kind": "normal",
+   "effective": "2026-11-14",
+   "dates": [
+    "2026-11-14"
+   ],
+   "source": "dutysheet",
+   "base": "TML6090A",
+   "revision": 1,
+   "sha256": "80e66fff5ab44e6e4e42d37336b9aae3635160cae1c61edabd806a8875943e30",
+   "primary": true
+  },
+  {
+   "code": "DS8025",
+   "file": "DS8025.json",
+   "day": "sunday",
+   "kind": "normal",
+   "effective": "2026-11-15",
+   "dates": [
+    "2026-11-15"
+   ],
+   "source": "dutysheet",
+   "base": "TML709GC",
+   "revision": 1,
+   "sha256": "131cd6d04c2b6cda33a49ce70424b4f97072e4a4c60cae8b912d5a81759c5964",
+   "primary": true
+  },
+  {
+   "code": "DS8027",
+   "file": "DS8027.json",
+   "day": "weekday",
+   "kind": "normal",
+   "effective": "2026-11-13",
+   "dates": [
+    "2026-11-13"
+   ],
+   "source": "dutysheet",
+   "base": "TML110CB",
+   "revision": 4,
+   "sha256": "fb040acd31b803ecfca1d1b8c47021f9044a8b1c74d1eb7b4f843da1e80abcfb",
    "primary": true
   }
  ]

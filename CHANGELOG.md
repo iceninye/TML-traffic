@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.25 — 2026-11-04
+## v0.8.25 — 2026-11-04 (`353a5a7`)
 - Run numbers no longer shift one train back when the page is opened (or comes back from the background) during a delay. Ice's 08:35 screenshot: Run 5, 5+ min late at Tsuen Wan West, was drawn on time at Mei Foo on Run 26's train, Runs 52/38/27 showed only +65..+120 s, and an extra "–" appeared. With no match history every untracked trip was expected at the line's delay, so a queue of late trains fitted the next trip's slot on every board. New `orderPriors` in `lib/tml-timetable.js`: per direction, group the 1-5 min readings into trains on a common line-time axis and align them in order with the scheduled trips (a late train behind a late train is cheap, a scheduled trip left without a train costs a little, a train without a trip or an early train costs more); the result is the expected delay of trips with no history. Synthetic check (`tools/validate_matching.mjs`, new "queue" and "cancelled trip" scenarios, 7 timetable/time sets): wrong-trip readings summed 498.5 → 20.6, worst 16.0% → 7.9%, opened-mid-incident queues 8-16% → 0%; one regression, a cancelled trip at DS1101 12:00 0% → 0.8%. docs/ALGORITHM.md §3l.
 - After more than 2 minutes without a match (page in the background) the trip history is dropped and trains are identified again from the boards.
 - Shell cache renamed `v58`.

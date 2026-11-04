@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.28 — 2026-11-04 (`dev`)
+## v0.8.28 — 2026-11-04 (`e941fb2`)
 - A train no longer loses its Run number because the boards round to whole minutes. Ice's 10:23 copy of the board readings (the first from 「複製站牌數據」): Run 23, on time and just past Kam Sheung Road, was drawn "–", and Run 23 +355 s appeared at Long Ping. The train behind (Run 1) was due at Long Ping in 50 s and Yuen Long in 103 s; on the order alignment's line-time axis these landed 61 s apart, just over the 60 s grouping limit, so they became two trains and the lone Yuen Long reading took Run 23's slot. Now a lone reading joins the nearest neighbouring train within 75 s (`ORDER_LONE_JOIN_SEC`), when that train has no reading at the same station. Widening the 60 s limit itself was tried and rejected: in long holds trains are only 100 s apart and it merged them (up-line +900 s opened mid-incident: 0% → 20% wrong).
 - Checked against v0.8.27 on 9 timetables × 10 times of day × 17 scenarios, page open and opened mid-incident: exact boards 117 rows better, none worse, "–" 22% fewer; boards off by up to ±20 s per station (new `JITTER` option in `tools/validate_matching.mjs`) 1408 better, 5 worse (at most +3.6%), wrong matches 15% fewer; ±40 s 1792 better, 46 worse (at most +9.6%), 22% fewer.
 - New `tools/validate_replay.mjs` (in CI) replays copied board readings from `tools/fixtures/`; the 10:23 copy fails on v0.8.27 and passes now. docs/ALGORITHM.md §3o.

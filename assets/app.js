@@ -56,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.24", commit: "6cf6c5a" }
+const BUILD = { version: "0.8.25", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -287,6 +287,10 @@ let timetables = null
 // Readings per scheduled trip from recent snapshots (they keep narrowing
 // that trip's delay while they are fresh).
 let tripHistory = new Map()
+// When tripHistory was last written. After a longer gap (the page was in the
+// background) its delays are out of date: start again from the boards.
+let tripHistoryAt = 0
+const HISTORY_STALE_MS = 120_000
 let hopTimesKey = ""
 let offTimetableStreak = 0
 let onTimetableStreak = 0
@@ -498,6 +502,7 @@ function placeTrains(snapshot, now) {
   let result = null
   if (book) {
     const tau = serviceSeconds(now)
+    if (now - tripHistoryAt > HISTORY_STALE_MS) tripHistory = new Map()
     result = matchReadings(book, readings, now, tripHistory)
     // Does the running service match this timetable at all? A special
     // timetable this app does not have, overnight service, or an incident
@@ -543,6 +548,7 @@ function placeTrains(snapshot, now) {
     leftover = result.leftover
     state.lineDelay = result.lineDelay
     tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
+    tripHistoryAt = now
   } else {
     // Countdown-only: no timetable times either; running times come from
     // the base model plus what it has learned from the boards.

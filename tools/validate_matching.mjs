@@ -48,6 +48,8 @@ function boards(ms, delayOf) {
   for (const trip of bk.trips) {
     if (!trip.passenger) continue
     const d = delayOf(trip)
+    // A cancelled trip (delay Infinity) never shows on a board.
+    if (!Number.isFinite(d)) continue
     const firstServed = trip.stops.findIndex((s) => !s.empty)
     trip.stops.forEach((stop, k) => {
       // A terminus board does not list arrivals (the app drops them too).
@@ -148,6 +150,7 @@ function physical(delays) {
       const b = trips[i]
       const at = new Map(a.stops.map((s) => [s.code, s.arr]))
       let need = delays.get(b.id) ?? 0
+      if (!Number.isFinite(need) || !Number.isFinite(delays.get(a.id) ?? 0)) continue
       for (const s of b.stops) {
         if (!at.has(s.code)) continue
         need = Math.max(need, at.get(s.code) + (delays.get(a.id) ?? 0) + MIN_SEP - s.arr)
@@ -182,6 +185,22 @@ for (const dir of ["DOWN", "UP"]) {
   d.set(trips[3].id, 300)
   d.set(trips[9].id, 240)
   results.late = scenario("line +90 s, two UP trains +300/+240", physical(d))
+}
+
+// 4. Like the 2026-11-04 08:35 screenshot: two trains +150 s and the one
+// behind them +330 s, the trains behind queueing. Opened mid-incident, every
+// train used to take the Run number of the one ahead.
+for (const dir of ["DOWN", "UP"]) {
+  const trips = byDir(dir)
+  const m = Math.floor(trips.length / 2)
+  const d = new Map([[trips[m - 1].id, 150], [trips[m].id, 150], [trips[m + 1].id, 330]])
+  results[`queue-${dir}`] = scenario(`queue ${dir}: +150, +150, +330 behind`, physical(d))
+}
+// 5. A cancelled trip: the gap it leaves must not shift the trains behind
+// onto the slot ahead of them.
+for (const dir of ["DOWN", "UP"]) {
+  const trips = byDir(dir)
+  results[`cancel-${dir}`] = scenario(`cancelled ${dir} trip, rest on time`, new Map([[trips[Math.floor(trips.length / 2)].id, Infinity]]))
 }
 
 const rows = Object.values(results)

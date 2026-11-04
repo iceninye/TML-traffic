@@ -237,6 +237,13 @@
    "revision": 5,
    "sha256": "fb040acd31b803ecfca1d1b8c47021f9044a8b1c74d1eb7b4f843da1e80abcfb",
    "primary": true
+  },
+  {
+   "code": "TML709MB",
+   "file": "TML709MB.json",
+   "day": "sunday",
+   "kind": "special",
+   "effective": "2026-11-01"
   }
  ]
 }

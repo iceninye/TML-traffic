@@ -27,6 +27,7 @@ jobs:
       - name: Train matching and feed
         run: |
           node tools/validate_matching.mjs
+          node tools/validate_replay.mjs
           node tools/validate_headway.mjs
           node tools/validate_position.mjs
           node tools/validate_lagstats.mjs

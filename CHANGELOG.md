@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.29 — 2026-11-04 (`dev`)
+## v0.8.29 — 2026-11-04 (`81a713f`)
 - A train on its last hop into Tuen Mun or Wu Kai Sha is drawn when the page has just been opened. Ice's 11:20 screenshots (page just opened): Run 11 was missing near Tuen Mun and appeared at the platform about a minute later. After Siu Hong no board lists a train (a terminus board lists no arrivals); a page open for a while keeps it on the timetable to the platform, but a page just opened (or back from the background) had nothing to draw it from, and Run 11's next trip, already on the Tuen Mun board, is only drawn from its scheduled start (11:20:40). Now, when the terminus board names a Run's next trip and the trip before it is not being shown but should be on that last hop, it is drawn there at its direction's delay (`approaching` from `matchReadings`, used by the tracker only for trains it is not already showing).
 - `tools/validate_matching.mjs` now advances the drawing between snapshots and counts trains on the line that are not drawn ("missing"). Against v0.8.28 (9 timetables × 10 times × 17 scenarios): missing per snapshot summed 549.4 → 43.7 with exact boards, 642.6 → 79.2 at ±20 s, 798.0 → 214.5 at ±40 s; unmatched, wrong-trip and "–" unchanged; no row worse except two at ±40 s (+0.11 and +0.06 missing per snapshot). docs/ALGORITHM.md §3p.
 - Shell cache renamed `v62`.

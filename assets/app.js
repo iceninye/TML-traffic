@@ -56,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.26", commit: "8d5e7bb" }
+const BUILD = { version: "0.8.27", commit: "5a8c276" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -581,6 +581,34 @@ function placeTrains(snapshot, now) {
   const runs = tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
   state.owners = ownReadings(snapshot.boards ?? [], matched, runs, now)
   recordBoardLag(matched, runs, now)
+  recordBoardSnap(now, matched, leftover, runs)
+}
+
+// Diagnostics only (hidden panel, 「複製站牌數據」): the last BOARD_SNAPS
+// refreshes as the matcher saw them, so an odd dot ("–", a wrong Run) can be
+// traced to the readings behind it. Kept in memory, never stored.
+// Readings: [station, dest, ttnt, seconds until due, run or "–"].
+// Trains: [kind, run, dir, dest, km, delay estimate].
+const BOARD_SNAPS = 10
+const boardSnaps = []
+function recordBoardSnap(now, matched, leftover, runs) {
+  try {
+    const rd = (r, owner) => [r.station, r.dest, r.ttnt, Math.round((r.dueAt - now) / 1000), owner]
+    const readings = []
+    for (const entry of matched.values()) for (const r of entry.readings) readings.push(rd(r, entry.trip.run ?? entry.trip.id))
+    for (const r of leftover) readings.push(rd(r, "–"))
+    boardSnaps.push({
+      at: new Date(now).toISOString(),
+      book: state.book,
+      off: Boolean(state.offTimetable),
+      lineDelay: Math.round(state.lineDelay ?? 0),
+      readings,
+      trains: runs.map((r) => [r.kind, r.trip?.run ?? "–", r.dir, r.dest, r.km == null ? null : Math.round(r.km * 100) / 100, r.kind === "sched" ? Math.round(r.delayEst) : null]),
+    })
+    if (boardSnaps.length > BOARD_SNAPS) boardSnaps.shift()
+  } catch (error) {
+    console.warn("board snapshot", error)
+  }
 }
 
 // Log-only (lib/tml-lagstats.js): how long boards keep a 0 after the dot
@@ -751,8 +779,9 @@ function showLagPanel() {
     `<p>${sum.over.map((x) => `&gt;${x.sec} 秒 ${pct(x.share)}`).join(" · ")}</p>` +
     (sum.arrival ? `<p>站牌開始報 0 減光點到站：中位 ${sum.arrival.median} 秒（P10 ${sum.arrival.p10}，P90 ${sum.arrival.p90}，${sum.arrival.n} 個）</p>` : "") +
     `<p>乘車記錄 ${rideLog().rides().length} 次。先開你搭緊嗰架車嘅列車卡，再按「開始乘車記錄」。</p>` +
+    `<p>見到「–」或者 Run 錯，即刻按「複製站牌數據」（最近 ${boardSnaps.length}/${BOARD_SNAPS} 次刷新嘅站牌讀數同列車位置）。</p>` +
     `<table><thead><tr><th>站</th><th>樣本</th><th>中位</th><th>P90</th></tr></thead><tbody>${rows}</tbody></table>` +
-    `<div class="lag-btns"><button data-act="ride">開始乘車記錄</button><button data-act="copy">複製 JSON</button><button data-act="clear">清除</button><button data-act="close">關閉</button></div></div>`
+    `<div class="lag-btns"><button data-act="ride">開始乘車記錄</button><button data-act="copy">複製 JSON</button><button data-act="boards">複製站牌數據</button><button data-act="clear">清除</button><button data-act="close">關閉</button></div></div>`
   panel.addEventListener("click", async (event) => {
     const act = event.target.closest("button")?.dataset.act
     if (event.target === panel || act === "close") panel.remove()
@@ -765,6 +794,13 @@ function showLagPanel() {
     } else if (act === "ride") {
       panel.remove()
       startRide()
+    } else if (act === "boards") {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify({ version: BUILD.version, snaps: boardSnaps }))
+        event.target.textContent = `已複製 ${boardSnaps.length} 次`
+      } catch {
+        event.target.textContent = "複製失敗"
+      }
     } else if (act === "copy") {
       try {
         await navigator.clipboard.writeText(JSON.stringify({ version: BUILD.version, summary: sum, samples: lagStats.samples(), rides: rideLog().rides() }))

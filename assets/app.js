@@ -21,7 +21,7 @@ import { createTracker } from "../lib/tml-motion.js"
 import { createLagStats } from "../lib/tml-lagstats.js"
 import { createRideLog } from "../lib/tml-ridelog.js"
 import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
-import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
+import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
 const LANG = "tc"
@@ -56,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.25", commit: "353a5a7" }
+const BUILD = { version: "0.8.26", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -513,7 +513,7 @@ function placeTrains(snapshot, now) {
     const delays = [...result.trips.values()].map((e) => Math.abs(e.delay))
     const scattered = delays.length ? delays.filter((d) => d > 120).length / delays.length : 0
     const headwayOff = ["UP", "DOWN"].some((dir) => {
-      const planned = headwayAt(book, dir, tau)
+      const planned = scheduledHeadway(book, dir, tau)
       return planned && measured[dir] && Math.abs(measured[dir] - planned) / planned > 0.3
     })
     const notice = (snapshot.boards ?? []).some((b) => /special|特別|arrangement|安排/i.test(b.message ?? ""))
@@ -532,7 +532,10 @@ function placeTrains(snapshot, now) {
       state.offTimetable = true
       tracker.dropScheduled()
     }
-    else if (state.offTimetable && onTimetableStreak >= 3) state.offTimetable = false
+    else if (state.offTimetable && onTimetableStreak >= 3) {
+      state.offTimetable = false
+      tracker.dropModel()
+    }
   } else {
     state.offTimetable = true
   }
@@ -886,7 +889,10 @@ function paintClock() {
     els.period.title = s.offTimetableNote
   } else if (book) {
     const tau = serviceSeconds(now)
-    const headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
+    // The bands say whether there is service at all; the figure shown is
+    // the stations' scheduled spacing now (scheduledHeadway).
+    let headway = headwayAt(book, "DOWN", tau) ?? headwayAt(book, "UP", tau)
+    if (headway) headway = scheduledHeadway(book, "DOWN", tau) ?? scheduledHeadway(book, "UP", tau) ?? headway
     if (!headway) {
       // Past the last headway band, the last trains may still be running.
       paintPeriod(state.runs.length ? s.lastTrains : s.offService, s)

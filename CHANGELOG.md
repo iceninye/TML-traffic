@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.30 — 2026-11-04 (`aea26dc`)
+## v0.8.30 — 2026-11-04 (`d7798de`)
 - Duty Sheets 8024 and 8025 added, and 8027 replaced by its new workbook. Dates from the workbooks, as Ice assigned: 13/11 → 8027, 14/11 (Saturday) → 8024, 15/11 (Sunday) → 8025; all listed under 特別日. 8024 is a KTSP event timetable (443 trips, 41 runs, 130 duty cards), 8025 has the same 378 trips as TML709GC plus the duty numbers (420 trips, 42 runs, 120 duty cards), and the new 8027 (549 trips, 80 runs) now runs on 13/11 instead of 30/10 (that day has passed). Times and trip numbers come from each workbook's `timetable` sheet and platforms are read, as for earlier sheets.
 - New 8027 against the 30/10 one: same duty cards, 13 trips added (DOWN Runs 77-82 from Tsuen Wan West in the evening, new Runs 78 and 82), one UP trip from Diamond Hill removed; base timetable now TML110CB.
 - The 8024 workbook lists two KSR/TAD duties (8024135, 8024322) again on its ETS DM tab with their closing HUH/ETS shuttle legs, which the main card already holds; `tools/dutycards.py` drops the repeat instead of reporting a duplicate duty number.

@@ -86,7 +86,10 @@ const byDir = (dir) => live.filter((t) => t.dir === dir).sort((a, b) => a.start 
 // Both carry the history from one snapshot to the next as the app does.
 const SNAPS = 30
 const RAMP_SNAPS = 12
-function scenario(name, delays) {
+// A long hold builds up at about 1 s/s, as a held train's delay does in
+// reality: rampSnaps = delay / 20.5 s, with 15 snapshots scored after it.
+function scenario(name, delays, rampSnaps = RAMP_SNAPS) {
+  const SNAPS_N = rampSnaps === RAMP_SNAPS ? SNAPS : rampSnaps + 15
   const run = (opened) => {
     let history = new Map()
     let wrong = 0
@@ -95,12 +98,12 @@ function scenario(name, delays) {
     let dashes = 0
     let snaps = 0
     const tracker = createTracker(model)
-    for (let i = 0; i < SNAPS; i += 1) {
-      const ms = T0 + (i - RAMP_SNAPS) * 20_500
-      const ramp = Math.min(1, (i + 1) / RAMP_SNAPS)
+    for (let i = 0; i < SNAPS_N; i += 1) {
+      const ms = T0 + (i - rampSnaps) * 20_500
+      const ramp = Math.min(1, (i + 1) / rampSnaps)
       const delayOf = (trip) => (delays.get(trip.id) ?? 0) * ramp
       const readings = boards(ms, delayOf)
-      if (opened && i < RAMP_SNAPS) continue
+      if (opened && i < rampSnaps) continue
       const res = matchReadings(bk, readings, ms, history)
       history = new Map([...res.trips].map(([id, e]) => [id, { readings: e.history, delay: e.delay }]))
       // As the app does (assets/app.js placeTrains): leftover readings go to
@@ -109,7 +112,7 @@ function scenario(name, delays) {
         ? estimateTrains(network.routes_(), res.leftover.map((r) => r.obs), network.point.bind(network)).map((t) => ({ ...t, observedAtMs: t.observedAt, dueAtMs: t.dueAt }))
         : []
       const runs = tracker.update({ matched: res.trips, fallback, headwayOf: () => 180 }, ms)
-      if (i < RAMP_SNAPS) continue
+      if (i < rampSnaps) continue
       snaps += 1
       dashes += runs.filter((r) => r.kind === "model").length
       total += readings.length
@@ -196,7 +199,15 @@ for (const dir of ["DOWN", "UP"]) {
   const d = new Map([[trips[m - 1].id, 150], [trips[m].id, 150], [trips[m + 1].id, 330]])
   results[`queue-${dir}`] = scenario(`queue ${dir}: +150, +150, +330 behind`, physical(d))
 }
-// 5. A cancelled trip: the gap it leaves must not shift the trains behind
+// 5. Holds past 10 minutes (2026-11-04 10:02: up line at +605 s, "–"
+// beside the queue). Up to v0.8.26 the order alignment stopped at 10 min.
+for (const dir of ["DOWN", "UP"]) {
+  for (const sec of [720, 900]) {
+    const trips = byDir(dir)
+    results[`long-${dir}-${sec}`] = scenario(`long hold ${dir} +${sec} s, queue (1 s/s)`, physical(new Map([[trips[Math.floor(trips.length / 2)].id, sec]])), Math.round(sec / 20.5))
+  }
+}
+// 6. A cancelled trip: the gap it leaves must not shift the trains behind
 // onto the slot ahead of them.
 for (const dir of ["DOWN", "UP"]) {
   const trips = byDir(dir)

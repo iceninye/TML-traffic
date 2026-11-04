@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.30 — 2026-11-04 (`dev`)
+## v0.8.30 — 2026-11-04 (`6b13a4c`)
 - Duty Sheets for the next weekend, dates read from the workbooks: DS8027 on Fri 13 Nov (the 9 Sep issue, base TML110CB, replaces the 30 Oct one that was registered under the same code), DS8024 on Sat 14 Nov (base TML6090A) and DS8025 on Sun 15 Nov (base TML709GC). Every other day is unaffected. 8027: 549 trips, 166 duty cards; 8024: 443 trips, 130 cards; 8025: 420 trips, 120 cards. DS8025 and DS8027 contain all the trips of their base timetable; DS8024 has 368 of the base's 401 trips (92%), 43 new and 33 missing, so its mid-line times are reconstructed from the sheet's own terminal departures.
 - `tools/dutycards.py`: when a duty number appears on two tabs, the card on the tab that matches the number's group digit is kept and the other is dropped as a shuttle block. The 8024 workbook's ETS DM tab carries two blocks numbered 8024135 (a KSR duty) and 8024322 (a TAD duty); before, they replaced the real cards (6.5 h instead of 9 h and 8 h) and `validate_data` failed on duplicate numbers. `tools/validate_duties.mjs` checks both cards, and that no HUH3→ETS1 or ETS2→HUH2 leg is left as passenger in the new sheets.
 - Cards not in the workbook's duty list are skipped as before (8024588, 8025588, 8027586). docs/DUTYSHEET.md.

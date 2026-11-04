@@ -208,6 +208,17 @@ def read_cards(path):
         raise ValueError(f"expected one service date, found {sorted(dates) or 'none'}")
     info = {"code": code.group(1), "titleDay": code.group(2).strip(), "issuedText": issued.group(1) if issued else None,
             "date": next(iter(dates)), "sha256": digest}
+    # 8024 repeats two KSR/TAD duties (8024135, 8024322) on the ETS DM tab to show their closing
+    # HUH/ETS shuttle legs; the same legs already end the main card, so the repeat is dropped.
+    main = {d["id"]: d for d in duties if d["tab"] in ("KSR", "TAW", "overnight")}
+    kept = []
+    for d in duties:
+        m = main.get(d["id"])
+        if m is not None and d is not m and d["tab"] == "ETS DM" and all(l in m["legs"] for l in d["legs"]):
+            stats["cards"] -= 1
+            continue
+        kept.append(d)
+    duties = kept
     listed = duty_list_ids(wb)
     if listed is not None:
         extra = sorted(d["id"] for d in duties if d["id"] not in listed)

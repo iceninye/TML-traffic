@@ -68,15 +68,37 @@
    "sha256": "69384c7edaf93200cedd7c2786d5647ca819e81e80eb0aba16801b1976c373c8"
   },
   {
+   "code": "8024",
+   "file": "DS8024.json",
+   "class": "special",
+   "dates": [
+    "2026-11-14"
+   ],
+   "issued": "2026-06-27",
+   "duties": 130,
+   "sha256": "80e66fff5ab44e6e4e42d37336b9aae3635160cae1c61edabd806a8875943e30"
+  },
+  {
+   "code": "8025",
+   "file": "DS8025.json",
+   "class": "special",
+   "dates": [
+    "2026-11-15"
+   ],
+   "issued": "2026-06-28",
+   "duties": 120,
+   "sha256": "131cd6d04c2b6cda33a49ce70424b4f97072e4a4c60cae8b912d5a81759c5964"
+  },
+  {
    "code": "8027",
    "file": "DS8027.json",
    "class": "special",
    "dates": [
-    "2026-10-30"
+    "2026-11-13"
    ],
    "issued": "2026-09-16",
    "duties": 166,
-   "sha256": "d6c54e70dfda811b543370c4f38a4eb907023ef7129a98a01f94a0158fc12701"
+   "sha256": "fb040acd31b803ecfca1d1b8c47021f9044a8b1c74d1eb7b4f843da1e80abcfb"
   }
  ]
 }

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.26 — 2026-11-04
+## v0.8.26 — 2026-11-04 (`8d5e7bb`)
 - Run numbers no longer drop out (the header switching to 「特別車務：按到站倒數推算 … Duty Sheet 不適用」) during an ordinary delay around a peak-to-off-peak change. Ice's 09:31 screenshots: the header read 「非繁忙 · 班距約 6 分」 while trains still ran every 3 min. The planned headway came from the timetable's headway bands, which are keyed by departure from the first station (DS1101 DOWN: 6 min from 09:15), but trains that left before then are still on the line until about 09:50, so the "headway off" signal was always on in those windows and any delay (the second signal) switched to countdown mode, and back a minute later. The planned headway is now the scheduled spacing of the next four trains at each station, median over stations, measured the same way as the boards (`scheduledHeadway` in `lib/tml-timetable.js`); the header's 班距 and 繁忙/非繁忙 follow it. New `tools/validate_headway.mjs` (in CI): with on-time boards, false "headway off" in 10% of weekday checks (DS1101, TML1100B) and 1.2% on Saturday, now 0% in all six timetables.
 - Back from countdown mode, the countdown dots are dropped at once instead of coasting about 20 s beside their own numbered trains as "–" (synthetic flip: up to 54 "–" for one refresh, now 0).
 - Shell cache renamed `v59`.

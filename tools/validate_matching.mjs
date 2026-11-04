@@ -2,6 +2,7 @@
 //
 //   node tools/validate_matching.mjs [DS1101|TML1100B|...] [HH:MM]
 //   DEBUG="<scenario name>" OPENED=1 node tools/validate_matching.mjs   (list wrong matches)
+//   JITTER=20 node tools/validate_matching.mjs   (boards off the timetable by up to ±20 s per station)
 //
 // The live MTR feed cannot be replayed offline, so this builds the next-train
 // boards a given set of train delays would produce (ttnt = ceil((arrival +
@@ -41,6 +42,17 @@ const T0 = DAY0 + (h * 3600 + m * 60) * 1000
 if (serviceDayStart(T0) !== DAY0) throw new Error("service day mismatch")
 const secOf = (ms) => (ms - DAY0) / 1000
 
+// JITTER=s adds a fixed per-train, per-station offset in [-s, s]: real
+// running times differ from the timetable's, so one train's readings at
+// neighbouring stations do not line up exactly (0 by default).
+const JITTER = Number(process.env.JITTER ?? 0)
+function jitter(id, code) {
+  if (!JITTER) return 0
+  let h = 2166136261
+  for (const ch of `${id}|${code}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  return ((h >>> 0) / 4294967295) * 2 * JITTER - JITTER
+}
+
 // Boards at time `ms`: for every station and direction, the next four trains.
 function boards(ms, delayOf) {
   const tau = (ms - DAY0) / 1000
@@ -54,7 +66,7 @@ function boards(ms, delayOf) {
     trip.stops.forEach((stop, k) => {
       // A terminus board does not list arrivals (the app drops them too).
       if (stop.empty || stop.code === trip.dest) return
-      const arr = (k === firstServed ? stop.dep : stop.arr) + d
+      const arr = (k === firstServed ? stop.dep : stop.arr) + d + jitter(trip.id, stop.code)
       if (arr < tau - 20 || arr > tau + 1500) return
       const key = `${stop.code}|${trip.dir}`
       const list = by.get(key) ?? []

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.27 — 2026-11-04 (`dev`)
+## v0.8.27 — 2026-11-04 (`5a8c276`)
 - Trains more than 10 minutes late keep their Run number. Ice's 10:02 screenshot: the up line reached +605 s, a "–" appeared at 宋皇臺 and Runs 7 and 28 were swapped. The order alignment (`orderPriors`, v0.8.25) only allowed a train to be up to 10 min behind its trip, so a train beyond that could only take a later trip or become "–"; the limit is now 20 min (`ORDER_LATE_MAX`). The alignment also ignored the destination, so a train for Wu Kai Sha could take a Diamond Hill or Mei Foo short working; a board reading now only fits a trip with the same destination.
 - Synthetic check (`tools/validate_matching.mjs`, new "long hold" scenarios: one direction held to +720 s and +900 s at 1 s/s, 8 timetable/time sets): up-line long holds with the page opened mid-incident 5-25% wrong-trip → 0-2%; wrong-trip sum 505.3 → 295.6, "–" sum 48.9 → 26.4; older scenarios unchanged. Still about 20% wrong for down-line +720/+900 s at peak when the page is opened mid-incident. docs/ALGORITHM.md §3n.
 - Hidden panel (tap the footer version 5 times): new 「複製站牌數據」 copies the raw board readings and the drawn trains (Run, direction, position, delay) of the last 10 refreshes, to diagnose a "–" after the fact.

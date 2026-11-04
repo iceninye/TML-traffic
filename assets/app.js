@@ -56,7 +56,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.28", commit: "e941fb2" }
+const BUILD = { version: "0.8.29", commit: "81a713f" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -498,6 +498,7 @@ function placeTrains(snapshot, now) {
   state.measured = measured
 
   let matched = new Map()
+  let approaching = []
   let leftover = readings
   let result = null
   if (book) {
@@ -548,6 +549,7 @@ function placeTrains(snapshot, now) {
       model.setScheduleTimes(hopTimesAround(book, tau))
     }
     matched = result.trips
+    approaching = result.approaching
     leftover = result.leftover
     state.lineDelay = result.lineDelay
     tripHistory = new Map([...matched].map(([id, entry]) => [id, { readings: entry.history, delay: entry.delay }]))
@@ -578,7 +580,7 @@ function placeTrains(snapshot, now) {
   state.fallbackCount = fallback.length
   // Fallback trains report spacing against the headway measured from the
   // boards, never against a timetable.
-  const runs = tracker.update({ matched, fallback, headwayOf: (dir) => measured[dir] }, now)
+  const runs = tracker.update({ matched, approaching, fallback, headwayOf: (dir) => measured[dir] }, now)
   state.owners = ownReadings(snapshot.boards ?? [], matched, runs, now)
   recordBoardLag(matched, runs, now)
   recordBoardSnap(now, matched, leftover, runs)

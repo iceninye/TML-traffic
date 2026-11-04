@@ -24,7 +24,7 @@ import { estimateTrains } from "../lib/mtr-estimate.js"
 import { createNetwork } from "../lib/mtr-network.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
-import { createTimetables, matchReadings, serviceDayStart } from "../lib/tml-timetable.js"
+import { createTimetables, matchReadings, serviceDayStart, tripState } from "../lib/tml-timetable.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (p) => JSON.parse(readFileSync(join(here, "..", p), "utf8"))
@@ -108,6 +108,7 @@ function scenario(name, delays, rampSnaps = RAMP_SNAPS) {
     let left = 0
     let total = 0
     let dashes = 0
+    let missing = 0
     let snaps = 0
     const tracker = createTracker(model)
     for (let i = 0; i < SNAPS_N; i += 1) {
@@ -123,9 +124,25 @@ function scenario(name, delays, rampSnaps = RAMP_SNAPS) {
       const fallback = res.leftover.length
         ? estimateTrains(network.routes_(), res.leftover.map((r) => r.obs), network.point.bind(network)).map((t) => ({ ...t, observedAtMs: t.observedAt, dueAtMs: t.dueAt }))
         : []
-      const runs = tracker.update({ matched: res.trips, fallback, headwayOf: () => 180 }, ms)
+      const runs = tracker.update({ matched: res.trips, approaching: res.approaching, fallback, headwayOf: () => 180 }, ms)
+      // Advance the drawing a second at a time to the next snapshot, as the
+      // app's frames do; what is drawn at the end is what the user sees.
+      let shown = []
+      for (let k = 1; k <= 20; k += 1) shown = tracker.frame(ms + k * 1000)
       if (i < rampSnaps) continue
       snaps += 1
+      // Trains on the line (running or at a station on the way) that are not
+      // drawn: neither as their own Run nor as any dot within 0.6 km.
+      const tauEnd = (ms + 20_000 - DAY0) / 1000
+      for (const trip of live) {
+        const d = delayOf(trip)
+        if (!Number.isFinite(d)) continue
+        const st = tripState(trip, tauEnd - d, model)
+        if (st.phase !== "run" && st.phase !== "dwell") continue
+        if (shown.some((r) => (r.kind === "sched" && r.trip.id === trip.id) || (r.dir === trip.dir && Math.abs(r.pos.km - st.km) < 0.6))) continue
+        missing += 1
+        if (process.env.DEBUG === name && opened === (process.env.OPENED === "1")) console.log(`  snap ${i} missing Run ${trip.run} ${trip.dir} ${st.from}->${st.to} km ${st.km.toFixed(2)}`)
+      }
       dashes += runs.filter((r) => r.kind === "model").length
       total += readings.length
       left += res.leftover.length
@@ -134,12 +151,12 @@ function scenario(name, delays, rampSnaps = RAMP_SNAPS) {
         if (process.env.DEBUG === name && opened === (process.env.OPENED === "1")) console.log(`  snap ${i} ${r.station} ${r.dir}>${r.dest} ttnt ${r.ttnt}: trip ${r.truth.split(":")[1]} (+${Math.round(delayOf({ id: r.truth }))}) taken as ${id.split(":")[1]} (est ${Math.round(e.delay)}) line ${Math.round(res.lineDelay)}`)
       }
     }
-    return { total, left, wrong, dashes: dashes / Math.max(1, snaps) }
+    return { total, left, wrong, dashes: dashes / Math.max(1, snaps), missing: missing / Math.max(1, snaps) }
   }
   if (process.env.DEBUG) console.log([...delays].filter(([, v]) => v).map(([k, v]) => `${k.split(":")[1]}+${Math.round(v)}`).join(" "))
   const warm = run(false)
   const opened = run(true)
-  const pct = (r) => `${((100 * r.left) / r.total).toFixed(1)}% unmatched, ${((100 * r.wrong) / r.total).toFixed(1)}% wrong trip, ${r.dashes.toFixed(1)} "–"`
+  const pct = (r) => `${((100 * r.left) / r.total).toFixed(1)}% unmatched, ${((100 * r.wrong) / r.total).toFixed(1)}% wrong trip, ${r.dashes.toFixed(1)} "–", ${r.missing.toFixed(2)} missing`
   console.log(`${name.padEnd(42)} warm: ${pct(warm)} | opened: ${pct(opened)}`)
   return { warm, opened }
 }

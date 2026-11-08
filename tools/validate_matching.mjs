@@ -24,7 +24,7 @@ import { estimateTrains } from "../lib/mtr-estimate.js"
 import { createNetwork } from "../lib/mtr-network.js"
 import { createModel } from "../lib/tml-model.js"
 import { createTracker } from "../lib/tml-motion.js"
-import { createTimetables, matchReadings, serviceDayStart, tripState } from "../lib/tml-timetable.js"
+import { applyOverlays, createTimetables, matchReadings, serviceDayStart, tripState } from "../lib/tml-timetable.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (p) => JSON.parse(readFileSync(join(here, "..", p), "utf8"))
@@ -32,8 +32,17 @@ const model = createModel(read("data/tml-timetable.json"), read("data/tml-track.
 const network = createNetwork(read("data/tml-network.json"))
 const book = process.argv[2] ?? "DS1101"
 const clock = process.argv[3] ?? "08:56"
-const timetables = createTimetables({ [book]: read(`data/timetables/${book}.json`) }, model)
+// OVERLAY=both: the data/overlays.json trips (week 46 Run 851) are in the feed
+// and in the book the matcher uses; OVERLAY=feed: only in the feed (what the
+// app did before the overlay existed). Dated 2026-11-10, a weekday of week 46.
+const OVERLAY = process.env.OVERLAY ?? ""
+const overlays = read("data/overlays.json").overlays
+const raw = read(`data/timetables/${book}.json`)
+const withExtra = applyOverlays(raw, overlays, "2026-11-10")
+const timetables = createTimetables({ [book]: OVERLAY === "both" ? withExtra : raw }, model)
 const bk = timetables.books[book]
+// The trains that really run (what the boards are built from).
+const truth = OVERLAY ? createTimetables({ [book]: withExtra }, model).books[book] : bk
 
 // Midnight HKT on 2026-10-07 (a Wednesday); schedule times are seconds after it.
 const DAY0 = Date.UTC(2026, 9, 6, 16, 0, 0)
@@ -57,7 +66,7 @@ function jitter(id, code) {
 function boards(ms, delayOf) {
   const tau = (ms - DAY0) / 1000
   const by = new Map()
-  for (const trip of bk.trips) {
+  for (const trip of truth.trips) {
     if (!trip.passenger) continue
     const d = delayOf(trip)
     // A cancelled trip (delay Infinity) never shows on a board.
@@ -88,7 +97,7 @@ function boards(ms, delayOf) {
 }
 
 // Trips on the line at T0 (started, not finished) ordered by position.
-const live = bk.trips.filter((t) => t.passenger && t.start - 600 <= secOf(T0) && t.end + 200 >= secOf(T0))
+const live = truth.trips.filter((t) => t.passenger && t.start - 600 <= secOf(T0) && t.end + 200 >= secOf(T0))
 const byDir = (dir) => live.filter((t) => t.dir === dir).sort((a, b) => a.start - b.start)
 
 // Each scenario runs 30 snapshots (about 10 minutes). Delays build up over

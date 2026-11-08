@@ -21,7 +21,7 @@ import { createTracker } from "../lib/tml-motion.js"
 import { createLagStats } from "../lib/tml-lagstats.js"
 import { createRideLog } from "../lib/tml-ridelog.js"
 import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
-import { calendarDay, createTimetables, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
+import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
 const LANG = "tc"
@@ -34,6 +34,7 @@ const RUNS_KEY = "tml-traffic-show-runs"
 // times; v1 values were relative to the old single-table model.
 const LEARN_KEY = "tml-traffic-learned-v2"
 const LAG_KEY = "tml-traffic-board-lag"
+const ACK_KEY = "tml-traffic-ack-"
 const RIDE_KEY = "tml-traffic-ride-log"
 // The feed only re-reads a station once it is 20 s old, so refresh just after
 // that: every pass then reads all 27 (at 18 s each station was read every 36 s).
@@ -56,7 +57,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.30", commit: "d7798de" }
+const BUILD = { version: "0.8.31", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -250,6 +251,7 @@ const els = {
   mapFallback: document.getElementById("map-fallback"),
   viewSeg: document.getElementById("view-seg"),
   pauseBtn: document.getElementById("pause-btn"),
+  bellBtn: document.getElementById("bell-btn"),
   colLegend: document.getElementById("col-legend"),
   sheet: document.getElementById("sheet"),
   sheetBody: document.getElementById("sheet-body"),
@@ -318,19 +320,27 @@ function requestSpecials() {
   if (specialsRequested) return
   specialsRequested = true
   for (const e of specialEntries) {
-    fetchJson(`data/timetables/${e.file}`).then((data) => timetables.add(data)).catch(() => {})
+    fetchJson(`data/timetables/${e.file}`).then(addBook).catch(() => {})
   }
 }
 
+// Dated additions (data/overlays.json) go onto every book as it is added.
+let overlayData = { overlays: [], notices: [] }
+let overlayDate = null
+const addBook = (data) => timetables.add(applyOverlays(data, overlayData.overlays, overlayDate))
+
 async function boot() {
-  const [netJson, timetable, track, manifest] = await Promise.all([
+  const [netJson, timetable, track, manifest, overlays] = await Promise.all([
     fetchJson("data/tml-network.json"),
     fetchJson("data/tml-timetable.json"),
     fetchJson("data/tml-track.json").catch(() => null),
     // Working timetables are listed in data/timetables/index.json; new ones
     // are added there by tools/parse_timetables.py, no code change needed.
     fetchJson("data/timetables/index.json").catch(() => ({ timetables: [] })),
+    fetchJson("data/overlays.json").catch(() => ({ overlays: [], notices: [] })),
   ])
+  overlayData = overlays
+  overlayDate = serviceDate(Date.now())
   network = createNetwork(netJson)
   places = netJson.places ?? {}
   model = createModel(timetable, track)
@@ -342,7 +352,7 @@ async function boot() {
   const today = calendarDay(Date.now())
   const first = pickFirstEntry(entries, today, date)
   if (first) {
-    timetables.add(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
+    addBook(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
     state.book = first.code
   }
   // The other normal timetables load now; special ones (events, typhoon) only
@@ -350,7 +360,7 @@ async function boot() {
   specialEntries = entries.filter((e) => e.kind === "special")
   for (const e of entries) {
     if (e === first || e.kind === "special") continue
-    fetchJson(`data/timetables/${e.file}`).then((data) => timetables.add(data)).catch(() => {})
+    fetchJson(`data/timetables/${e.file}`).then(addBook).catch(() => {})
   }
   // Section labels and the fallback model use this period's timetable times.
   if (timetables.books[state.book]) {
@@ -373,6 +383,7 @@ async function boot() {
   buildDiagram()
   wireControls()
   render()
+  showNotices()
 
   await refresh(true)
   requestAnimationFrame(loop)
@@ -764,6 +775,43 @@ function onFootTap(event) {
     footTaps = []
     showLagPanel()
   }
+}
+
+/* --------------------------------------------------------------- notices */
+
+// Dated notices (data/overlays.json) tell the user when the app cannot give
+// correct schedule data, e.g. a week on temporary duty sheets whose revised
+// versions the app does not have. The 🔔 prompt shows once per notice until
+// acknowledged (remembered on this device); the 🔔 button reopens it.
+function activeNotices() {
+  return (overlayData.notices ?? []).filter((n) => n.dates?.includes(overlayDate))
+}
+
+function showNotices() {
+  const active = activeNotices()
+  els.bellBtn.hidden = active.length === 0
+  const pending = pendingNotices(active, overlayDate, (id) => readPref(ACK_KEY + id) === "1")
+  if (pending.length) openNoticePanel(pending)
+}
+
+function openNoticePanel(list) {
+  document.getElementById("notice-panel")?.remove()
+  const panel = document.createElement("div")
+  panel.id = "notice-panel"
+  panel.setAttribute("role", "alertdialog")
+  panel.setAttribute("aria-modal", "true")
+  panel.innerHTML =
+    `<div class="notice-box">` +
+    list.map((n) => `<h2>🔔 ${escapeHtml(n.title)}</h2>${String(n.text).split("\n").map((p) => `<p>${escapeHtml(p)}</p>`).join("")}`).join("") +
+    `<div class="notice-btns"><button type="button" data-act="ack">知道了</button></div></div>`
+  panel.addEventListener("click", (event) => {
+    if (event.target.closest("[data-act=ack]")) {
+      for (const n of list) writePref(ACK_KEY + n.id, "1")
+      panel.remove()
+    }
+  })
+  document.body.append(panel)
+  panel.querySelector("button").focus()
 }
 
 function showLagPanel() {
@@ -2482,6 +2530,7 @@ function wireControls() {
     const button = event.target.closest("button")
     if (button) showView(button.dataset.view)
   })
+  els.bellBtn.addEventListener("click", () => openNoticePanel(activeNotices()))
   els.pauseBtn.addEventListener("click", () => {
     state.paused = !state.paused
     writePref(PAUSE_KEY, state.paused ? "1" : "0")

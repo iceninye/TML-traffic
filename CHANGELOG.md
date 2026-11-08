@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.31 — 2026-11-08 (`e9f214f`)
+- Week 46 (Mon 9 to Fri 13 Nov): the extra special train Run 851 from the MTR notice 「司機職務表臨時改動」 is added as a dated overlay (`data/overlays.json`, written by `tools/make_overlay_w46.py`, applied by `applyOverlays` in `lib/tml-timetable.js` to every weekday book on those dates only; any other date loads exactly the same books as before). Trips: YUL 08:10:57 start service → WKS (Down), then WKS 09:13:12 → MEF 10:00 (Up, L, terminates at Mei Foo). The empty moves from W1F/TIST are not drawn. Only the departures and the MEF arrival are from the notice; the stops in between follow an ordinary DS1101 trip, so they are modelled. The notice's WKS time (9:17 relief) conflicts with the 09:13:12 departure, so the Down trip keeps the ordinary running time (WKS 09:12:36).
+- The notice says other trips are affected and the revised 1101xxx/8027xxx sheets are not in the app, so those trips can drift; the matcher already tolerates delays, and the 更份 numbers of the changed duties are not known.
+- 🔔 notice prompt: `data/overlays.json` can hold dated notices; on those dates the page asks the user to acknowledge a short explanation (「知道了」, remembered per device) and shows a 🔔 button in the header to read it again. First one: week 46 temporary duty sheets.
+- Checked with `tools/validate_matching.mjs` (new `OVERLAY=feed|both`: the feed has Run 851, the book lacks it / has it) on DS1101 08:35 and 09:30 and DS8027 08:35: 130, 75 and 130 row-metrics better, none worse; DS1101 09:30 with ±20 s jitter 84 better, none worse. Other validators pass.
+- Shell cache renamed `v64`.
+
 ## v0.8.30 — 2026-11-04 (`d7798de`)
 - Duty Sheets 8024 and 8025 added, and 8027 replaced by its new workbook. Dates from the workbooks, as Ice assigned: 13/11 → 8027, 14/11 (Saturday) → 8024, 15/11 (Sunday) → 8025; all listed under 特別日. 8024 is a KTSP event timetable (443 trips, 41 runs, 130 duty cards), 8025 has the same 378 trips as TML709GC plus the duty numbers (420 trips, 42 runs, 120 duty cards), and the new 8027 (549 trips, 80 runs) now runs on 13/11 instead of 30/10 (that day has passed). Times and trip numbers come from each workbook's `timetable` sheet and platforms are read, as for earlier sheets.
 - New 8027 against the 30/10 one: same duty cards, 13 trips added (DOWN Runs 77-82 from Tsuen Wan West in the evening, new Runs 78 and 82), one UP trip from Diamond Hill removed; base timetable now TML110CB.

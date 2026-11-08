@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v63"
+const CACHE = "tml-traffic-shell-v64"
 const SHELL = [
   "./",
   "index.html",
@@ -28,6 +28,7 @@ const SHELL = [
   "data/tml-network.json",
   "data/tml-timetable.json",
   "data/tml-track.json",
+  "data/overlays.json",
   "data/timetables/index.json",
   "data/timetables/TML1100B.json",
   "data/timetables/TML6090A.json",

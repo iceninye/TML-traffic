@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.31 — 2026-11-08 (`dev`)
+## v0.8.31 — 2026-11-08 (`e9f214f`)
 - Week 46 (Mon 9 to Fri 13 Nov): the extra special train Run 851 from the MTR notice 「司機職務表臨時改動」 is added as a dated overlay (`data/overlays.json`, written by `tools/make_overlay_w46.py`, applied by `applyOverlays` in `lib/tml-timetable.js` to every weekday book on those dates only; any other date loads exactly the same books as before). Trips: YUL 08:10:57 start service → WKS (Down), then WKS 09:13:12 → MEF 10:00 (Up, L, terminates at Mei Foo). The empty moves from W1F/TIST are not drawn. Only the departures and the MEF arrival are from the notice; the stops in between follow an ordinary DS1101 trip, so they are modelled. The notice's WKS time (9:17 relief) conflicts with the 09:13:12 departure, so the Down trip keeps the ordinary running time (WKS 09:12:36).
 - The notice says other trips are affected and the revised 1101xxx/8027xxx sheets are not in the app, so those trips can drift; the matcher already tolerates delays, and the 更份 numbers of the changed duties are not known.
 - 🔔 notice prompt: `data/overlays.json` can hold dated notices; on those dates the page asks the user to acknowledge a short explanation (「知道了」, remembered per device) and shows a 🔔 button in the header to read it again. First one: week 46 temporary duty sheets.

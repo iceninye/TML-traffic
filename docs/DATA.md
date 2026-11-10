@@ -1,6 +1,6 @@
 # 資料檔案結構
 
-全部資料都係 `data/` 入面嘅靜態 JSON，App 啟動時用 `fetch` 讀取。大部分由 `tools/` 腳本生成，**唔好手改**（唯一例外：`data/timetables/index.json` 嘅 `alsoOn`，見下文）。
+全部資料都係 `data/` 入面嘅靜態 JSON，App 啟動時用 `fetch` 讀取。大部分由 `tools/` 腳本生成，**唔好手改**（人手維護嘅例外：`data/calendar.json`，即假期同「某日用邊份 Duty Sheet」；舊有 `alsoOn` 仍然支援但已搬去 calendar，見下文）。
 
 ```
 data/
@@ -35,7 +35,8 @@ data/
 | `base` | Duty Sheet 時間表用邊份官方時間表做底 |
 | `primary` | `true` 先會被優先載入（見 [`DUTYSHEET.md`](DUTYSHEET.md)「選用規則」） |
 | `dates` | 只喺呢啲行車日載入（Excel Duty Sheet 由表內日期讀出，例如 `["2026-10-24"]`）；冇呢個欄位即所有日子 |
-| `alsoOn` | 額外指定日子用呢份 Duty Sheet（例如假日跟星期日 7091）。**手動維護**，解析器重新登記時會保留 |
+| `alsoOn` | （舊做法，仍支援）額外指定日子用呢份 Duty Sheet。新安排請寫入 `data/calendar.json` 嘅 `sheets` |
+| `sameAs` | 同另一份時間表班次完全一樣（只係重新編碼），`file` 指向原檔，App 唔會重複載入 |
 | `revision` / `sha256` | 同一代號重新解析嘅版本同內容雜湊 |
 
 行車日喺**凌晨 4 點**換日；`dates`、`alsoOn` 都按行車日計。

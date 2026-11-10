@@ -63,12 +63,13 @@ node tools/validate_matching.mjs                                  # 班次對應
 | 情況 | 做法 |
 |---|---|
 | Excel Duty Sheet（有指定行車日） | 全自動：`index.json` 項目帶 `dates: ["YYYY-MM-DD"]`，只喺該行車日載入，其他日子唔受影響 |
-| 平日／假日要借用另一份（例如 2026-10-19 用星期日 7091） | 手動喺 `data/timetables/index.json` 嗰份 Duty Sheet 項目加／改 `alsoOn: ["2026-10-19"]`；解析器重新登記時會保留。例子見 `DS7091` |
+| 某一日要指定用邊份（例如 2026-10-31 用 8022） | 編輯 `data/calendar.json` 嘅 `sheets`，加一行 `"2026-10-31": "DS8022"`（code 見 `data/timetables/index.json`），再跑 `node tools/validate_calendar.mjs`。優先過假期同 index 內嘅 `dates` |
+| 公眾假期（星期一至五） | 自動：`data/calendar.json` 嘅 `holidays` 用星期日時間表同 Duty Sheet 7091。星期六假期照用星期六。每年按政府公佈更新一次 |
 | 同一個編號出咗另一個版本（例如 7091 嘅 2026-11-01 馬拉松版，行車日只得一日） | 用 `--code` 另起編號登記：`python3 tools/parse_dutysheet.py file.xlsx --code 7091M`。時間表同更份卡片都寫成 `DS7091M`，標題行顯示「Duty Sheet 7091M」，只喺 `dates` 嗰日載入；原本嘅 7091 其他星期日照用 |
 | 日常平日／星期六／星期日 | 唔使設定：最新、已生效、`primary: true` 嘅 Duty Sheet 自動優先 |
 | 冇 Duty Sheet 嘅日子 | 唔使設定：header 顯示「Duty Sheet 不適用」，Run 編號同更份功能隱藏 |
 
-行車日喺凌晨 4 點換日。`alsoOn` 目前只喺 `index.json` 手動維護；更份卡片 (`data/duties/index.json`) 嘅 `dates` 只記錄 Excel 內嘅行車日。
+行車日喺凌晨 4 點換日。日期指定集中喺 `data/calendar.json`（`alsoOn` 為舊做法，仍支援）；更份卡片 (`data/duties/index.json`) 嘅 `dates` 只記錄 Excel 內嘅行車日。
 
 ### 6. Duty 總表（Index 工作表）→ `data/duty-basic.json`
 
@@ -135,7 +136,7 @@ Run 同秒數全部一樣，KSR／TAW 接班時間等於時間表嘅開出時間
 
 ## 選用規則
 
-- 指定某日用某份 Duty Sheet（例如平日用星期日嗰份）：喺 `index.json` 該 Duty Sheet 項目加 `alsoOn: ["2026-10-19"]`（DS7091 已有 2026-10-19）；解析器重新登記時會保留。
+- 指定某日用某份 Duty Sheet（例如平日用星期日嗰份）：喺 `data/calendar.json` 嘅 `sheets` 加一行（例如 `"2026-10-19": "DS7091"`）。
 
 - `index.json` 入面 `source: "dutysheet"` 嘅項目，`primary: true` 先會被載入：生效日 ≥ 底表生效日。Duty Sheet 時間表以底表為基礎：Duty Sheet 證實嘅班次（包括錦上路等中途開出嘅出廠車）沿用底表逐站時間、車次號；只有底表冇嘅總站班次先重建。
 - 啟動時：生效日已到嘅最新 primary Duty Sheet 優先，否則日曆對應嘅正常時間表。之後仍按看板讀數（`pickDay`）校正。

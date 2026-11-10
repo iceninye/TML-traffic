@@ -1,0 +1,166 @@
+{
+ "note": "日期對應（人手維護）。holidays：香港政府公佈嘅公眾假期，星期一至五嘅假期當日預設用星期日時間表同 Duty Sheet（星期六假期照用星期六；實時班次可以覆蓋）。sheets：某一日指定用邊份時間表／Duty Sheet（用 data/timetables/index.json 嘅 code），優先過假期同 index 內嘅 dates／alsoOn。每年更新一次 holidays；檢查：node tools/validate_calendar.mjs",
+ "holidays": [
+  {
+   "date": "2026-01-01",
+   "name": "元旦"
+  },
+  {
+   "date": "2026-02-17",
+   "name": "農曆年初一"
+  },
+  {
+   "date": "2026-02-18",
+   "name": "農曆年初二"
+  },
+  {
+   "date": "2026-02-19",
+   "name": "農曆年初三"
+  },
+  {
+   "date": "2026-04-03",
+   "name": "耶穌受難節"
+  },
+  {
+   "date": "2026-04-04",
+   "name": "耶穌受難節翌日"
+  },
+  {
+   "date": "2026-04-06",
+   "name": "清明節翌日"
+  },
+  {
+   "date": "2026-04-07",
+   "name": "復活節星期一翌日"
+  },
+  {
+   "date": "2026-05-01",
+   "name": "勞動節"
+  },
+  {
+   "date": "2026-05-25",
+   "name": "佛誕翌日"
+  },
+  {
+   "date": "2026-06-19",
+   "name": "端午節"
+  },
+  {
+   "date": "2026-07-01",
+   "name": "香港特別行政區成立紀念日"
+  },
+  {
+   "date": "2026-09-26",
+   "name": "中秋節翌日"
+  },
+  {
+   "date": "2026-10-01",
+   "name": "國慶日"
+  },
+  {
+   "date": "2026-10-19",
+   "name": "重陽節翌日"
+  },
+  {
+   "date": "2026-12-25",
+   "name": "聖誕節"
+  },
+  {
+   "date": "2026-12-26",
+   "name": "聖誕節後第一個周日"
+  },
+  {
+   "date": "2027-01-01",
+   "name": "元旦",
+   "verified": false
+  },
+  {
+   "date": "2027-02-06",
+   "name": "農曆年初一",
+   "verified": false
+  },
+  {
+   "date": "2027-02-08",
+   "name": "農曆年初三",
+   "verified": false
+  },
+  {
+   "date": "2027-02-09",
+   "name": "農曆年初四",
+   "verified": false
+  },
+  {
+   "date": "2027-03-26",
+   "name": "耶穌受難節",
+   "verified": false
+  },
+  {
+   "date": "2027-03-27",
+   "name": "耶穌受難節翌日",
+   "verified": false
+  },
+  {
+   "date": "2027-03-29",
+   "name": "復活節星期一",
+   "verified": false
+  },
+  {
+   "date": "2027-04-05",
+   "name": "清明節",
+   "verified": false
+  },
+  {
+   "date": "2027-05-01",
+   "name": "勞動節",
+   "verified": false
+  },
+  {
+   "date": "2027-05-13",
+   "name": "佛誕",
+   "verified": false
+  },
+  {
+   "date": "2027-06-09",
+   "name": "端午節",
+   "verified": false
+  },
+  {
+   "date": "2027-07-01",
+   "name": "香港特別行政區成立紀念日",
+   "verified": false
+  },
+  {
+   "date": "2027-09-16",
+   "name": "中秋節翌日",
+   "verified": false
+  },
+  {
+   "date": "2027-10-01",
+   "name": "國慶日",
+   "verified": false
+  },
+  {
+   "date": "2027-10-08",
+   "name": "重陽節",
+   "verified": false
+  },
+  {
+   "date": "2027-12-25",
+   "name": "聖誕節",
+   "verified": false
+  },
+  {
+   "date": "2027-12-27",
+   "name": "聖誕節後第一個周日",
+   "verified": false
+  }
+ ],
+ "holidaysSource": {
+  "2026": "https://www.info.gov.hk/gia/general/202505/16/P2025051300353.htm",
+  "2027": "二手來源（HR Online 報道政府憲報），日期同節日對得上，未對憲報原文；請核對後移走 verified:false"
+ },
+ "sheets": {
+  "2026-10-19": "DS7091",
+  "2026-10-31": "DS8022"
+ }
+}

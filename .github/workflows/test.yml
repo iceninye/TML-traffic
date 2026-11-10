@@ -18,7 +18,9 @@ jobs:
         with:
           node-version: 22
       - name: Data
-        run: node tools/validate_data.mjs
+        run: |
+          node tools/validate_data.mjs
+          node tools/validate_calendar.mjs
       - name: Duty cards and hours
         run: |
           node tools/validate_duties.mjs

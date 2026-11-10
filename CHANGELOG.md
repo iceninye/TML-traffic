@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.32 — 2026-11-10 (`dev`)
+## v0.8.32 — 2026-11-10 (`bc1fff7`)
 - 用戶睇得明：公眾假期（星期一至五）而家預設用星期日時間表同 Duty Sheet 7091，唔使等實時班次先轉；時間表載入失敗會顯示提示；離線可用嘅時間表更完整。
 - 新 `data/calendar.json`：香港政府公佈嘅公眾假期（2026 已對政府新聞稿，2027 為二手來源待核對）同「某日指定用邊份」（`sheets`）。2026-10-19、2026-10-31 嘅 `alsoOn` 搬咗入嚟（`index.json` 兩份嘅 `alsoOn` 移除，行為不變）。`calendarDay`/`entriesForDate`/`pickFirstEntry` 多一個可選參數，`model.setHolidays` 令假期用星期日時段。
 - `tools/validate_calendar.mjs`（加入 CI）：日期格式、指定嘅 code 存在、同一日兩份 Duty Sheet 撞日要指明、假期清單快用完提醒。

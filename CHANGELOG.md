@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.36 — 2026-11-10 (`dev`)
+## v0.8.36 — 2026-11-10 (`713ecd8`)
 - Run 851 times corrected (Ice, 2026-11-10): the train reaches Wu Kai Sha at 09:13:12 and leaves at 09:17 (v0.8.31 had them swapped), then runs to Mei Foo (10:00, L). The stops in between are still modelled (an ordinary DS1101 trip scaled to those times). The 🔔 text says the same.
 - Tue 17/11 uses Duty Sheet 8027 (`data/calendar.json` `sheets`; the sheet's own `dates` stay 13/11). No revised week-46 sheets exist (Run 851 is a test run), so other trips that week can still drift.
 - Checked with `tools/validate_matching.mjs OVERLAY=feed|both` (feed has Run 851; book without / with it): DS1101 10:00 32 better, none worse; 08:35 115 better, 1 worse (+0.22 missing); 09:00 35 better, 21 worse (all ≤ +0.3 points, mostly "–" in long holds); totals at 09:00, wrong-trip share summed over 17 scenarios 82.9 → 67.8 (page open) and 135.4 → 120.4 (opened), missing 1.4 → 0.4. validate_calendar and the other validators pass.

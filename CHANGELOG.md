@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.36 — 2026-11-10 (`713ecd8`)
+- Run 851 times corrected (Ice, 2026-11-10): the train reaches Wu Kai Sha at 09:13:12 and leaves at 09:17 (v0.8.31 had them swapped), then runs to Mei Foo (10:00, L). The stops in between are still modelled (an ordinary DS1101 trip scaled to those times). The 🔔 text says the same.
+- Tue 17/11 uses Duty Sheet 8027 (`data/calendar.json` `sheets`; the sheet's own `dates` stay 13/11). No revised week-46 sheets exist (Run 851 is a test run), so other trips that week can still drift.
+- Checked with `tools/validate_matching.mjs OVERLAY=feed|both` (feed has Run 851; book without / with it): DS1101 10:00 32 better, none worse; 08:35 115 better, 1 worse (+0.22 missing); 09:00 35 better, 21 worse (all ≤ +0.3 points, mostly "–" in long holds); totals at 09:00, wrong-trip share summed over 17 scenarios 82.9 → 67.8 (page open) and 135.4 → 120.4 (opened), missing 1.4 → 0.4. validate_calendar and the other validators pass.
+- Shell cache renamed `v69`.
+
 ## v0.8.35 — 2026-11-10 (`4404cbc`)
 - 用戶睇得明：平日開頁少載約 1 MB 資料（星期六／日嘅時間表唔再一開頁就載，要用時先載），開得快啲；畫面同行為冇變。
 - 按日型載入：開頁只載今日日型（及已選嗰份）嘅正常時間表；其他日型同特別時間表喺列車同已載入時間表唔吻合時先載（同原有「特別時間表」機制一樣）。模擬班次測試：平日開頁時間表檔 6 → 2 個；「未公佈假期」同特別時間表情境最終結果同 v0.8.34 一樣。

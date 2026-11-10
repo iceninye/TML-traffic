@@ -3,9 +3,10 @@
 
 Source: the MTR notice "司機職務表臨時改動" (duty sheets 1101xxx / 8027xxx, for
 week 46 only). Only the revenue legs are modelled: YUL2 08:10:57 start service
-towards WKS, and WKS 09:13:12 to MEF 10:00 (L, terminates at Mei Foo). The
-intermediate stops follow an ordinary trip of DS1101 (YUL-WKS as is, WKS-MEF
-scaled to arrive at 10:00:00), so they are modelled, not published times.
+towards WKS (arrives 09:13:12), and WKS 09:17 to MEF 10:00 (L, terminates at
+Mei Foo). Ice confirmed on 2026-11-10 that the notice's WKS times are 09:13:12
+arrival and 09:17 departure. The intermediate stops follow an ordinary trip of
+DS1101 scaled to those times, so they are modelled, not published times.
 """
 import json
 from pathlib import Path
@@ -37,10 +38,13 @@ def build(stops, dep0, scale=1.0, arr_end=None):
 def hms(h, m, s):
     return h * 3600 + m * 60 + s
 
-down = build(pick("DOWN", "YUL", "WKS"), hms(8, 10, 57))
+tpl_down = pick("DOWN", "YUL", "WKS")
+dep_down = hms(8, 10, 57)
+arr_down = hms(9, 13, 12)
+down = build(tpl_down, dep_down, (arr_down - dep_down) / (tpl_down[-1][1] - tpl_down[0][2]), arr_down)
 tpl_up = pick("UP", "WKS", "MEF")
 tpl_len = tpl_up[-1][1] - tpl_up[0][2]
-dep_up = hms(9, 13, 12)
+dep_up = hms(9, 17, 0)
 up = build(tpl_up, dep_up, (hms(10, 0, 0) - dep_up) / tpl_len, hms(10, 0, 0))
 
 dates = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"]
@@ -60,7 +64,7 @@ out = {
         "id": "2026-w46-duty-sheets",
         "dates": dates,
         "title": "Week 46 臨時司機職務表",
-        "text": "11月9日至13日（星期一至五）港鐵用臨時司機職務表（1101xxx／8027xxx），加開臨時加班車 Run 851（元朗 08:10 開出往烏溪沙，09:13 烏溪沙開出，美孚 10:00 終點，L），亦會影響部份班次。\n本 App 未有新版職務表，只加入咗 Run 851，其他班次嘅時間、Run 編號同更份號碼可能有輕微偏差，請以車長職務表為準。",
+        "text": "11月9日至13日（星期一至五）港鐵用臨時司機職務表（1101xxx／8027xxx），加開臨時加班車 Run 851（元朗 08:10 開出往烏溪沙，09:13 到烏溪沙、09:17 開出，美孚 10:00 終點，L），亦會影響部份班次。\n本 App 未有新版職務表，只加入咗 Run 851，其他班次嘅時間、Run 編號同更份號碼可能有輕微偏差，請以車長職務表為準。",
     }],
 }
 (root / "data/overlays.json").write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n")

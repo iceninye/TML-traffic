@@ -3,6 +3,15 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.32 — 2026-11-10 (`dev`)
+- 用戶睇得明：公眾假期（星期一至五）而家預設用星期日時間表同 Duty Sheet 7091，唔使等實時班次先轉；時間表載入失敗會顯示提示；離線可用嘅時間表更完整。
+- 新 `data/calendar.json`：香港政府公佈嘅公眾假期（2026 已對政府新聞稿，2027 為二手來源待核對）同「某日指定用邊份」（`sheets`）。2026-10-19、2026-10-31 嘅 `alsoOn` 搬咗入嚟（`index.json` 兩份嘅 `alsoOn` 移除，行為不變）。`calendarDay`/`entriesForDate`/`pickFirstEntry` 多一個可選參數，`model.setHolidays` 令假期用星期日時段。
+- `tools/validate_calendar.mjs`（加入 CI）：日期格式、指定嘅 code 存在、同一日兩份 Duty Sheet 撞日要指明、假期清單快用完提醒。
+- TML1110A 同 TML1100B 班次完全一樣：`index.json` 改為 `sameAs` 別名並刪走重複檔（-317 KB），App 唔再重複載入；`parse_timetables.py` 遇到完全相同嘅班次會自動登記別名，並提醒「新正常時間表新過 Duty Sheet」。
+- `sw.js`：離線預載由 `index.json` 讀（唔再寫死 3 個代號），只載正常時間表同未過期嘅 dated Duty Sheet；殼層 cache 改 `v65`。
+- 清走兩個 `.DS_Store`、死碼 `fairLineReads`；修正過時註解同文件。
+- 比較（對 v0.8.31）：10 項驗證輸出逐行一樣（只有 DS7091／DS8022 的 alsoOn 說明行因搬到 calendar 而不同）；2026-10 至 2027-01 每日揀嘅表只喺 2026-10-01、12-25、2027-01-01 由平日 DS1101 變 DS7091（10-19 本來已係 DS7091）。
+
 ## v0.8.31 — 2026-11-08 (`e9f214f`)
 - Week 46 (Mon 9 to Fri 13 Nov): the extra special train Run 851 from the MTR notice 「司機職務表臨時改動」 is added as a dated overlay (`data/overlays.json`, written by `tools/make_overlay_w46.py`, applied by `applyOverlays` in `lib/tml-timetable.js` to every weekday book on those dates only; any other date loads exactly the same books as before). Trips: YUL 08:10:57 start service → WKS (Down), then WKS 09:13:12 → MEF 10:00 (Up, L, terminates at Mei Foo). The empty moves from W1F/TIST are not drawn. Only the departures and the MEF arrival are from the notice; the stops in between follow an ordinary DS1101 trip, so they are modelled. The notice's WKS time (9:17 relief) conflicts with the 09:13:12 departure, so the Down trip keeps the ordinary running time (WKS 09:12:36).
 - The notice says other trips are affected and the revised 1101xxx/8027xxx sheets are not in the app, so those trips can drift; the matcher already tolerates delays, and the 更份 numbers of the changed duties are not known.

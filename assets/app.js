@@ -57,7 +57,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.31", commit: "e9f214f" }
+const BUILD = { version: "0.8.32", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -315,6 +315,7 @@ const t = () => STRINGS[LANG]
 // Special timetables (events, typhoon) are fetched once, the first time the
 // normal ones fit the boards badly; pickDay then considers them too.
 let specialEntries = []
+let bootProblem = null
 let specialsRequested = false
 function requestSpecials() {
   if (specialsRequested) return
@@ -330,7 +331,7 @@ let overlayDate = null
 const addBook = (data) => timetables.add(applyOverlays(data, overlayData.overlays, overlayDate))
 
 async function boot() {
-  const [netJson, timetable, track, manifest, overlays] = await Promise.all([
+  const [netJson, timetable, track, manifest, overlays, calendar] = await Promise.all([
     fetchJson("data/tml-network.json"),
     fetchJson("data/tml-timetable.json"),
     fetchJson("data/tml-track.json").catch(() => null),
@@ -338,28 +339,38 @@ async function boot() {
     // are added there by tools/parse_timetables.py, no code change needed.
     fetchJson("data/timetables/index.json").catch(() => ({ timetables: [] })),
     fetchJson("data/overlays.json").catch(() => ({ overlays: [], notices: [] })),
+    // Public holidays and one-off date to sheet choices (data/calendar.json).
+    fetchJson("data/calendar.json").catch(() => ({ holidays: [], sheets: {} })),
   ])
+  const holidays = new Set((calendar.holidays ?? []).map((h) => h.date))
   overlayData = overlays
   overlayDate = serviceDate(Date.now())
   network = createNetwork(netJson)
   places = netJson.places ?? {}
   model = createModel(timetable, track)
+  model.setHolidays(holidays)
   timetables = createTimetables({}, model)
   // The calendar's timetable first, so the first trains appear quickly; the
   // rest load in the background and become candidates when they arrive.
   const date = serviceDate(Date.now())
-  const entries = entriesForDate((manifest.timetables ?? []).filter((e) => e.source !== "dutysheet" || e.primary), date)
-  const today = calendarDay(Date.now())
-  const first = pickFirstEntry(entries, today, date)
+  const entries = entriesForDate((manifest.timetables ?? []).filter((e) => e.source !== "dutysheet" || e.primary), date, calendar)
+  const today = calendarDay(Date.now(), holidays)
+  const first = pickFirstEntry(entries, today, date, calendar)
   if (first) {
-    addBook(await fetchJson(`data/timetables/${first.file}`).catch(() => null))
+    const book = await fetchJson(`data/timetables/${first.file}`).catch(() => null)
+    addBook(book)
     state.book = first.code
+    if (!book) bootProblem = "時間表載入失敗（網絡或離線），列車位置可能唔準"
   }
   // The other normal timetables load now; special ones (events, typhoon) only
   // when the normal ones stop fitting the boards (see requestSpecials).
   specialEntries = entries.filter((e) => e.kind === "special")
+  const loadedFiles = new Set(first ? [first.file] : [])
   for (const e of entries) {
-    if (e === first || e.kind === "special") continue
+    // An entry that points at an earlier entry's file (same timetable re-issued
+    // under a new code, "sameAs") is not fetched twice.
+    if (e === first || e.kind === "special" || loadedFiles.has(e.file)) continue
+    loadedFiles.add(e.file)
     fetchJson(`data/timetables/${e.file}`).then(addBook).catch(() => {})
   }
   // Section labels and the fallback model use this period's timetable times.
@@ -1256,6 +1267,8 @@ function render() {
     showAlert(`<b>${s.notice}</b> ${[...notices].map(escapeHtml).join(" · ")}`)
   } else if (delayed > 0) {
     showAlert(`<b>${s.delayNote}</b>`)
+  } else if (bootProblem && !timetables?.books[state.book]) {
+    showAlert(`<b>${escapeHtml(bootProblem)}</b>`)
   } else {
     showAlert("")
   }

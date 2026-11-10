@@ -2,7 +2,7 @@
 // MTR feed and any map tiles are left alone so nothing stale is ever replayed
 // while the network is up.
 
-const CACHE = "tml-traffic-shell-v64"
+const CACHE = "tml-traffic-shell-v65"
 const SHELL = [
   "./",
   "index.html",
@@ -29,13 +29,11 @@ const SHELL = [
   "data/tml-timetable.json",
   "data/tml-track.json",
   "data/overlays.json",
+  "data/calendar.json",
   "data/timetables/index.json",
-  "data/timetables/TML1100B.json",
-  "data/timetables/TML6090A.json",
-  "data/timetables/TML7090.json",
 ]
 
-// Best effort: the Duty cards and the official duty hours for offline use. Every sheet
+// Best effort: the Duty cards, the official duty hours and the normal timetables for offline use. Every sheet
 // in index.json is cached, so a new sheet needs no change here.
 async function cacheDuties(cache) {
   try {
@@ -46,7 +44,12 @@ async function cacheDuties(cache) {
       return response
     }
     const index = await (await get("data/duties/index.json")).json()
-    await Promise.all([get("data/duty-basic.json"), get("data/duty-codes.json"), ...index.sheets.map((sheet) => get(`data/duties/${sheet.file}`))])
+    // The normal timetables come from the manifest, so a new or renamed one
+    // needs no change here (special ones are fetched online when needed).
+    const manifest = await (await get("data/timetables/index.json")).json()
+    const today = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10)
+    const books = [...new Set((manifest.timetables ?? []).filter((e) => e.kind === "normal" && (!e.dates || e.dates.at(-1) >= today)).map((e) => e.file))]
+    await Promise.all([get("data/duty-basic.json"), get("data/duty-codes.json"), ...index.sheets.map((sheet) => get(`data/duties/${sheet.file}`)), ...books.map((file) => get(`data/timetables/${file}`))])
   } catch {
     // the page fetches them itself when online
   }

@@ -450,6 +450,16 @@ def iso_date(text):
 DAY_BY_TYPE = {"1": "weekday", "5": "weekday", "6": "saturday", "7": "sunday"}
 
 
+def same_trips(path, out):
+    """True when the stored timetable at `path` has exactly these trips."""
+    try:
+        with open(path, encoding="utf8") as fh:
+            old = json.load(fh)
+    except OSError:
+        return False
+    return old.get("trips") == out["trips"] and old.get("sectionA") == out["sectionA"]
+
+
 def main(paths):
     sys.path.insert(0, HERE)
     from validate_timetable import validate
@@ -495,12 +505,26 @@ def main(paths):
                 print(f"  ✗ {e}")
             failed = True
             continue
-        with open(os.path.join(folder, f"{code}.json"), "w", encoding="utf8") as fh:
-            json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
-            fh.write("\n")
-        entry = {"code": code, "file": f"{code}.json", "day": day,
-                 "kind": kind,
-                 "effective": iso_date(eff.group(1)) if eff else None}
+        effective = iso_date(eff.group(1)) if eff else None
+        # The same trips re-issued under a new code (recompiled PDF): register an
+        # alias that points at the existing file instead of storing a copy.
+        twin = next((e for e in index["timetables"] if e["code"] != code and not e.get("sameAs") and e.get("day") == day
+                     and e.get("kind") == kind and e.get("source") != "dutysheet"
+                     and same_trips(os.path.join(folder, e["file"]), out)), None)
+        if twin:
+            entry = {"code": code, "file": twin["file"], "day": day, "kind": kind, "effective": effective, "sameAs": twin["code"]}
+            print(f"{code}: 同 {twin['code']} 班次完全一樣，只登記別名（唔另存一份）")
+        else:
+            with open(os.path.join(folder, f"{code}.json"), "w", encoding="utf8") as fh:
+                json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
+                fh.write("\n")
+            entry = {"code": code, "file": f"{code}.json", "day": day,
+                     "kind": kind,
+                     "effective": effective}
+        newer_sheets = [e["code"] for e in index["timetables"] if e.get("source") == "dutysheet" and e.get("day") == day
+                        and kind == "normal" and (e.get("effective") or "") < (effective or "") and not e.get("dates")]
+        if newer_sheets and not twin:
+            print(f"  ⚠ 呢份新正常時間表（{effective}）新過 Duty Sheet {', '.join(newer_sheets)}：App 開頁仍先用 Duty Sheet，實時班次配對得更好先會自動轉。請盡快攞新 Duty Sheet。")
         index["timetables"] = [e for e in index["timetables"] if e["code"] != code] + [entry]
         print(f"{code}: PASS, registered as {day}")
         for n in notes:

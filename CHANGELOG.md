@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.34 — 2026-11-10 (`dev`)
+## v0.8.34 — 2026-11-10 (`c726a97`)
 - 用戶睇得明：畫面右上新增「？ 說明」，列出列車顏色／虛線／L 嘅意思、倒數同狀態字眼，同幾個隱藏功能（橙點、Duty Sheet 標籤、複製站牌數據）點用。
 - 頁腳同說明面板顯示資料範圍：現用嘅常規 Duty Sheet（平日 1101、星期六 6091、星期日／假期 7091）同特別日資料去到幾時，一眼睇到有冇過期。
 - 按鈕同關閉掣加高到 36px，更易撳（其餘字體同版面不變）。

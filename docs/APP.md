@@ -194,9 +194,9 @@ python3 -m http.server 8790 --bind 127.0.0.1
 # 4. 切地圖 → 應該出真地圖；再切回路綫圖 → 列車點仍然貼住路軌
 
 # 5. 語法檢查（無 bundler，所以逐檔 parse）
-node --check assets/app.js
-node --check lib/mtr-estimate.js
-node --check lib/mtr-run.js
+node --input-type=module --check < assets/app.js
+node --input-type=module --check < lib/mtr-estimate.js
+node --input-type=module --check < lib/mtr-run.js
 
 # 6. 引擎仍然正常
 node tools/probe-tml.mjs

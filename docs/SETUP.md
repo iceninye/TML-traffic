@@ -17,7 +17,7 @@ python3 -m http.server 8790 --bind 127.0.0.1
 - 要用 HTTP server，直接開 `index.html`（`file://`）會因 ES module 同 `fetch` 載入資料失敗。
 - 實時班次直接由瀏覽器向 `https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php` 攞（該端點允許跨域），本機同線上一樣；網絡連唔到就會顯示原因（逾時、HTTP 狀態、網絡錯誤）。
 - 註冊咗 service worker（`sw.js`），改完檔案後如果見到舊畫面，開發者工具 → Application → Service Workers 撳 Unregister，或者硬重新整理。
-- 逐檔語法檢查：`node --check assets/app.js`（其他 `lib/*.js` 同理）。
+- 逐檔語法檢查：`node --input-type=module --check < assets/app.js`（其他 `lib/*.js` 同理；注意單用 `node --check 檔案` 對 ES module 有時唔會報語法錯）。
 
 可選工具嘅環境：
 
@@ -81,7 +81,7 @@ npx wrangler deploy             # 真正部署（要先 npx wrangler login）
 
 | 指令 | 檢查咩 | 需要網絡 |
 |---|---|---|
-| `node --check assets/app.js` | 語法 | 否 |
+| `node --input-type=module --check < assets/app.js` | 語法 | 否 |
 | `node tools/validate_matching.mjs` | 延誤情境下嘅班次對應（合成讀數） | 否 |
 | `node tools/validate_position.mjs` | 被扣列車嘅列車點位置（合成讀數） | 否 |
 | `node tools/validate_duties.mjs` | 更份卡片資料同當值判斷（用 `data/duties/` 真資料） | 否 |

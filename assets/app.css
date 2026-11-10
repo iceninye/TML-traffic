@@ -231,6 +231,7 @@ button {
 }
 
 .btn {
+  min-height: 36px;
   padding: 5px 11px;
   font-size: 12.5px;
   border: 1px solid var(--edge);
@@ -627,8 +628,8 @@ svg.diagram {
   position: absolute;
   top: 10px;
   right: 12px;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--panel-2);
   color: var(--muted);
@@ -886,3 +887,19 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 #notice-panel p { margin: 0 0 8px; }
 #notice-panel .notice-btns { display: flex; justify-content: flex-end; margin-top: 12px; }
 #notice-panel button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 0; background: var(--warn); color: #000; cursor: pointer; }
+
+/* Help / legend sheet */
+.help-h { margin: 14px 0 6px; font-size: 13px; color: var(--muted); font-weight: 650; }
+.help-row { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; font-size: 14px; line-height: 1.5; }
+.help-sw { flex: none; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; border: 2px solid transparent; }
+.help-sw.none { display: none; }
+.help-sw[data-k="up"] { background: var(--up); }
+.help-sw[data-k="down"] { background: var(--down); }
+.help-sw[data-k="short"] { background: var(--panel-2); border: 2px dashed var(--text); }
+.help-sw[data-k="late"] { background: var(--late); }
+.help-sw[data-k="alarm"] { background: var(--alarm); border-color: #fff; }
+.help-sw[data-k="gap"] { background: var(--gap); }
+.help-sw[data-k="delay"] { background: var(--panel-2); border: 3px solid var(--warn); }
+.help-sw[data-k="last"] { background: var(--muted); opacity: 0.6; }
+.sheet .help-data { margin: 14px 0 0; }
+.foot-data { opacity: 0.85; }

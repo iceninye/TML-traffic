@@ -44,4 +44,4 @@ jobs:
           python tools/update.py --check
       - name: Parse every script
         run: |
-          for f in assets/*.js lib/*.js sw.js; do node --check "$f"; done
+          for f in assets/*.js lib/*.js sw.js; do node --input-type=module --check < "$f" || { echo "syntax error in $f"; exit 1; }; done

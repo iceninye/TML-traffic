@@ -1,6 +1,8 @@
 .git
 .github
 tools
+worker
+requirements.txt
 docs
 wrangler.jsonc
 .assetsignore

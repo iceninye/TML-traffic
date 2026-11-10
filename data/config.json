@@ -1,0 +1,4 @@
+{
+ "note": "feedProxy: 可選嘅班次邊緣快取網址（見 worker/README.md），空字串＝直接讀 data.gov.hk。",
+ "feedProxy": ""
+}

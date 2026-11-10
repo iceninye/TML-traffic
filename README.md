@@ -58,11 +58,14 @@
 index.html
 assets/app.css        手寫 CSS
 assets/app.js         UI 層（雙軌路綫圖、雙色地圖、列車卡）
+assets/strings.js     介面文字（繁體中文）
+assets/helpers.js     共用小工具（HTML 轉義、時間格式、localStorage 包裝）
 assets/icon.svg
 sw.js                 offline app shell（改版要改 cache 名）
 wrangler.jsonc        Cloudflare Workers 靜態資源設定（根目錄即網站）
 .assetsignore         部署時略過嘅檔案
-lib/mtr-*.js          抽取返嚟嘅估算引擎（串連各站倒數 → 列車）
+lib/mtr-*.js          抽取返嚟嘅估算引擎（串連各站倒數 → 列車）；mtr-proxy.js 係可選嘅班次邊緣快取客戶端
+worker/               可選：港鐵班次邊緣快取 Worker（預設關閉，見 worker/README.md）
 lib/tml-model.js      時間表位置模型（行車 + 停站 + S 曲線 + 時段）
 lib/tml-timetable.js  時間表對應：讀數 → 班次 → 延誤 → 位置
 lib/tml-motion.js     追蹤 + 列車時鐘平滑
@@ -72,6 +75,8 @@ data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
 data/timetables/       工作時間表（index.json 清單 + 每份一個 <代號>.json）
 data/duties/           更份卡片（index.json + DS<代號>.json）
+data/calendar.json    公眾假期同「某日用邊份」（人手維護）
+data/config.json      可選設定（feedProxy）
 tools/                資料解析、驗證同 probe 腳本
 docs/                 演算法、模型、App 設計文件
 ```

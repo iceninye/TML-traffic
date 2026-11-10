@@ -21,6 +21,9 @@ import { createTracker } from "../lib/tml-motion.js"
 import { createLagStats } from "../lib/tml-lagstats.js"
 import { createRideLog } from "../lib/tml-ridelog.js"
 import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealMates, onDuty } from "../lib/tml-duties.js"
+import { createProxyFetch } from "../lib/mtr-proxy.js"
+import { STRINGS } from "./strings.js"
+import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -57,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.34", commit: "c726a97" }
+const BUILD = { version: "0.8.35", commit: "4404cbc" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -74,187 +77,6 @@ const INTERCHANGE = {
   TAW: [["EAL", "#5EB6E4"]],
 }
 const TUNNEL = { from: "KSR", to: "TWW", name: "大欖隧道" }
-
-const STRINGS = {
-  tc: {
-    title: "屯馬綫列車動態圖",
-    sub: "Tuen Ma Line · 實時推算",
-    diagram: "路綫圖",
-    map: "地圖",
-    pause: "暫停",
-    showRuns: "顯示 Run 編號",
-    resume: "繼續",
-    up: "上行",
-    down: "下行",
-    toTum: "往屯門",
-    toWks: "往烏溪沙",
-    terminus: "總站",
-    live: "LIVE",
-    trainsDir: (u, d) => `▲ ${u} · ▼ ${d} 班`,
-    stations: (n) => `${n}/27 站`,
-    updated: (s) => (s < 60 ? `${s} 秒前更新` : `${Math.floor(s / 60)} 分鐘前更新`),
-    loading: "讀取中…",
-    feedDown: (r, why) => `暫時連唔到港鐵班次資料${why ? `（${why}）` : ""}，${r} 秒後自動重試`,
-    feedWhy: { timeout: "逾時", network: "網絡錯誤，如用緊 VPN／代理，請將 data.gov.hk 設為直連", data: "資料無法讀取", app: "程式錯誤" },
-    mtrPaused: (r) => `港鐵暫停提供實時班次，${r} 秒後再試`,
-    mtrNotice: "港鐵通告",
-    mtrNoticeNone: "港鐵暫停提供實時班次資料",
-    noticeMore: "詳情",
-    stale: (a, r) => `資料延遲（${a < 60 ? `${a} 秒` : `${Math.floor(a / 60)} 分鐘`}前），列車按時間表推算・${r} 秒後重試`,
-    offline: "網絡離線，恢復後自動更新",
-    paused: "已暫停更新",
-    min: "分",
-    due: "即將",
-    platform: "月台",
-    scheduled: "預定",
-    delayBadge: "延誤",
-    delayNote: "港鐵報告有列車延誤，列車位置以黃色外框標示",
-    notice: "服務提示",
-    position: "現時位置",
-    running: (a, b) => `行駛中 ${a} → ${b}`,
-    dwelling: (a) => `${a} 停站中`,
-    waiting: (a) => `${a} 即將開出`,
-    waitingIn: (a, m) => `${a} 候發，約 ${m} 分鐘後開出`,
-    duty: "更份",
-    relief: (place, duty) => `（${place} 換 ${duty}）`,
-    dutyAll: "全日更份 ›",
-    dutyPlan: (run) => `Run ${run} 全日更份`,
-    dutyPickUp: "接車",
-    dutyRelief: "交車",
-    dutyNow: "現時",
-    toDepot: "回廠",
-    dutyBack: "返回列車資料",
-    dutyNote: (code) => `來源：Duty Sheet ${code}。接車時間為開出時間（準確到秒）；交車時間為列車到站時間（按時間表）。`,
-    noDuties: "呢架車冇更份資料（只有 Duty Sheet 時間表先有）",
-    lastTrip: "L 尾程",
-    lastTripNote: "最後一程，到站後回廠",
-    schedDep: "原定開出",
-    expectedDep: (clock) => `（預計 ${clock}）`,
-    arrived: (a) => `已抵達 ${a}`,
-    dest: "目的地",
-    nextStops: "前方各站（推算）",
-    speed: "車速",
-    shortTrip: "短程車",
-    follow: "跟隨",
-    following: "跟隨中",
-    close: "閂",
-    noTrains: "暫時冇班次資料",
-    mapUnavailable: "地圖開唔到（瀏覽器唔支援 WebGL 或網絡問題），已自動轉回路綫圖。",
-    mapLoading: "載入地圖…",
-    attribution: "路軌 © OpenStreetMap 貢獻者 (ODbL) · 底圖 OpenFreeMap",
-    source: "資料來源：港鐵 Next Train API（data.gov.hk）",
-    disclaimer: "⚠免責聲明：本站列車位置為演算法推算之模擬數據，非港鐵官方即時定位。資料僅供參考，本站概不承擔任何責任。",
-    lateTag: (sec) => `+ ${sec}s`,
-    lateLabel: "慢於時間表",
-    lateSec: (sec) => `${sec} 秒`,
-    lateSource: { timetable: "比時間表班次遲", spacing: "與前車距離比實測班距長" },
-    gapTag: (sec) => `班距 +${sec}s`,
-    spacing: "班距",
-    spacingOk: "正常",
-    na: "N/A",
-    onTime: "準時（相差少於 60 秒）",
-    readings: (n) => `綜合 ${n} 個車站倒數`,
-    dayType: { weekday: "平日", saturday: "星期六", sunday: "星期日／假期", special: "特別時間表" },
-    peak: "繁忙",
-    offTimetable: (u, d, mu, md) => `特別車務：按到站倒數推算 · 上行 ${u} 班 / 下行 ${d} 班 · 實測班距 上行 ${mu} 分 / 下行 ${md} 分`,
-    offTimetableNote: "時間表同實際車務唔吻合，列車位置只按港鐵到站倒數推算；車次、Run 編號及時間表延誤不適用",
-    offPeak: "非繁忙",
-    matchNote: (m, f) => `${m} 班對應時間表班次，${f} 班按行車模型推算`,
-    dutySource: (code, date, only) => `班次來源：Duty Sheet ${code}（${only ? `只用於 ${date}` : `${date} 起`}）；班次及各站時間以官方時間表為準，並附更份；只有時間表沒有的班次才按模型推算`,
-    tripId: (run, trip) => `車次 ${trip}（Run ${run}）`,
-    tripNo: (trip) => `車次 ${trip}`,
-    sheetTag: (code) => `Duty Sheet ${code ?? "不適用"}`,
-    dsTitle: (code) => `Duty Sheet ${code ?? "不適用"}`,
-    dsTabs: ["當值", "今日全部", "所有編號"],
-    dsGroupAll: "全部",
-    dsClass: { weekday: "平日", saturday: "星期六", sunday: "星期日", special: "特別日" },
-    dsNone: "今日沒有適用的 Duty Sheet（顯示「不適用」），所以沒有當值資料；可到「所有編號」查看其他 Duty Sheet。",
-    dsLoading: "讀取更份資料中…",
-    dsFailed: "讀取更份資料失敗，稍後再試",
-    dsNoCards: (code) => `Duty Sheet ${code} 只有更份編號，未有上班、下班及用膳資料`,
-    dsOnNow: (n) => `當值 ${n} 更`,
-    dsNoDuty: (id) => `Duty Sheet 冇更份 ${id} 嘅卡片資料`,
-    dsNobody: "此刻沒有更份當值",
-    dsSearch: "搜尋更份編號",
-    dsNoMatch: "沒有符合的更份",
-    dsCount: (n) => `${n} 更`,
-    dsOn: "上班",
-    dsOff: "下班",
-    dsMeal: "用膳",
-    dsMates: "飯腳",
-    dsHandover: "交機",
-    dsHandoverKind: { off: "放工", meal: "Meal" },
-    dsMatesNone: "冇（同車站重疊未夠 45 分鐘）",
-    dsWork: "工時",
-    dsWorkMin: (m) => `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}`,
-    dsBack: "‹ 返回",
-    dsNow: "現時",
-    dsSource: (code, tab, issued, dates, cls, full) =>
-      `來源：Duty Sheet ${code}（${cls}${dates ? `，只用於 ${dates}` : ""}）${tab ? `、工作表 ${tab}` : ""}${issued ? `、發佈 ${issued}` : ""}。${full ? "只收編號、上下班、用膳、各腿 Run 及時間，備註原文不收錄；接班時間準確到秒，離班時間為到站時間（按分鐘）。" : "此份只有更份編號。"}`,
-    dsLegs: "全日行程",
-    dsBookOn: "上班",
-    dsBookOff: "下班",
-    dsLiveTrain: "睇列車",
-    dsPhase: {
-      drive: (run, a, b) => `Run ${run} 行駛中 ${a} → ${b}`,
-      empty: (run, a, b) => `Run ${run} 空車 ${a} → ${b}`,
-      park: (run, a, b) => `Run ${run} 泊車 ${a} → ${b}`,
-      ride: (run, a, b) => `乘搭接駁 ${a} → ${b}`,
-      prep: (run, a) => `出車準備 ${a}`,
-      wait: (run, a) => `待命／等候 ${a}`,
-      other: (run, a) => `其他 ${a}`,
-      meal: (run, a) => `用膳中 ${a}`,
-      end: (run, a) => `收車 ${a}`,
-      gap: (run, a) => `等待接班 ${a}`,
-    },
-    dsKind: { drive: "載客", empty: "空車", park: "泊車", prep: "準備", ride: "乘搭", wait: "待命", other: "其他" },
-    dsUntil: (clock) => `至 ${clock}`,
-    dsNext: {
-      leg: (clock, run, place) => `${clock} 接${run == null ? "" : ` Run ${run}`}（${place}）`,
-      meal: (clock, place) => `${clock} 用膳（${place}）`,
-      off: (clock, place) => `${clock} 下班（${place}）`,
-    },
-    dsNextLabel: "之後",
-    basis: { sched: (n) => `按時間表班次 + ${n} 個車站倒數校正`, model: (n) => `時間表無對應班次，按 ${n} 個車站倒數推算` },
-    band: { early: "清晨", shoulder: "繁忙過渡", amPeak: "早上繁忙", day: "日間", pmPeak: "黃昏繁忙", evening: "晚間" },
-    headway: (m) => `班距約 ${m} 分`,
-    offService: "非服務時間",
-    lastTrains: "尾班車時段",
-    peakRun: "繁忙時段行車時間",
-    offRun: "非繁忙行車時間",
-    hopLabel: (km, down, up) => `${km.toFixed(2)} km · ▼${clockSpan(down)} ▲${clockSpan(up)}`,
-    shortLegend: "虛線圈＝短程車",
-    colUp: "往屯門",
-    colDown: "往烏溪沙",
-    help: "？ 說明",
-    helpTitle: "圖例同說明",
-    helpIntro: "列車位置係由港鐵各站「下一班幾分鐘」反推出嚟嘅推算，唔係官方定位。",
-    helpGroups: [
-      ["列車", [
-        ["up", "橙色：上行，往屯門"],
-        ["down", "藍色：下行，往烏溪沙"],
-        ["short", "虛線圈：短程車"],
-        ["late", "紅色「+ Xs」：比時間表慢 60 秒以上"],
-        ["alarm", "紅色閃爍：慢 180 秒以上"],
-        ["gap", "黃色「班距 +Xs」：搵唔到對應時間表班次，只知與前車距離比平常班距長"],
-        ["delay", "黃色外框：港鐵報告有延誤"],
-        ["last", "L：尾程，到站後回廠（顏色較淡）"],
-      ]],
-      ["倒數同狀態", [
-        [null, "「即將」：港鐵報 0 分鐘；列車開出後可能仍然顯示，以列車位置為準"],
-        [null, "「資料延遲」：最近幾次讀取失敗，列車暫時按時間表推算"],
-        [null, "「特別車務」：實際行車同時間表唔吻合，Run 編號同延誤不適用"],
-      ]],
-      ["隱藏功能", [
-        [null, "撳標題左邊嘅橙點：開／關 Run 編號（會記住）"],
-        [null, "撳列車：睇車次同前方各站；開咗 Run 編號後可睇「全日更份」"],
-        [null, "撳畫面上方「Duty Sheet …」：更份當值、今日全部、所有編號"],
-        [null, "撳頁腳版本號 5 次：「複製站牌數據」，畀維護者重播問題"],
-      ]],
-    ],
-    helpData: (info) => `資料：${info}`,
-  },
-}
 
 const els = {
   brandDot: document.querySelector(".brand-dot"),
@@ -340,15 +162,21 @@ const t = () => STRINGS[LANG]
 
 /* ------------------------------------------------------------------ data */
 
-// Special timetables (events, typhoon) are fetched once, the first time the
-// normal ones fit the boards badly; pickDay then considers them too.
+// Special timetables (events, typhoon) and the normal ones of the other day
+// types are fetched once, the first time the loaded ones fit the boards badly;
+// pickDay then considers them too.
+let feedProxy = ""
 let specialEntries = []
+let deferredEntries = []
 let bootProblem = null
 let specialsRequested = false
 function requestSpecials() {
   if (specialsRequested) return
   specialsRequested = true
-  for (const e of specialEntries) {
+  const loaded = new Set()
+  for (const e of [...deferredEntries, ...specialEntries]) {
+    if (loaded.has(e.file)) continue
+    loaded.add(e.file)
     fetchJson(`data/timetables/${e.file}`).then(addBook).catch(() => {})
   }
 }
@@ -359,7 +187,7 @@ let overlayDate = null
 const addBook = (data) => timetables.add(applyOverlays(data, overlayData.overlays, overlayDate))
 
 async function boot() {
-  const [netJson, timetable, track, manifest, overlays, calendar] = await Promise.all([
+  const [netJson, timetable, track, manifest, overlays, calendar, config] = await Promise.all([
     fetchJson("data/tml-network.json"),
     fetchJson("data/tml-timetable.json"),
     fetchJson("data/tml-track.json").catch(() => null),
@@ -369,7 +197,10 @@ async function boot() {
     fetchJson("data/overlays.json").catch(() => ({ overlays: [], notices: [] })),
     // Public holidays and one-off date to sheet choices (data/calendar.json).
     fetchJson("data/calendar.json").catch(() => ({ holidays: [], sheets: {} })),
+    // Optional settings (data/config.json): feedProxy, see worker/README.md.
+    fetchJson("data/config.json").catch(() => ({})),
   ])
+  feedProxy = typeof config?.feedProxy === "string" && /^https:\/\//.test(config.feedProxy) ? config.feedProxy : ""
   const holidays = new Set((calendar.holidays ?? []).map((h) => h.date))
   overlayData = overlays
   overlayDate = serviceDate(Date.now())
@@ -391,14 +222,20 @@ async function boot() {
     state.book = first.code
     if (!book) bootProblem = "時間表載入失敗（網絡或離線），列車位置可能唔準"
   }
-  // The other normal timetables load now; special ones (events, typhoon) only
-  // when the normal ones stop fitting the boards (see requestSpecials).
+  // The other normal timetables of today's day type load now. Those of the
+  // other day types and the special ones (events, typhoon) load only when
+  // these stop fitting the boards (see requestSpecials), e.g. on an
+  // unannounced holiday; that saves about a third of the data on a normal day.
   specialEntries = entries.filter((e) => e.kind === "special")
   const loadedFiles = new Set(first ? [first.file] : [])
   for (const e of entries) {
     // An entry that points at an earlier entry's file (same timetable re-issued
     // under a new code, "sameAs") is not fetched twice.
     if (e === first || e.kind === "special" || loadedFiles.has(e.file)) continue
+    if (e.day !== today && e.day !== first?.day) {
+      deferredEntries.push(e)
+      continue
+    }
     loadedFiles.add(e.file)
     fetchJson(`data/timetables/${e.file}`).then(addBook).catch(() => {})
   }
@@ -436,7 +273,10 @@ async function boot() {
 }
 
 function makeFeed() {
-  return createFeed(network, { readSchedule, readNotice, carryArrivalClock, estimateTrains, lang: LANG })
+  // With a feedProxy the 27 station reads share one request; the proxy falls
+  // back to reading data.gov.hk directly whenever it fails.
+  const fetchImpl = feedProxy ? createProxyFetch({ proxyUrl: feedProxy }) : undefined
+  return createFeed(network, { readSchedule, readNotice, carryArrivalClock, estimateTrains, lang: LANG, ...(fetchImpl ? { fetchImpl } : {}) })
 }
 
 async function fetchJson(url) {
@@ -2681,34 +2521,6 @@ function wireControls() {
   }
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {})
-  }
-}
-
-/* --------------------------------------------------------------- helpers */
-
-function clockSpan(sec) {
-  const m = Math.floor(sec / 60)
-  const r = Math.round(sec % 60)
-  return `${m}:${String(r).padStart(2, "0")}`
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
-}
-
-function readPref(key) {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function writePref(key, value) {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // Private mode or blocked storage: the preference just is not remembered.
   }
 }
 

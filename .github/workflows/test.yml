@@ -34,6 +34,7 @@ jobs:
           node tools/validate_position.mjs
           node tools/validate_lagstats.mjs
           node tools/validate_feed_errors.mjs
+          node tools/validate_proxy.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

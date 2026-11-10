@@ -3,6 +3,14 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.35 — 2026-11-10 (`4404cbc`)
+- 用戶睇得明：平日開頁少載約 1 MB 資料（星期六／日嘅時間表唔再一開頁就載，要用時先載），開得快啲；畫面同行為冇變。
+- 按日型載入：開頁只載今日日型（及已選嗰份）嘅正常時間表；其他日型同特別時間表喺列車同已載入時間表唔吻合時先載（同原有「特別時間表」機制一樣）。模擬班次測試：平日開頁時間表檔 6 → 2 個；「未公佈假期」同特別時間表情境最終結果同 v0.8.34 一樣。
+- 可選班次邊緣快取：新 `worker/`（獨立 Worker，預設**關閉**）將 27 個站請求合成 1 個並快取 5 秒；`data/config.json` 嘅 `feedProxy` 填網址先啟用，proxy 失敗自動改為直接讀 data.gov.hk（失敗後 30 秒內唔再問 proxy）。額度說明見 `worker/README.md`。新 `lib/mtr-proxy.js`、`tools/validate_proxy.mjs`（加入 CI）。
+- `assets/app.js` 拆出 `assets/strings.js`（介面文字）同 `assets/helpers.js`（共用小工具），app.js 少約 210 行；`sw.js` 預載清單加入新檔，殼層 cache `v68`。
+- 試過但冇做：`pickDay` 撞分時優先 Duty Sheet。模擬測試顯示會令特別時間表日誤顯示星期日 7091 嘅更份編號（同日實際用嘅 Duty Sheet 可能唔同），比現時顯示「不適用」差，所以撤回。已公佈嘅假期由 `calendar.json` 處理。
+- 比較（對 v0.8.34）：11 項驗證輸出逐行一樣；模擬班次（Chromium，平日／未公佈假期／兩種特別時間表各 3 次）列車數、最終標籤一樣；頁首、頁腳、說明、站、列車兩頁、Duty Sheet 卡嘅文字（數字遮蔽後）完全一樣，無頁面錯誤；feedProxy 開／關／proxy 出事三種情況列車數一致（直接請求 81 → 0／3 個 proxy 請求；出事時改直接讀）。
+
 ## v0.8.34 — 2026-11-10 (`c726a97`)
 - 用戶睇得明：畫面右上新增「？ 說明」，列出列車顏色／虛線／L 嘅意思、倒數同狀態字眼，同幾個隱藏功能（橙點、Duty Sheet 標籤、複製站牌數據）點用。
 - 頁腳同說明面板顯示資料範圍：現用嘅常規 Duty Sheet（平日 1101、星期六 6091、星期日／假期 7091）同特別日資料去到幾時，一眼睇到有冇過期。

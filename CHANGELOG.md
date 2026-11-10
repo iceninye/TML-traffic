@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.35 — 2026-11-10 (`dev`)
+## v0.8.35 — 2026-11-10 (`4404cbc`)
 - 用戶睇得明：平日開頁少載約 1 MB 資料（星期六／日嘅時間表唔再一開頁就載，要用時先載），開得快啲；畫面同行為冇變。
 - 按日型載入：開頁只載今日日型（及已選嗰份）嘅正常時間表；其他日型同特別時間表喺列車同已載入時間表唔吻合時先載（同原有「特別時間表」機制一樣）。模擬班次測試：平日開頁時間表檔 6 → 2 個；「未公佈假期」同特別時間表情境最終結果同 v0.8.34 一樣。
 - 可選班次邊緣快取：新 `worker/`（獨立 Worker，預設**關閉**）將 27 個站請求合成 1 個並快取 5 秒；`data/config.json` 嘅 `feedProxy` 填網址先啟用，proxy 失敗自動改為直接讀 data.gov.hk（失敗後 30 秒內唔再問 proxy）。額度說明見 `worker/README.md`。新 `lib/mtr-proxy.js`、`tools/validate_proxy.mjs`（加入 CI）。

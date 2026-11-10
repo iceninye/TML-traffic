@@ -112,7 +112,7 @@ node tools/validate-hours.mjs                           # 官表工時同更份�
 
 1. 改動只應該有 `data/timetables/`、`data/duties/`、`data/duty-basic.json`、`data/duty-hours-fixes.json`（同需要時 `docs/`）。
 2. 加入新資料即係改變 App 行為，要按 [`SETUP.md`](SETUP.md)「發佈新版」同時改版本號三處（`assets/app.js` 嘅 `BUILD`、`CHANGELOG.md`、`sw.js` 嘅 cache 名）。
-3. 跑上面驗證指令同 `node --check assets/app.js`，再開 PR。
+3. 跑上面驗證指令同 `node --input-type=module --check < assets/app.js`，再開 PR。
 
 資料結構見 [`DATA.md`](DATA.md)。
 

@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.34 — 2026-11-10 (`c726a97`)
+- 用戶睇得明：畫面右上新增「？ 說明」，列出列車顏色／虛線／L 嘅意思、倒數同狀態字眼，同幾個隱藏功能（橙點、Duty Sheet 標籤、複製站牌數據）點用。
+- 頁腳同說明面板顯示資料範圍：現用嘅常規 Duty Sheet（平日 1101、星期六 6091、星期日／假期 7091）同特別日資料去到幾時，一眼睇到有冇過期。
+- 按鈕同關閉掣加高到 36px，更易撳（其餘字體同版面不變）。
+- 維護：CI 同文件嘅語法檢查改用 `node --input-type=module --check < 檔案`。單用 `node --check 檔案` 對 ES module 有時唔會報語法錯（本次開發中親眼見過：壞咗嘅 app.js 都通過）。README 功能一節改為分組條列。殼層 cache `v67`。
+- 比較（對 v0.8.33）：11 項驗證輸出逐行一樣；Chromium 360px 闊度深色／淺色模式無橫向捲動、無頁面錯誤，說明面板開關正常。
+
 ## v0.8.33 — 2026-11-10 (`9c7b307`)
 - 用戶睇得明：分頁喺背景時唔再每秒重畫（慳電），返回前台即時補畫。其餘係整理資料嘅工具，App 畫面冇變。
 - 新 `tools/update.py`：一條指令匯入新檔案，自動分辨 Duty Sheet／Duty 總表／時間表，缺依賴自動建 `.venv`（`requirements.txt` 固定版本），完成後行驗證並用中文列出改動同未來 14 日預計用邊份。`--dry-run` 試跑、`--check` 檢查環境。

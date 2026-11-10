@@ -57,7 +57,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.33", commit: "9c7b307" }
+const BUILD = { version: "0.8.34", commit: "c726a97" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -226,6 +226,33 @@ const STRINGS = {
     shortLegend: "虛線圈＝短程車",
     colUp: "往屯門",
     colDown: "往烏溪沙",
+    help: "？ 說明",
+    helpTitle: "圖例同說明",
+    helpIntro: "列車位置係由港鐵各站「下一班幾分鐘」反推出嚟嘅推算，唔係官方定位。",
+    helpGroups: [
+      ["列車", [
+        ["up", "橙色：上行，往屯門"],
+        ["down", "藍色：下行，往烏溪沙"],
+        ["short", "虛線圈：短程車"],
+        ["late", "紅色「+ Xs」：比時間表慢 60 秒以上"],
+        ["alarm", "紅色閃爍：慢 180 秒以上"],
+        ["gap", "黃色「班距 +Xs」：搵唔到對應時間表班次，只知與前車距離比平常班距長"],
+        ["delay", "黃色外框：港鐵報告有延誤"],
+        ["last", "L：尾程，到站後回廠（顏色較淡）"],
+      ]],
+      ["倒數同狀態", [
+        [null, "「即將」：港鐵報 0 分鐘；列車開出後可能仍然顯示，以列車位置為準"],
+        [null, "「資料延遲」：最近幾次讀取失敗，列車暫時按時間表推算"],
+        [null, "「特別車務」：實際行車同時間表唔吻合，Run 編號同延誤不適用"],
+      ]],
+      ["隱藏功能", [
+        [null, "撳標題左邊嘅橙點：開／關 Run 編號（會記住）"],
+        [null, "撳列車：睇車次同前方各站；開咗 Run 編號後可睇「全日更份」"],
+        [null, "撳畫面上方「Duty Sheet …」：更份當值、今日全部、所有編號"],
+        [null, "撳頁腳版本號 5 次：「複製站牌數據」，畀維護者重播問題"],
+      ]],
+    ],
+    helpData: (info) => `資料：${info}`,
   },
 }
 
@@ -252,6 +279,7 @@ const els = {
   viewSeg: document.getElementById("view-seg"),
   pauseBtn: document.getElementById("pause-btn"),
   bellBtn: document.getElementById("bell-btn"),
+  helpBtn: document.getElementById("help-btn"),
   colLegend: document.getElementById("col-legend"),
   sheet: document.getElementById("sheet"),
   sheetBody: document.getElementById("sheet-body"),
@@ -345,6 +373,7 @@ async function boot() {
   const holidays = new Set((calendar.holidays ?? []).map((h) => h.date))
   overlayData = overlays
   overlayDate = serviceDate(Date.now())
+  dataInfo = buildDataInfo(manifest, overlayDate)
   network = createNetwork(netJson)
   places = netJson.places ?? {}
   model = createModel(timetable, track)
@@ -827,6 +856,40 @@ function openNoticePanel(list) {
   panel.querySelector("button").focus()
 }
 
+function openHelp() {
+  const s = t()
+  const info = dataInfoText()
+  const groups = s.helpGroups.map(([title, rows]) =>
+    `<h3 class="help-h">${title}</h3>` +
+    rows.map(([kind, text]) => `<div class="help-row">${kind ? `<i class="help-sw" data-k="${kind}" aria-hidden="true"></i>` : `<i class="help-sw none" aria-hidden="true"></i>`}<span>${escapeHtml(text)}</span></div>`).join("")).join("")
+  openSheet(
+    `<button class="sheet-close" aria-label="${s.close}">✕</button><h2>${s.helpTitle}</h2><div class="sub">${s.helpIntro}</div>${groups}` +
+    (info ? `<div class="sub help-data">${s.helpData(escapeHtml(info))}</div>` : ""),
+    "help",
+  )
+}
+
+// What the loaded data covers, from data/timetables/index.json: the regular
+// Duty Sheets in force and how far the one-day sheets go, so a stale site is visible.
+let dataInfo = ""
+function dataInfoText() {
+  return dataInfo
+}
+function buildDataInfo(manifest, date) {
+  const sheets = (manifest.timetables ?? []).filter((e) => e.source === "dutysheet" && e.primary)
+  const regular = ["weekday", "saturday", "sunday"].map((day) => {
+    const e = sheets.filter((x) => !x.dates && x.day === day && (x.effective ?? "") <= date).sort((a, b) => (b.effective ?? "").localeCompare(a.effective ?? ""))[0]
+    return e ? `${t().dayType[day]} ${e.code.replace(/^DS/, "")}` : null
+  }).filter(Boolean)
+  const dated = sheets.flatMap((x) => x.dates ?? []).sort()
+  const last = dated.at(-1)
+  const shortDate = (d) => `${d.slice(8)}/${d.slice(5, 7)}`
+  const parts = []
+  if (regular.length) parts.push(`Duty Sheet ${regular.join("、")}`)
+  if (last) parts.push(`特別日資料至 ${shortDate(last)}${last < date ? "（已過，之後只用常規表）" : ""}`)
+  return parts.join(" · ")
+}
+
 function showLagPanel() {
   document.getElementById("lag-panel")?.remove()
   if (!lagStats) recordBoardLag(new Map(), [], Date.now())
@@ -915,6 +978,7 @@ function applyStrings() {
   els.viewSeg.querySelector('[data-view="diagram"]').textContent = s.diagram
   els.viewSeg.querySelector('[data-view="map"]').textContent = s.map
   for (const button of els.viewSeg.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === state.view))
+  els.helpBtn.textContent = s.help
   els.pauseBtn.textContent = state.paused ? s.resume : s.pause
   els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
   paintRunsToggle()
@@ -930,7 +994,7 @@ function applyStrings() {
     ? "dev"
     : `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}">${BUILD.commit}</a>`
   els.foot.innerHTML =
-    `<p>${s.source}</p><p>${s.disclaimer}</p>` +
+    `<p>${s.source}</p><p>${s.disclaimer}</p>` + (dataInfo ? `<p class="foot-data">${s.helpData(escapeHtml(dataInfo))}</p>` : "") +
     `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
   paintClock()
 }
@@ -2546,6 +2610,7 @@ function wireControls() {
     if (button) showView(button.dataset.view)
   })
   els.bellBtn.addEventListener("click", () => openNoticePanel(activeNotices()))
+  els.helpBtn.addEventListener("click", openHelp)
   els.pauseBtn.addEventListener("click", () => {
     state.paused = !state.paused
     writePref(PAUSE_KEY, state.paused ? "1" : "0")

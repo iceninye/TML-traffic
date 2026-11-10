@@ -1,0 +1,41 @@
+# 每週檢查未來 14 日預計用邊份 Duty Sheet，有缺口就開／更新 Issue 通知。
+name: Coverage
+
+on:
+  schedule:
+    - cron: "0 1 * * 1" # 逢星期一 09:00 香港時間
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Report
+        id: report
+        run: |
+          set +e
+          node tools/coverage.mjs --days 14 --md > report.md
+          echo "warn=$([ $? -eq 2 ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+          cat report.md
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WARN: ${{ steps.report.outputs.warn }}
+        run: |
+          title="未來 14 日 Duty Sheet 對應檢查"
+          gh label create coverage --color BFD4F2 --description "每週 Duty Sheet 對應檢查" 2>/dev/null || true
+          number=$(gh issue list --label coverage --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file report.md
+            if [ "$WARN" = "1" ]; then gh issue comment "$number" --body "本週檢查仍有需要留意嘅項目，詳見上面內文。"; else gh issue close "$number" --comment "已無缺口。"; fi
+          elif [ "$WARN" = "1" ]; then
+            gh issue create --label coverage --title "$title" --body-file report.md
+          fi

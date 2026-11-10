@@ -34,6 +34,14 @@ jobs:
           node tools/validate_position.mjs
           node tools/validate_lagstats.mjs
           node tools/validate_feed_errors.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python tools still load
+        run: |
+          pip install -r requirements.txt
+          python -m py_compile tools/*.py
+          python tools/update.py --check
       - name: Parse every script
         run: |
           for f in assets/*.js lib/*.js sw.js; do node --check "$f"; done

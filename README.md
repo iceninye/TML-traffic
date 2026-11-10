@@ -67,6 +67,11 @@ python3 -m http.server 8790 --bind 127.0.0.1
 
 冇 build step。部署（Cloudflare Workers／GitHub Pages）、`wrangler.jsonc`、發佈新版嘅版本號三處、驗證腳本同已知限制，見 [`docs/SETUP.md`](docs/SETUP.md)。
 
+## 更新資料（Duty Sheet、時間表、假期）
+
+收到新檔案：`python3 tools/update.py 新檔案`（自動分辨、驗證、列出改動同未來 14 日用邊份）。
+指定某日用邊份、公眾假期：改 `data/calendar.json`。詳細步驟同常見錯誤見 [`docs/DUTYSHEET.md`](docs/DUTYSHEET.md) 頂部「5 分鐘版」。
+
 ## 新增／更新時間表
 
 港鐵出新版或特別時間表（PDF）時：

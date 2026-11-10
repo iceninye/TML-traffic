@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.33 — 2026-11-10 (`dev`)
+## v0.8.33 — 2026-11-10 (`9c7b307`)
 - 用戶睇得明：分頁喺背景時唔再每秒重畫（慳電），返回前台即時補畫。其餘係整理資料嘅工具，App 畫面冇變。
 - 新 `tools/update.py`：一條指令匯入新檔案，自動分辨 Duty Sheet／Duty 總表／時間表，缺依賴自動建 `.venv`（`requirements.txt` 固定版本），完成後行驗證並用中文列出改動同未來 14 日預計用邊份。`--dry-run` 試跑、`--check` 檢查環境。
 - `parse_dutysheet.py` 加保護：專用日版本同常規 Duty Sheet 同編號會拒絕（建議 `--code`）；較舊版本唔會蓋過較新版本（`--force` 可覆蓋）。實測：將全部已收檔案（包括舊 8027 同馬拉松 7091）一次過餵入，兩個錯誤檔案都被攔截，資料冇被改。

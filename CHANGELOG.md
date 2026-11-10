@@ -3,6 +3,15 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.33 — 2026-11-10 (`9c7b307`)
+- 用戶睇得明：分頁喺背景時唔再每秒重畫（慳電），返回前台即時補畫。其餘係整理資料嘅工具，App 畫面冇變。
+- 新 `tools/update.py`：一條指令匯入新檔案，自動分辨 Duty Sheet／Duty 總表／時間表，缺依賴自動建 `.venv`（`requirements.txt` 固定版本），完成後行驗證並用中文列出改動同未來 14 日預計用邊份。`--dry-run` 試跑、`--check` 檢查環境。
+- `parse_dutysheet.py` 加保護：專用日版本同常規 Duty Sheet 同編號會拒絕（建議 `--code`）；較舊版本唔會蓋過較新版本（`--force` 可覆蓋）。實測：將全部已收檔案（包括舊 8027 同馬拉松 7091）一次過餵入，兩個錯誤檔案都被攔截，資料冇被改。
+- 新 `tools/coverage.mjs` 同每週 GitHub Action（逢星期一）：列出未來 14 日預計用邊份，有缺口（冇 Duty Sheet、假期清單將完、將來假期未核對）就開／更新 Issue，無缺口自動關閉。
+- CI 加 Python 檢查（`py_compile`、`update.py --check`），依賴升級弄壞解析器會即時發現。
+- `tools/fixtures/README.md`：點樣收集真實讀數入 replay。實際新增 fixture 需要你喺手機複製站牌數據。
+- 文件：`docs/DUTYSHEET.md` 頂部新增「5 分鐘版」同常見錯誤表，README 加更新資料一節。殼層 cache `v66`。
+
 ## v0.8.32 — 2026-11-10 (`bc1fff7`)
 - 用戶睇得明：公眾假期（星期一至五）而家預設用星期日時間表同 Duty Sheet 7091，唔使等實時班次先轉；時間表載入失敗會顯示提示；離線可用嘅時間表更完整。
 - 新 `data/calendar.json`：香港政府公佈嘅公眾假期（2026 已對政府新聞稿，2027 為二手來源待核對）同「某日指定用邊份」（`sheets`）。2026-10-19、2026-10-31 嘅 `alsoOn` 搬咗入嚟（`index.json` 兩份嘅 `alsoOn` 移除，行為不變）。`calendarDay`/`entriesForDate`/`pickFirstEntry` 多一個可選參數，`model.setHolidays` 令假期用星期日時段。

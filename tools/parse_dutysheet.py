@@ -746,6 +746,21 @@ def main(argv):
             info, duties, card_stats = dutycards.cards_from_pdf(meta, legs, stats)
         if args.code:
             info["code"] = args.code
+        # Do not let a wrong file overwrite what is registered: an event-day
+        # workbook that carries the code of the regular sheet, or an older
+        # version of a sheet. --force overrides (e.g. to go back on purpose).
+        existing_entry = next((e for e in index["timetables"] if e["code"] == f"DS{meta['code']}"), None)
+        if existing_entry and not args.force and existing_entry.get("sha256") != meta["sha256"]:
+            if meta.get("dates") and not existing_entry.get("dates"):
+                print(f"{path}: ✗ 呢份只喺 {'、'.join(meta['dates'])} 行，但 DS{meta['code']} 已登記為常規 Duty Sheet；"
+                      f"直接匯入會蓋過佢。請用 --code {meta['code']}M（或其他編號）另起編號，確實要蓋過先用 --force")
+                failed = True
+                continue
+            if (meta.get("effective") or "") < (existing_entry.get("effective") or ""):
+                print(f"{path}: ✗ DS{meta['code']} 已登記較新版本（生效 {existing_entry.get('effective')}），"
+                      f"呢個檔案較舊（{meta.get('effective')}），唔會蓋過。確實要還原舊版先用 --force")
+                failed = True
+                continue
         missing = [w for w in card_stats["warnings"] if w.startswith("MISSING")]
         for w in missing:
             print(f"{path}: {w}")

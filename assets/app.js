@@ -57,7 +57,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.32", commit: "bc1fff7" }
+const BUILD = { version: "0.8.33", commit: "9c7b307" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -399,9 +399,11 @@ async function boot() {
   await refresh(true)
   requestAnimationFrame(loop)
   showView(state.view).catch(() => {})
-  setInterval(paintClock, 250)
+  // Nothing to repaint while the tab is hidden (saves battery); the visibilitychange
+  // handler repaints at once when the page comes back.
+  setInterval(() => { if (!document.hidden) paintClock() }, 250)
   // Countdowns age between feed reads: a "now" reading clears once its train leaves.
-  setInterval(render, 1000)
+  setInterval(() => { if (!document.hidden) render() }, 1000)
 }
 
 function makeFeed() {
@@ -2581,6 +2583,7 @@ function wireControls() {
   })
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return
+    render()
     refresh(false)
     retryDuty()
   })

@@ -1,5 +1,27 @@
 # Duty Sheet 數據源
 
+## 5 分鐘版：收到新檔案點做
+
+1. 將檔案放喺 repo 外面（例如 `~/Downloads/`），**唔好 commit**（repo 係公開嘅）。
+2. `python3 tools/update.py ~/Downloads/新檔案.xlsx`（可一次多個；第一次會自動建 `.venv` 並安裝依賴）。想先試跑：加 `--dry-run`（只限 Duty Sheet）。
+   - 自動分辨 Duty Sheet（xlsx／舊式 PDF）、Duty 總表（xlsx 有 `Index`）、工作時間表（PDF）。
+   - 如果個檔案係某日專用但編號同常規 Duty Sheet 一樣（例如 7091 嘅馬拉松版），會拒絕並教你用 `--code 7091M`；舊版唔會蓋過新版（確要還原用 `--force`）。
+3. 睇輸出最後兩節：「今次改動」同「未來 14 日預計用邊份」。某日要指定用另一份，就改 `data/calendar.json` 嘅 `sheets`，再行 `node tools/validate_calendar.mjs`。
+4. 開 PR（改動只應有 `data/` 同 `docs/`）。合併後 Cloudflare 自動部署。
+5. 每週一早上 GitHub Action 會檢查未來 14 日，有缺口（冇 Duty Sheet、假期清單將完、有假期未核對）就開 Issue 通知。
+
+常見錯誤：
+
+| 訊息 | 原因 | 做法 |
+|---|---|---|
+| 分辨唔到係 Duty Sheet… | CSV 或其他格式 | 用原本 xlsx／PDF |
+| 呢份只喺 … 行，但 DSxxxx 已登記為常規 | 專用日版本同常規版同編號 | 加 `--code xxxxM` |
+| 已登記較新版本 | 檔案比已有嘅舊 | 確認檔案啱先；要還原用 `--force` |
+| 缺 pdfplumber／openpyxl | 未安裝 | `update.py` 會自動裝；失敗就睇 `pip install -r requirements.txt` 嘅錯誤 |
+| 驗證失敗（✗ validate_…） | 資料唔一致 | 睇該腳本輸出；唔好 commit，貼畀 Claude 或開 Issue |
+
+以下係每個步驟嘅詳細說明（`update.py` 內部就係行呢啲）。
+
 ## 操作指南：準備同加入新 Duty Sheet
 
 ### 1. 檔案格式

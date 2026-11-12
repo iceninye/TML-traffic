@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.37 — 2026-11-12 (`pending`)
+## v0.8.37 — 2026-11-12 (`f991ea8`)
 - 用戶睇得明：修正兩個配對錯誤（Ice 2026-11-12 11:32 兩張截圖，Duty Sheet 1101）。(1) 已完成嘅 Run 2 會以「+345s」紅 dot 出現喺恆安，貼住真正嘅 Run 3；(2) 紅磡出現一班「-」，貼住 Run 7 +95s。
 - Run 2 幽靈車：同一班車嘅兩個讀數（恆安 2 分、馬鞍山 3 分）線時間差 81 s，超過孤立讀數合併上限（75 s），`orderPriors` 當成兩班車，多出嗰班派咗畀 Run 2（+349 s）。而家只喺合併後嘅車同孤立讀數都離其他車 ≥ 240 s 時，合併上限放到 120 s（`ORDER_LONE_JOIN_SPARSE_SEC`）；車距得 100-180 s 嘅 queue 場景維持 75 s。單純加大 75 s 試過，204 行 grid 有 15-25 行變差（opened 嘅 queue wrong-trip 升到 10-15%），所以唔用。
 - 「-」：Run 7 近站讀數（紅磡 3、何文田 4）話佢遲 100-170 s，遠站（鑽石山 11…）話佢準時（MTR 遠站預報假設追返時間），ABSORB（±90 s）接唔到，剩低讀數出 fallback「-」。ABSORB 加「追返」：ttnt ≥ 6 嘅遠站讀數可以比該班車估算早最多 200 s 併入（第二輪，唔影響 delay 估算）。Run 7 嘅 +95 badge 不變。

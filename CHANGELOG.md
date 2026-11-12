@@ -3,6 +3,15 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.37 — 2026-11-12 (`pending`)
+- 用戶睇得明：修正兩個配對錯誤（Ice 2026-11-12 11:32 兩張截圖，Duty Sheet 1101）。(1) 已完成嘅 Run 2 會以「+345s」紅 dot 出現喺恆安，貼住真正嘅 Run 3；(2) 紅磡出現一班「-」，貼住 Run 7 +95s。
+- Run 2 幽靈車：同一班車嘅兩個讀數（恆安 2 分、馬鞍山 3 分）線時間差 81 s，超過孤立讀數合併上限（75 s），`orderPriors` 當成兩班車，多出嗰班派咗畀 Run 2（+349 s）。而家只喺合併後嘅車同孤立讀數都離其他車 ≥ 240 s 時，合併上限放到 120 s（`ORDER_LONE_JOIN_SPARSE_SEC`）；車距得 100-180 s 嘅 queue 場景維持 75 s。單純加大 75 s 試過，204 行 grid 有 15-25 行變差（opened 嘅 queue wrong-trip 升到 10-15%），所以唔用。
+- 「-」：Run 7 近站讀數（紅磡 3、何文田 4）話佢遲 100-170 s，遠站（鑽石山 11…）話佢準時（MTR 遠站預報假設追返時間），ABSORB（±90 s）接唔到，剩低讀數出 fallback「-」。ABSORB 加「追返」：ttnt ≥ 6 嘅遠站讀數可以比該班車估算早最多 200 s 併入（第二輪，唔影響 delay 估算）。Run 7 嘅 +95 badge 不變。
+- 新 `tools/validate_screenshots.mjs`（加入 CI）：兩張截圖嘅站牌數字重現，舊版 4 項 FAIL，新版全 ok。
+- 比較（對 v0.8.36）：`validate_matching.mjs` compact grid（DS1101 08:35/10:00/17:50/22:00、DS6091 10:00、DS7091 18:00，exact 同 JITTER=20，每份 17 個場景，共 204 行）：只改 lone-join 203 行一樣、1 行更好、0 行變差；加埋追返（200 s）21 行更好、2 行輕微變差（都係 JITTER=20、≤ 0.1 點；exact 板冇一行變差）。追返 240 s 時 exact 有 1 行（DS7091 18:00 long hold DOWN +720 opened wrong-trip 4.9 → 5.1%）變差，所以收窄到 200 s（試過 180 s：Run 7 +160→0 追返模擬仍有 4 個 snapshot 有「-」）。模擬 Run 7 紅磡 +160 s 追返到鑽石山 0 s：14 個 snapshot 嘅「-」由每個都有變 0。
+- 未驗證：實機；請下次見到「-」或怪 Run 時用「複製站牌數據」貼出。
+- Shell cache renamed `v70`.
+
 ## v0.8.36 — 2026-11-10 (`713ecd8`)
 - Run 851 times corrected (Ice, 2026-11-10): the train reaches Wu Kai Sha at 09:13:12 and leaves at 09:17 (v0.8.31 had them swapped), then runs to Mei Foo (10:00, L). The stops in between are still modelled (an ordinary DS1101 trip scaled to those times). The 🔔 text says the same.
 - Tue 17/11 uses Duty Sheet 8027 (`data/calendar.json` `sheets`; the sheet's own `dates` stay 13/11). No revised week-46 sheets exist (Run 851 is a test run), so other trips that week can still drift.

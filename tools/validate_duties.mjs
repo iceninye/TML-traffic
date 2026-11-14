@@ -35,15 +35,16 @@ for (const entry of index.sheets) {
 }
 check(unnamed.size === 0, `every place on a card has a name${unnamed.size ? ` (missing: ${[...unnamed].join(" ")})` : ""}`)
 
-// A "ride" is a driver travelling as a passenger; moving an empty train into a depot or
-// pocket track is driving (Ice, 2026-11-14), so no ride may end in W1F / E3C / W1A / CIO1 from CIOT.
-const badRides = []
+// Ice (2026-11-14): every "Ride ..." row on the sheets so far is the driver driving (empty
+// train into or out of a depot, or a trip the timetable gives to the same duty), so none
+// of the current cards has a ride leg. A real ride must be added on purpose.
+const rides = []
 for (const entry of index.sheets) {
   for (const d of load(entry.code).duties) {
-    for (const l of d.legs ?? []) if (l[0] === "ride" && (["W1F", "E3C", "W1A"].includes(l[4]) || (l[2] === "CIOT" && l[4] === "CIO1"))) badRides.push(`${d.id} Run ${l[1]} ${l[2]}-${l[4]}`)
+    for (const l of d.legs ?? []) if (l[0] === "ride") rides.push(`${d.id} Run ${l[1]} ${l[2]}-${l[4]}`)
   }
 }
-check(badRides.length === 0, `no ride leg is an empty train into a depot${badRides.length ? ` (${badRides.slice(0, 5).join(", ")})` : ""}`)
+check(rides.length === 0, `no card has a ride leg${rides.length ? ` (${rides.slice(0, 5).join(", ")})` : ""}`)
 
 for (const entry of index.sheets) {
   const book = load(entry.code)

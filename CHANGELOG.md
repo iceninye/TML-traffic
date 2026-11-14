@@ -4,9 +4,8 @@ All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
 ## v0.8.38 — 2026-11-14
-- 用戶睇得明：修正「乘搭 Run 31 屯門 → 八鄉廠 W1F」呢類行程（Ice 2026-11-14）。呢啲係車長自己揸冇載客嘅列車入廠／入側線，之後先坐接駁返錦上路收工，唔係乘搭。`data/duties/` 內 190 段（屯門 → W1F／E3C 145 段、美孚／紅磡3 → W1A 41 段、CIOT → CIO1 4 段）由 `ride` 改為 `empty`（空車）；同一行程喺其他更份本來已經係 `empty`（例如 1101105 同 1101104）。
-- `tools/dutycards.py`：新 `empty_move()`，之後再讀 Duty Sheet 都會一樣處理。真正乘搭（荃灣西／烏溪沙 ⇄ 屯門、WKS → KSR1／TAW3、LT1 → ETS2）冇改。`validate_duties.mjs` 加檢查：入廠行程唔可以係 `ride`。
-- 未確認：LT1 → ETS2（5 段）同 7091M 7091704 嘅 WKS → TAW3（1 段）暫時保留為乘搭，等 Ice 確認。
+- 用戶睇得明：修正「乘搭 Run 31 屯門 → 八鄉廠 W1F」呢類行程（Ice 2026-11-14）。呢啲係車長自己揸車（入廠、出廠或載客班次），之後先坐接駁返錦上路收工，唔係乘搭。`data/duties/` 內 ride 全部改正：屯門 → W1F／E3C、美孚／紅磡3 → W1A、CIOT → CIO1、LT1 → ETS2（出廠）、WKS → TAW3 改為 `empty`（空車）；WKS ⇄ 屯門、WKS → KSR1 改為 `drive`（時間表本來已經話呢班係同一更份駕駛）。而家所有更份都冇 `ride`。
+- `tools/dutycards.py`：新 `empty_move()`，之後再讀 Duty Sheet 都會一樣處理。`validate_duties.mjs` 加檢查：卡片入面冇 `ride`。
 - Shell cache renamed `v71`.
 
 ## v0.8.37 — 2026-11-12 (`f991ea8`)

@@ -119,7 +119,8 @@ def leg_kind(remark, flag, has_run):
     r = remark.lower()
     if r.startswith("train preparation") or r.startswith("empty train"):
         return "prep" if r.startswith("train") else "empty"
-    if r.startswith("ride") or r.startswith("自己攬車"):
+    # Flag N = empty train (Ice, 2026-11-14), so an N row is never a ride, whatever its remark says.
+    if "N" not in flag and (r.startswith("ride") or r.startswith("自己攬車")):
         return "ride"
     if r.startswith(("spare", "break")) or "standby" in r:
         return "wait"

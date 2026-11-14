@@ -35,6 +35,17 @@ for (const entry of index.sheets) {
 }
 check(unnamed.size === 0, `every place on a card has a name${unnamed.size ? ` (missing: ${[...unnamed].join(" ")})` : ""}`)
 
+// Ice (2026-11-14): every "Ride ..." row on the sheets so far is the driver driving (empty
+// train into or out of a depot, or a trip the timetable gives to the same duty), so none
+// of the current cards has a ride leg. A real ride must be added on purpose.
+const rides = []
+for (const entry of index.sheets) {
+  for (const d of load(entry.code).duties) {
+    for (const l of d.legs ?? []) if (l[0] === "ride") rides.push(`${d.id} Run ${l[1]} ${l[2]}-${l[4]}`)
+  }
+}
+check(rides.length === 0, `no card has a ride leg${rides.length ? ` (${rides.slice(0, 5).join(", ")})` : ""}`)
+
 for (const entry of index.sheets) {
   const book = load(entry.code)
   check(book.duties.length === entry.duties, `DS${entry.code}: index count ${entry.duties} matches ${book.duties.length}`)

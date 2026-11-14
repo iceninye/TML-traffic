@@ -93,7 +93,26 @@ PARK_TRIPS = {("HUH3", "ETS1"), ("ETS2", "HUH2")}
 
 
 def park_kind(kind, frm, to):
-    return "park" if kind == "drive" and (frm, to) in PARK_TRIPS else kind
+    kind = "park" if kind == "drive" and (frm, to) in PARK_TRIPS else kind
+    return empty_move(kind, frm, to)
+
+
+# The sheet words some of the driver's own legs as a "Ride ..." row, but the driver is
+# driving (Ice, 2026-11-14): an empty train into a depot or pocket track (TUM to W1F,
+# 6091113 Run 31), out of a depot (LT1 to ETS2), or WKS to TAW3; and the revenue trips
+# WKS <-> TUM / WKS to KSR1, which the timetable already gives to the same duty. The same
+# moves on other cards are plain drive / empty rows.
+EMPTY_INTO = {"W1F", "E3C", "W1A"}
+EMPTY_PAIRS = {("CIOT", "CIO1"), ("LT1", "ETS2"), ("WKS", "TAW3")}
+DRIVE_PAIRS = {("WKS", "TUM"), ("TUM", "WKS"), ("WKS", "KSR1")}
+
+
+def empty_move(kind, frm, to):
+    if kind != "ride":
+        return kind
+    if to in EMPTY_INTO or (frm, to) in EMPTY_PAIRS:
+        return "empty"
+    return "drive" if (frm, to) in DRIVE_PAIRS else kind
 
 
 def leg_kind(remark, flag, has_run):

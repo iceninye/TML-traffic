@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.38 — 2026-11-14
+- 用戶睇得明：修正「乘搭 Run 31 屯門 → 八鄉廠 W1F」呢類行程（Ice 2026-11-14）。呢啲係車長自己揸車（入廠、出廠或載客班次），之後先坐接駁返錦上路收工，唔係乘搭。`data/duties/` 內 ride 全部改正：屯門 → W1F／E3C、美孚／紅磡3 → W1A、CIOT → CIO1、LT1 → ETS2（出廠）、WKS → TAW3 改為 `empty`（空車）；WKS ⇄ 屯門、WKS → KSR1 改為 `drive`（時間表本來已經話呢班係同一更份駕駛）。而家所有更份都冇 `ride`。
+- `tools/dutycards.py`：新 `empty_move()`，之後再讀 Duty Sheet 都會一樣處理。`validate_duties.mjs` 加檢查：卡片入面冇 `ride`。
+- Shell cache renamed `v71`.
+
 ## v0.8.37 — 2026-11-12 (`f991ea8`)
 - 用戶睇得明：修正兩個配對錯誤（Ice 2026-11-12 11:32 兩張截圖，Duty Sheet 1101）。(1) 已完成嘅 Run 2 會以「+345s」紅 dot 出現喺恆安，貼住真正嘅 Run 3；(2) 紅磡出現一班「-」，貼住 Run 7 +95s。
 - Run 2 幽靈車：同一班車嘅兩個讀數（恆安 2 分、馬鞍山 3 分）線時間差 81 s，超過孤立讀數合併上限（75 s），`orderPriors` 當成兩班車，多出嗰班派咗畀 Run 2（+349 s）。而家只喺合併後嘅車同孤立讀數都離其他車 ≥ 240 s 時，合併上限放到 120 s（`ORDER_LONE_JOIN_SPARSE_SEC`）；車距得 100-180 s 嘅 queue 場景維持 75 s。單純加大 75 s 試過，204 行 grid 有 15-25 行變差（opened 嘅 queue wrong-trip 升到 10-15%），所以唔用。

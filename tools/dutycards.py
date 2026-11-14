@@ -93,7 +93,23 @@ PARK_TRIPS = {("HUH3", "ETS1"), ("ETS2", "HUH2")}
 
 
 def park_kind(kind, frm, to):
-    return "park" if kind == "drive" and (frm, to) in PARK_TRIPS else kind
+    kind = "park" if kind == "drive" and (frm, to) in PARK_TRIPS else kind
+    return empty_move(kind, frm, to)
+
+
+# The sheet words a driver's own empty-train move into a depot or pocket track as a
+# "Ride ..." row: TUM to W1F/E3C, MEF1/HUH3 to W1A, CIOT to CIO1. The driver is
+# driving the train without passengers and gets back by shuttle afterwards (Ice,
+# 2026-11-14, 6091113 Run 31 TUM to W1F). The same move on other cards is a plain
+# empty row. Real rides (WKS to TUM / KSR1 / TAW3, LT1 to ETS2) stay "ride".
+EMPTY_INTO = {"W1F", "E3C", "W1A"}
+EMPTY_PAIRS = {("CIOT", "CIO1")}
+
+
+def empty_move(kind, frm, to):
+    if kind == "ride" and (to in EMPTY_INTO or (frm, to) in EMPTY_PAIRS):
+        return "empty"
+    return kind
 
 
 def leg_kind(remark, flag, has_run):

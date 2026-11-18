@@ -3,6 +3,11 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.8.39 — 2026-11-18 (`ad79417`)
+- Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。
+- 新增本星期嘅取消提示，沿用上星期提示及確認記錄；同步更新 `tools/make_overlay_w46.py`，重新產生資料唔會恢復已取消日期。`validate_calendar.mjs` 加入運行日期、提示同取消邊界檢查。
+- Shell cache renamed `v72`.
+
 ## v0.8.38 — 2026-11-14
 - 用戶睇得明：修正「乘搭 Run 31 屯門 → 八鄉廠 W1F」呢類行程（Ice 2026-11-14）。呢啲係車長自己揸車（入廠、出廠或載客班次），之後先坐接駁返錦上路收工，唔係乘搭。`data/duties/` 內 ride 全部改正：屯門 → W1F／E3C、美孚／紅磡3 → W1A、CIOT → CIO1、LT1 → ETS2（出廠）、WKS → TAW3 改為 `empty`（空車）；WKS ⇄ 屯門、WKS → KSR1 改為 `drive`（時間表本來已經話呢班係同一更份駕駛）。而家所有更份都冇 `ride`。
 - `tools/dutycards.py`：新 `empty_move()`，之後再讀 Duty Sheet 都會一樣處理。`validate_duties.mjs` 加檢查：卡片入面冇 `ride`。

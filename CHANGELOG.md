@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.8.39 — 2026-11-18
+## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。
 - 新增本星期嘅取消提示，沿用上星期提示及確認記錄；同步更新 `tools/make_overlay_w46.py`，重新產生資料唔會恢復已取消日期。`validate_calendar.mjs` 加入運行日期、提示同取消邊界檢查。
 - Shell cache renamed `v72`.

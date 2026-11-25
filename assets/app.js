@@ -1995,7 +1995,7 @@ function segmentInfoHtml(segment) {
   const epRows = records.entryPoints.map((ep) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
-    return `<li class="td-row"><div class="td-main"><span class="ep-chip yellow">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
+    return `<li class="td-row"><div class="td-main"><span class="ep-chip yellow" title="${s.toTum}">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green" title="${s.toWks}">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km · ${trackName}</div>${tdDetails(ep)}</li>`
   })
   const cpdRows = records.cpds.map((cpd) =>

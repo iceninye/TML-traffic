@@ -1,19 +1,21 @@
 // Checks the optional feed proxy (lib/mtr-proxy.js) and its Worker (worker/src/index.js) without a network.
 //   node tools/validate_proxy.mjs
 import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { createProxyFetch } from "../lib/mtr-proxy.js"
 import worker, { STATIONS, buildBoard, UPSTREAM } from "../worker/src/index.js"
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 let failed = 0
 const check = (ok, what) => {
   console.log(`${ok ? "✓" : "✗"} ${what}`)
   if (!ok) failed += 1
 }
 
-const network = JSON.parse(readFileSync(`${root}/data/tml-network.json`, "utf8"))
+const network = JSON.parse(readFileSync(join(root, "data/tml-network.json"), "utf8"))
 check(JSON.stringify(STATIONS) === JSON.stringify(Object.keys(network.stations)), "Worker 站碼清單同 data/tml-network.json 一致")
-check(JSON.parse(readFileSync(`${root}/data/config.json`, "utf8")).feedProxy === "", "預設關閉 feedProxy")
+check(JSON.parse(readFileSync(join(root, "data/config.json"), "utf8")).feedProxy === "", "預設關閉 feedProxy")
 
 // A fake data.gov.hk: every station answers { data: { "TML-<sta>": ... } }.
 let upstreamCalls = 0

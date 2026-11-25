@@ -2,10 +2,11 @@
 //   node tools/validate_calendar.mjs
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { isDeepStrictEqual } from "node:util"
 import { applyOverlays, pendingNotices, serviceDate } from "../lib/tml-timetable.js"
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (path) => JSON.parse(readFileSync(join(root, path), "utf8"))
 let failed = 0
 const check = (ok, what) => {

@@ -21,9 +21,15 @@ jobs:
       - name: Report
         id: report
         run: |
-          set +e
-          node tools/coverage.mjs --days 14 --md > report.md
-          echo "warn=$([ $? -eq 2 ] && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
+          set -e
+          code=0
+          node tools/coverage.mjs --days 14 --md > report.md || code=$?
+          case "$code" in
+            0) warn=0 ;;
+            2) warn=1 ;;
+            *) echo "coverage failed with exit code $code" >&2; exit "$code" ;;
+          esac
+          echo "warn=$warn" >> "$GITHUB_OUTPUT"
           cat report.md
       - name: Open, update or close the issue
         env:

@@ -3,9 +3,10 @@
 // --md：輸出 Markdown（每週 GitHub Action 用嚟開 Issue）。有警告時 exit code 為 2。
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { calendarDay, entriesForDate, pickFirstEntry, serviceDate } from "../lib/tml-timetable.js"
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (p) => JSON.parse(readFileSync(join(root, p), "utf8"))
 const argv = process.argv.slice(2)
 const days = Number(argv[argv.indexOf("--days") + 1]) || 14

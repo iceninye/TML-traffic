@@ -2,6 +2,7 @@
 //   node tools/validate_data.mjs
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 let failed = 0
 const check = (ok, what) => {
@@ -10,7 +11,7 @@ const check = (ok, what) => {
     console.log(`✗ ${what}`)
   }
 }
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 
 // data/ 入面每個 JSON 都讀得通
 let files = 0

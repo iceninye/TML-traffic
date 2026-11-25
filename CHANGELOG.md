@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.9.0 — 2026-11-26 (`dev`, test branch)
+- 車站新增左右軌點擊：上行開「該站 → 上一站」、下行開「該站 → 下一站」；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。
+- 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。
+- 移除左上角橙色掣；有適用 Duty Sheet 時，Run 編號同「全日更份」直接可用。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v73`。
+
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。
 - 新增本星期嘅取消提示，沿用上星期提示及確認記錄；同步更新 `tools/make_overlay_w46.py`，重新產生資料唔會恢復已取消日期。`validate_calendar.mjs` 加入運行日期、提示同取消邊界檢查。

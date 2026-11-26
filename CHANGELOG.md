@@ -12,7 +12,8 @@ release commits stamped in the page footer.
 - EP 改用綠色／黃色圓形掣，支援全區段方向 glow 切換；CPD／EP 字型放大。單軌圖加 Neutral Zone 彩虹段，VCC 交界以紅色虛線、左右 label 同 chainage 標示。
 - Neutral Zone 彩虹加粗並提高不透明度；EP 方向文字只顯示喺第一組，路軌 EP 位置加可切換圓形掣同編號，CPD 加青色圓點。
 - 技術欄喺 CPD 前加入方向感知 EAP 列表，使用珊瑚色圓點；`n/a` 改為無框文字。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v78`。
+- 路軌 EP 改為單一深色圓點，只有 VCC 重疊處保留白字黑邊；Neutral Zone 改為路段內不透明彩虹色帶，CPD／EAP 改為同 EP 一樣嘅分層內容。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v79`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

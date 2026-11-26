@@ -2056,9 +2056,9 @@ function segmentInfoHtml(segment) {
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
   const eapRows = (records.emergencyAccessPoints ?? []).map((point) =>
-    `<li class="td-row td-compact eap-row"><div class="td-main"><span class="eap-dot" aria-hidden="true"></span>${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
+    `<li class="td-row td-point-group eap-row"><div class="td-main"><span class="eap-dot" aria-hidden="true"></span>${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpdRows = records.cpds.map((cpd) =>
-    `<li class="td-row td-compact cpd-row"><div class="td-main"><span class="cpd-dot" aria-hidden="true"></span>${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
+    `<li class="td-row td-point-group cpd-row"><div class="td-main"><span class="cpd-dot" aria-hidden="true"></span>${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const neutralRows = records.neutralZones.map((zone) => {
     const where = zone.downLimitKm != null && zone.upLimitKm != null
       ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
@@ -2115,11 +2115,7 @@ function buildSegmentDiagram() {
   const defs = make("defs")
   const filter = make("filter", { id: "segment-glow", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: width + 120, height: height + 120 })
   filter.append(make("feGaussianBlur", { stdDeviation: 4 }))
-  const rainbow = make("linearGradient", { id: "segment-rainbow", gradientUnits: "userSpaceOnUse", x1: x, y1: top, x2: x, y2: bottom })
-  for (const [offset, color] of [["0%", "#ff4d6d"], ["20%", "#ff9f43"], ["40%", "#ffe66d"], ["60%", "#5cff9d"], ["80%", "#42d9ff"], ["100%", "#b779ff"]]) {
-    rainbow.append(make("stop", { offset, "stop-color": color }))
-  }
-  defs.append(filter, rainbow)
+  defs.append(filter)
   svg.append(defs)
 
   const color = segment.dir === "UP" ? COLORS.UP : COLORS.DOWN
@@ -2174,22 +2170,26 @@ function paintSegmentInfrastructure() {
   if (!Number.isFinite(span) || span === 0) return
   const yForChainage = (km) => top + ((km - range.chainageFrom) / span) * (bottom - top)
   layer.replaceChildren()
+  const defs = make("defs")
+  layer.append(defs)
 
-  for (const zone of records.neutralZones) {
+  for (const [index, zone] of records.neutralZones.entries()) {
     const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
     const values = limits.length === 2 ? limits : chainageValues(zone.chainageKm).filter(Number.isFinite)
     if (!values.length) continue
     const low = Math.min(...values)
     const high = Math.max(...values)
-    const y1 = Math.max(top, Math.min(bottom, yForChainage(low)))
-    const y2 = Math.max(top, Math.min(bottom, yForChainage(high)))
-    const pointPadding = limits.length === 2 ? 0 : 7
-    const lineY1 = Math.max(top, y1 - pointPadding)
-    const lineY2 = Math.min(bottom, y2 + pointPadding)
-    layer.append(
-      make("line", { x1: x, y1: lineY1, x2: x, y2: lineY2, class: "segment-neutral-zone-glow", stroke: "url(#segment-rainbow)", filter: "url(#segment-glow)" }),
-      make("line", { x1: x, y1: lineY1, x2: x, y2: lineY2, class: "segment-neutral-zone", stroke: "url(#segment-rainbow)" }),
-    )
+    const y1 = Math.min(yForChainage(low), yForChainage(high))
+    const y2 = Math.max(yForChainage(low), yForChainage(high))
+    const bandY1 = limits.length === 2 ? Math.max(top, y1) : Math.max(top, y1 - 5)
+    const bandHeight = limits.length === 2 ? Math.max(0.5, Math.min(bottom, y2) - bandY1) : Math.min(10, bottom - bandY1)
+    const gradientId = `segment-neutral-gradient-${index}`
+    const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: x, y1: bandY1, x2: x, y2: bandY1 + bandHeight })
+    for (const [offset, color] of [["0%", "#d73a49"], ["20%", "#e67e22"], ["40%", "#d4ac0d"], ["60%", "#2e9e5b"], ["80%", "#218fb5"], ["100%", "#7d3c98"]]) {
+      gradient.append(make("stop", { offset, "stop-color": color }))
+    }
+    defs.append(gradient)
+    layer.append(make("rect", { x: x - 5, y: bandY1, width: 10, height: bandHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }))
   }
 
   const vccFrom = records.vccFrom
@@ -2216,29 +2216,30 @@ function paintSegmentInfrastructure() {
     const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
-    for (const [direction, code, cx] of [["WKS", green, x - 8], ["TUM", yellow, x + 8]]) {
-      const active = epDir === direction
-      const label = direction === "WKS" ? t().tdWksDirection : t().tdTumDirection
-      const control = make("g", {
-        class: `segment-ep-control ${active ? "active" : ""}`,
-        role: "button",
-        tabindex: 0,
-        "data-ep-dir": direction,
-        "aria-pressed": String(active),
-        "aria-label": `${label} EP ${code}`,
-      })
-      const dot = make("circle", { cx, cy: y, r: active ? 7 : 5, class: `segment-ep-dot ${direction === "WKS" ? "green" : "yellow"}` })
-      if (active) dot.setAttribute("filter", "url(#segment-glow)")
-      control.append(make("circle", { cx, cy: y, r: 12, fill: "transparent" }), dot)
-      control.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          setSegmentEpDir(direction)
-        }
-      })
-      layer.append(control)
-    }
-    layer.append(make("text", { x: x + 22, y: y + 4, class: "segment-ep-code" }, `EP ${epDir === "WKS" ? green : yellow}`))
+    const code = epDir === "WKS" ? green : yellow
+    const nextDir = epDir === "WKS" ? "TUM" : "WKS"
+    const nextLabel = nextDir === "WKS" ? t().tdWksDirection : t().tdTumDirection
+    const overlapsVcc = records.vccBoundaries.some((boundary) =>
+      chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
+    const control = make("g", {
+      class: "segment-ep-control active",
+      role: "button",
+      tabindex: 0,
+      "data-ep-toggle": "1",
+      "aria-label": `EP ${code}，撳一下切換至 ${nextLabel}`,
+    })
+    control.append(
+      make("circle", { cx: x, cy: y, r: 12, fill: "transparent" }),
+      make("circle", { cx: x, cy: y, r: 6, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+    )
+    control.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault()
+        setSegmentEpDir(nextDir)
+      }
+    })
+    layer.append(control)
+    layer.append(make("text", { x: x + 16, y: y + 4, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
   }
 }
 
@@ -2886,6 +2887,8 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
       const { from, dir } = state.segment
       openSegment(from, dir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-toggle]")) {
+      setSegmentEpDir(state.segment.epDir === "WKS" ? "TUM" : "WKS")
     } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-dir]")) {
       setSegmentEpDir(event.target.closest("[data-ep-dir]").dataset.epDir)
     } else if (event.target.closest(".duty-open")) {

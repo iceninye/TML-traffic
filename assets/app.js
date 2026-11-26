@@ -24,7 +24,7 @@ import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealM
 import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
-import { formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
+import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -1956,7 +1956,7 @@ function openSegment(code, dir) {
   if (!dest) return
   state.selected = null
   state.station = null
-  state.segment = { from: code, to: dest, dir, status: "loading", range: null, records: null, geometry: null }
+  state.segment = { from: code, to: dest, dir, epDir: "WKS", status: "loading", range: null, records: null, geometry: null }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
   buildSegmentDiagram()
@@ -1980,6 +1980,7 @@ function openSegment(code, dir) {
     current.records = recordsForRange(technical, range, dir)
     current.status = "ok"
     paintSegmentInfo()
+    paintSegmentInfrastructure()
     syncSegmentTrains()
   }).catch((error) => {
     const current = state.segment
@@ -2039,10 +2040,18 @@ function segmentInfoHtml(segment) {
   }
   const { records, range } = segment
   if (!records || !range) return s.tdLoading
-  const epRows = records.entryPoints.map((ep) => {
+  const epDir = segment.epDir ?? "WKS"
+  const entryPoints = segment.dir === "DOWN" ? [...records.entryPoints].reverse() : records.entryPoints
+  const epButton = (direction, code, label) => {
+    const active = epDir === direction
+    return `<button type="button" class="ep-dot ${direction === "WKS" ? "green" : "yellow"}" data-ep-dir="${direction}" aria-pressed="${active}" aria-label="${escapeHtml(`${label} ${code}`)}" title="${escapeHtml(label)}"></button>` +
+      `<span class="ep-code">EP ${escapeHtml(code)}</span><span class="ep-direction">${escapeHtml(label)}</span>`
+  }
+  const epRows = entryPoints.map((ep) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
-    return `<li class="td-row td-compact ep-row"><div class="td-main"><span class="ep-chip yellow" title="${s.toTum}">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green" title="${s.toWks}">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
+    return `<li class="td-row td-ep-group"><div class="ep-line">${epButton("WKS", green, s.tdWksDirection)}</div>` +
+      `<div class="ep-line">${epButton("TUM", yellow, s.tdTumDirection)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
   const cpdRows = records.cpds.map((cpd) =>
@@ -2072,7 +2081,11 @@ function paintSegmentInfo() {
   if (!segment || state.sheetKind !== "segment") return
   const info = document.getElementById("segment-info")
   const range = document.getElementById("segment-range")
-  if (info) info.innerHTML = segmentInfoHtml(segment)
+  const scrollTop = info?.scrollTop ?? 0
+  if (info) {
+    info.innerHTML = segmentInfoHtml(segment)
+    info.scrollTop = scrollTop
+  }
   if (range) range.textContent = segment.range
     ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo))
     : segment.status === "error" ? t().tdFailed : t().tdLoading
@@ -2098,7 +2111,11 @@ function buildSegmentDiagram() {
   const defs = make("defs")
   const filter = make("filter", { id: "segment-glow", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: width + 120, height: height + 120 })
   filter.append(make("feGaussianBlur", { stdDeviation: 4 }))
-  defs.append(filter)
+  const rainbow = make("linearGradient", { id: "segment-rainbow", gradientUnits: "userSpaceOnUse", x1: x, y1: top, x2: x, y2: bottom })
+  for (const [offset, color] of [["0%", "#ff4d6d"], ["20%", "#ff9f43"], ["40%", "#ffe66d"], ["60%", "#5cff9d"], ["80%", "#42d9ff"], ["100%", "#b779ff"]]) {
+    rainbow.append(make("stop", { offset, "stop-color": color }))
+  }
+  defs.append(filter, rainbow)
   svg.append(defs)
 
   const color = segment.dir === "UP" ? COLORS.UP : COLORS.DOWN
@@ -2118,7 +2135,7 @@ function buildSegmentDiagram() {
     )
   }
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
-  svg.append(base, make("g", { id: "segment-train-layer" }))
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), make("g", { id: "segment-train-layer" }))
   const labelRoom = width - x - 32
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()
@@ -2131,8 +2148,53 @@ function buildSegmentDiagram() {
     }
   }
   segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm }
+  paintSegmentInfrastructure()
   segmentTrainNodes = new Map()
   syncSegmentTrains()
+}
+
+function paintSegmentInfrastructure() {
+  const segment = state.segment
+  const layer = segment?.geometry?.svg?.querySelector("#segment-infrastructure-layer")
+  if (!segment?.range || !segment.records || !layer) return
+  const { svg, x, top, bottom } = segment.geometry
+  const { range, records } = segment
+  const span = range.chainageTo - range.chainageFrom
+  if (!Number.isFinite(span) || span === 0) return
+  const yForChainage = (km) => top + ((km - range.chainageFrom) / span) * (bottom - top)
+  layer.replaceChildren()
+
+  for (const zone of records.neutralZones) {
+    const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
+    const values = limits.length === 2 ? limits : chainageValues(zone.chainageKm).filter(Number.isFinite)
+    if (!values.length) continue
+    const low = Math.min(...values)
+    const high = Math.max(...values)
+    const y1 = Math.max(top, Math.min(bottom, yForChainage(low)))
+    const y2 = Math.max(top, Math.min(bottom, yForChainage(high)))
+    const pointPadding = limits.length === 2 ? 0 : 7
+    layer.append(make("line", {
+      x1: x, y1: Math.max(top, y1 - pointPadding), x2: x, y2: Math.min(bottom, y2 + pointPadding),
+      class: "segment-neutral-zone", stroke: "url(#segment-rainbow)", filter: "url(#segment-glow)",
+    }))
+  }
+
+  const vccFrom = records.vccFrom
+  const vccTo = records.vccTo
+  for (const boundary of records.vccBoundaries) {
+    const values = chainageValues(boundary.values).filter(Number.isFinite)
+    if (!values.length) continue
+    const km = values[0]
+    const y = Math.max(top + 12, Math.min(bottom - 12, yForChainage(km)))
+    const left = 4
+    const right = svg.viewBox.baseVal.width - 4
+    layer.append(
+      make("line", { x1: left, y1: y, x2: right, y2: y, class: "segment-vcc-line" }),
+      make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
+      make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
+      make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+    )
+  }
 }
 
 let segmentTrainNodes = new Map()
@@ -2779,6 +2841,9 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
       const { from, dir } = state.segment
       openSegment(from, dir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-dir]")) {
+      state.segment.epDir = event.target.closest("[data-ep-dir]").dataset.epDir
+      paintSegmentInfo()
     } else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")
       openDutyCard(open.dataset.sheet, open.dataset.duty)

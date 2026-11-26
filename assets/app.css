@@ -768,18 +768,22 @@ svg.diagram {
 .eap-dot { background: #ff7a59; box-shadow: 0 0 6px rgba(255, 122, 89, 0.45); }
 .cpd-dot { background: #67c7ff; box-shadow: 0 0 6px rgba(103, 199, 255, 0.45); }
 .point-dot:focus-visible, .ep-dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.segment-neutral-zone-casing { fill: #041018; opacity: 0.92; }
-.segment-neutral-zone { opacity: 1; stroke: #041018; stroke-width: 1; }
-.segment-neutral-limit { stroke: #041018; stroke-width: 1.5; }
+.segment-neutral-zone { opacity: 1; stroke: none; }
+.segment-neutral-boundary { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; animation: segment-marker-flash 1.2s ease-in-out infinite; }
 .segment-neutral-label { fill: #041018; font-size: 8px; font-weight: 700; paint-order: stroke; stroke: #eef5fa; stroke-width: 2.5px; stroke-linejoin: round; }
-.segment-ep-control { cursor: pointer; opacity: 1; }
-.segment-ep-dot { stroke: rgba(255, 255, 255, 0.95); stroke-width: 0.75; }
+.segment-ep-control { opacity: 1; pointer-events: none; }
+.segment-ep-dot { stroke: rgba(255, 255, 255, 0.95); stroke-width: 0.75; animation: segment-marker-flash 1.6s ease-in-out infinite; }
 .segment-ep-dot.green { fill: #2f9e5b; }
 .segment-ep-dot.yellow { fill: #d79a16; }
-.segment-cpd-dot { fill: #168aad; stroke: #041018; stroke-width: 0.45; }
-.segment-eap-dot { fill: #c64d32; stroke: #041018; stroke-width: 0.45; }
-.segment-ep-control:focus-visible { outline: none; }
-.segment-ep-control:focus-visible .segment-ep-dot { stroke: #fff; stroke-width: 3; }
+.segment-cpd-dot { fill: #168aad; stroke: #041018; stroke-width: 0.45; animation: segment-marker-flash 1.6s ease-in-out infinite; }
+.segment-eap-dot { fill: #c64d32; stroke: #041018; stroke-width: 0.45; animation: segment-marker-flash 1.6s ease-in-out infinite; }
+@keyframes segment-marker-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .segment-ep-dot, .segment-cpd-dot, .segment-eap-dot, .segment-neutral-boundary { animation: none; }
+}
 .segment-ep-code { fill: #041018; font-size: 9.5px; font-weight: 700; }
 .segment-ep-code.overlap { fill: #fff; paint-order: stroke; stroke: #041018; stroke-width: 3px; stroke-linejoin: round; }
 .segment-vcc-line { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 5 5; }

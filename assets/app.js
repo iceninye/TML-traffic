@@ -1956,7 +1956,20 @@ function openSegment(code, dir) {
   if (!dest) return
   state.selected = null
   state.station = null
-  state.segment = { from: code, to: dest, dir, epDir: "WKS", routeMode: "EP", routeVisible: true, status: "loading", range: null, records: null, geometry: null }
+  state.segment = {
+    from: code,
+    to: dest,
+    dir,
+    routes: {
+      EP: { status: "off", direction: "WKS", selectedId: null },
+      CPD: { status: "off", selectedId: null },
+      EAP: { status: "off", selectedId: null },
+    },
+    status: "loading",
+    range: null,
+    records: null,
+    geometry: null,
+  }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
   buildSegmentDiagram()
@@ -2040,24 +2053,27 @@ function segmentInfoHtml(segment) {
   }
   const { records, range } = segment
   if (!records || !range) return s.tdLoading
-  const epDir = segment.epDir ?? "WKS"
-  const routeVisible = segment.routeVisible !== false
   const entryPoints = segment.dir === "DOWN" ? [...records.entryPoints].reverse() : records.entryPoints
-  const epButton = (direction, code, label, showLabel) => {
-    const active = segment.routeMode === "EP" && routeVisible && epDir === direction
-    return `<button type="button" class="ep-dot ${direction === "WKS" ? "green" : "yellow"}" data-ep-dir="${direction}" aria-pressed="${active}" aria-label="${escapeHtml(`${label} ${code}`)}" title="${escapeHtml(label)}"></button>` +
+  const epButton = (direction, code, id, label, showLabel) => {
+    const route = segment.routes?.EP
+    const itemId = `${direction}:${id}`
+    const active = route?.status === "all" ? route.direction === direction : route?.status === "single" && route.selectedId === itemId
+    return `<button type="button" class="ep-dot ${direction === "WKS" ? "green" : "yellow"}" data-route-kind="EP" data-route-id="${escapeHtml(id)}" data-ep-dir="${direction}" aria-pressed="${active}" aria-label="${escapeHtml(`${label} ${code}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>` +
       `<span class="ep-code">EP ${escapeHtml(code)}</span>${showLabel ? `<span class="ep-direction">${escapeHtml(label)}</span>` : ""}`
   }
   const pointButton = (kind, id, label) => {
-    const active = segment.routeMode === kind && routeVisible
-    return `<button type="button" class="point-dot ${kind === "CPD" ? "cpd-dot" : "eap-dot"}" data-route-kind="${kind}" aria-pressed="${active}" aria-label="${escapeHtml(`${label}：${id}`)}" title="${escapeHtml(`喺路軌顯示／隱藏 ${label}`)}"></button>`
+    const route = segment.routes?.[kind]
+    const active = route?.status === "all" || (route?.status === "single" && route.selectedId === id)
+    return `<button type="button" class="point-dot ${kind === "CPD" ? "cpd-dot" : "eap-dot"}" data-route-kind="${kind}" data-route-id="${escapeHtml(id)}" aria-pressed="${active}" aria-label="${escapeHtml(`${label}：${id}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>`
   }
   const epRows = entryPoints.map((ep, index) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
+    const yellowId = String(ep.yellowEPId ?? ep.yellowEP)
+    const greenId = String(ep.greenEPId ?? ep.greenEP)
     const showLabel = index === 0
-    return `<li class="td-row td-ep-group"><div class="ep-line">${epButton("WKS", green, s.tdWksDirection, showLabel)}</div>` +
-      `<div class="ep-line">${epButton("TUM", yellow, s.tdTumDirection, showLabel)}</div>` +
+    return `<li class="td-row td-ep-group"><div class="ep-line">${epButton("WKS", green, greenId, s.tdWksDirection, showLabel)}</div>` +
+      `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
   const eapRows = (records.emergencyAccessPoints ?? []).map((point) =>
@@ -2163,28 +2179,44 @@ function buildSegmentDiagram() {
   syncSegmentTrains()
 }
 
-function setSegmentRouteMode(kind, direction) {
+function setSegmentRouteItem(kind, id, direction) {
   const segment = state.segment
-  if (!segment || !["EP", "CPD", "EAP"].includes(kind)) return
-  if (kind === "EP" && !["WKS", "TUM"].includes(direction)) return
-  if (kind === "EP") {
-    if (segment.routeMode === "EP" && segment.routeVisible !== false && segment.epDir === direction) segment.routeVisible = false
-    else {
-      segment.routeMode = kind
-      segment.epDir = direction
-      segment.routeVisible = true
-    }
-  } else if (segment.routeMode === kind && segment.routeVisible !== false) segment.routeVisible = false
-  else {
-    segment.routeMode = kind
-    segment.routeVisible = true
+  if (!segment || !["EP", "CPD", "EAP"].includes(kind) || !id) return
+  if (!segment.routes) segment.routes = {
+    EP: { status: "off", direction: "WKS", selectedId: null },
+    CPD: { status: "off", selectedId: null },
+    EAP: { status: "off", selectedId: null },
   }
+  const route = segment.routes[kind]
+  if (kind === "EP") {
+    if (!["WKS", "TUM"].includes(direction)) return
+    const itemId = `${direction}:${id}`
+    if (route.status === "off") {
+      route.status = "all"
+      route.direction = direction
+      route.selectedId = null
+    } else if (route.status === "all") {
+      if (route.direction !== direction) {
+        route.direction = direction
+        route.selectedId = null
+      } else {
+        route.status = "single"
+        route.selectedId = itemId
+      }
+    } else if (route.selectedId === itemId) route.status = "off"
+    else {
+      route.status = "single"
+      route.direction = direction
+      route.selectedId = itemId
+    }
+  } else if (route.status === "off") route.status = "all"
+  else if (route.status === "all") {
+    route.status = "single"
+    route.selectedId = id
+  } else if (route.selectedId === id) route.status = "off"
+  else route.selectedId = id
   paintSegmentInfo()
   paintSegmentInfrastructure()
-}
-
-function setSegmentEpDir(direction) {
-  setSegmentRouteMode("EP", direction)
 }
 
 function paintSegmentInfrastructure() {
@@ -2208,30 +2240,24 @@ function paintSegmentInfrastructure() {
     const high = Math.max(...values)
     const limitY1 = Math.max(top, Math.min(bottom, Math.min(yForChainage(low), yForChainage(high))))
     const limitY2 = Math.max(top, Math.min(bottom, Math.max(yForChainage(low), yForChainage(high))))
-    const visibleHeight = limits.length === 2 ? Math.max(4, (limitY2 - limitY1) * 5) : 8
-    const center = Math.max(top + visibleHeight / 2, Math.min(bottom - visibleHeight / 2, (limitY1 + limitY2) / 2))
-    const bandY1 = center - visibleHeight / 2
+    const center = (limitY1 + limitY2) / 2
+    const swatchWidth = 19.4
+    const swatchHeight = 12
+    const swatchX = x - swatchWidth / 2
     const gradientId = `segment-neutral-gradient-${index}`
-    const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: x, y1: bandY1, x2: x, y2: bandY1 + visibleHeight })
+    const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: swatchX, y1: center, x2: swatchX + swatchWidth, y2: center })
     for (const [offset, color] of [["0%", "#d73a49"], ["20%", "#e67e22"], ["40%", "#d4ac0d"], ["60%", "#2e9e5b"], ["80%", "#218fb5"], ["100%", "#7d3c98"]]) {
       gradient.append(make("stop", { offset, "stop-color": color }))
     }
     defs.append(gradient)
     const group = make("g", { class: "segment-neutral-zone-group", "data-neutral-zone": zone.isolator })
     const rangeText = limits.length === 2 ? `${chainageText(low)}–${chainageText(high)} km` : `${chainageText(zone.chainageKm)} km`
-    const title = make("title", {}, `${zone.isolator} ${rangeText}${limits.length === 2 ? "；顯示闊度 ×5，界線為實際範圍" : ""}`)
     group.append(
-      title,
-      make("rect", { x: x - 7, y: bandY1 - 1, width: 14, height: visibleHeight + 2, rx: 2, class: "segment-neutral-zone-casing" }),
-      make("rect", { x: x - 6, y: bandY1, width: 12, height: visibleHeight, rx: 1, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
+      make("title", {}, `${zone.isolator} ${rangeText}；白色界線為實際 1× 範圍`),
+      make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
+      make("line", { x1: x, y1: limitY1, x2: x, y2: limitY2, class: "segment-neutral-boundary" }),
+      make("text", { x: swatchX, y: center + swatchHeight / 2 + 9, class: "segment-neutral-label" }, "Neutral zone"),
     )
-    if (limits.length === 2) {
-      group.append(
-        make("line", { x1: x - 8, y1: limitY1, x2: x + 8, y2: limitY1, class: "segment-neutral-limit" }),
-        make("line", { x1: x - 8, y1: limitY2, x2: x + 8, y2: limitY2, class: "segment-neutral-limit" }),
-      )
-    }
-    group.append(make("text", { x: x + 12, y: Math.min(bottom - 2, bandY1 + visibleHeight + 12), class: "segment-neutral-label" }, `${zone.isolator}${limits.length === 2 ? " ×5" : ""}`))
     layer.append(group)
   }
 
@@ -2252,61 +2278,55 @@ function paintSegmentInfrastructure() {
     )
   }
 
-  const routeMode = segment.routeMode ?? "EP"
-  const routeVisible = segment.routeVisible !== false
-  if (!routeVisible) return
-
-  if (routeMode === "EP") {
-    const epDir = segment.epDir ?? "WKS"
+  const epRoute = segment.routes?.EP
+  if (epRoute?.status === "all" || epRoute?.status === "single") {
+    const epDir = epRoute.direction ?? "WKS"
     for (const ep of records.entryPoints) {
+      const id = String(epDir === "WKS" ? ep.greenEPId ?? ep.greenEP : ep.yellowEPId ?? ep.yellowEP)
+      const itemId = `${epDir}:${id}`
+      if (epRoute.status === "single" && epRoute.selectedId !== itemId) continue
       const km = chainageValues(ep.chainageKm).find(Number.isFinite)
       if (!Number.isFinite(km)) continue
       const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
-      const green = formatEp(ep.greenEPId ?? ep.greenEP)
-      const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
-      const code = epDir === "WKS" ? green : yellow
-      const nextDir = epDir === "WKS" ? "TUM" : "WKS"
-      const nextLabel = nextDir === "WKS" ? t().tdWksDirection : t().tdTumDirection
+      const code = formatEp(id)
       const overlapsVcc = records.vccBoundaries.some((boundary) =>
         chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
       const control = make("g", {
         class: "segment-ep-control active",
-        role: "button",
-        tabindex: 0,
-        "data-ep-toggle": "1",
-        "aria-label": `EP ${code}，撳一下切換至 ${nextLabel}`,
+        "aria-hidden": "true",
+        "data-route-marker": "EP",
+        "data-route-id": itemId,
       })
       control.append(
         make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
         make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}`, filter: "url(#segment-ep-glow)" }),
       )
-      control.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          setSegmentEpDir(nextDir)
-        }
-      })
       layer.append(control)
       layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
     }
-    return
   }
 
-  const rows = routeMode === "CPD" ? records.cpds : records.emergencyAccessPoints ?? []
   const markerX = x + (segment.dir === "DOWN" ? -2.75 : 2.75)
-  for (const point of rows) {
-    const km = chainageValues(point.chainageKm).find(Number.isFinite)
-    if (!Number.isFinite(km)) continue
-    const y = Math.max(top, Math.min(bottom, yForChainage(km)))
-    const marker = make("circle", {
-      cx: markerX,
-      cy: y,
-      r: routeMode === "CPD" ? 1.15 : 1.3,
-      class: `segment-${routeMode.toLowerCase()}-dot`,
-      "data-route-marker": routeMode,
-    })
-    marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
-    layer.append(marker)
+  for (const kind of ["CPD", "EAP"]) {
+    const route = segment.routes?.[kind]
+    if (route?.status !== "all" && route?.status !== "single") continue
+    const rows = kind === "CPD" ? records.cpds : records.emergencyAccessPoints ?? []
+    for (const point of rows) {
+      if (route.status === "single" && route.selectedId !== point.id) continue
+      const km = chainageValues(point.chainageKm).find(Number.isFinite)
+      if (!Number.isFinite(km)) continue
+      const y = Math.max(top, Math.min(bottom, yForChainage(km)))
+      const marker = make("circle", {
+        cx: markerX,
+        cy: y,
+        r: kind === "CPD" ? 1.15 : 1.3,
+        class: `segment-${kind.toLowerCase()}-dot`,
+        "data-route-marker": kind,
+        "data-route-id": point.id,
+      })
+      marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
+      layer.append(marker)
+    }
   }
 }
 
@@ -2954,12 +2974,9 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
       const { from, dir } = state.segment
       openSegment(from, dir)
-    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-toggle]")) {
-      setSegmentEpDir(state.segment.epDir === "WKS" ? "TUM" : "WKS")
-    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-dir]")) {
-      setSegmentEpDir(event.target.closest("[data-ep-dir]").dataset.epDir)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
-      setSegmentRouteMode(event.target.closest("[data-route-kind]").dataset.routeKind)
+      const button = event.target.closest("[data-route-kind]")
+      setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)
     } else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")
       openDutyCard(open.dataset.sheet, open.dataset.duty)

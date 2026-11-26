@@ -28,7 +28,8 @@ release commits stamped in the page footer.
 - CPD 查詢支援官方 `U`／`D`／`U/D` 軌道編碼，36 個方向性 CPD 不再遺漏；validator 加入真實編碼迴歸。
 - EAP 標題旁加入獨立連線開關，只控制 EAP 連線，同 EP 開關互不影響。
 - 放大圖上／下車站圖示可跳轉到所選方向嘅前／後相鄰站段，支援鍵盤操作；點擊層置於列車上方，終站冇相鄰段時唔顯示跳轉。
-- 修正放大圖行車箭咀：起點站固定喺頂部、終點站喺底部，所以路軌同列車箭咀都指向下。
+- 修正放大圖整體定向：上行屯門方向喺上、列車向上；下行烏溪沙方向喺下、列車向下。chainage range、VCC／Neutral Zone／EP／CPD／EAP 列表同 marker／連線全部跟隨上下次序。
+- Shell cache renamed `v93`。
 - 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v92`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)

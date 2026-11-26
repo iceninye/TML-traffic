@@ -2005,7 +2005,7 @@ function tdSection(title, rows, empty) {
 
 function tdVccSection(label, rows, empty) {
   const s = t()
-  return `<section class="td-section td-vcc"><div class="td-summary">${label}</div><h3>${s.tdVcc}</h3>${rows.length
+  return `<section class="td-section td-vcc"><h3>${s.tdVccAreasHeading}</h3><div class="td-summary">${label}</div><h3>${s.tdVcc}</h3>${rows.length
     ? `<ul class="td-list">${rows.join("")}</ul>`
     : `<p class="empty">${empty}</p>`}</section>`
 }
@@ -2042,27 +2042,27 @@ function segmentInfoHtml(segment) {
   const epRows = records.entryPoints.map((ep) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
-    return `<li class="td-row"><div class="td-main"><span class="ep-chip yellow" title="${s.toTum}">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green" title="${s.toWks}">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
+    return `<li class="td-row td-compact ep-row"><div class="td-main"><span class="ep-chip yellow" title="${s.toTum}">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green" title="${s.toWks}">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
   const cpdRows = records.cpds.map((cpd) =>
-    `<li class="td-row"><div class="td-main">${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km${cpd.track === "-" ? ` · ${s.tdBothTracks}` : ""}</div></li>`)
+    `<li class="td-row td-compact cpd-row"><div class="td-main">${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const neutralRows = records.neutralZones.map((zone) => {
     const where = zone.downLimitKm != null && zone.upLimitKm != null
       ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
       : `${chainageText(zone.chainageKm)} km`
-    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where} · ${escapeHtml(zone.type)}</div>${tdNote(zone)}</li>`
+    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where}</div>${tdNote(zone)}</li>`
   })
   const vccRows = records.vccBoundaries.map((boundary) =>
     `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`)
   const vccLabel = records.vccFrom && records.vccTo
     ? records.vccFrom === records.vccTo ? `VCC ${records.vccFrom}` : s.tdVccAreas(records.vccFrom, records.vccTo)
-    : s.tdVcc
+    : s.tdNone
   return (
+    tdVccSection(vccLabel, vccRows, s.tdNone) +
+    tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
-    tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
-    tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSources(range, records)
   )
 }
@@ -2114,12 +2114,22 @@ function buildSegmentDiagram() {
     const name = network.name(code, LANG)
     base.append(
       make("rect", { x: x - 12, y: y - 7, width: 24, height: 14, rx: 7, class: "dg-station" }),
-      make("text", { x: x + 24, y: y - 2, class: "dg-name segment-name" }, name),
-      make("text", { x: x + 24, y: y + 13, class: "dg-name-2 segment-name" }, `${code} · ${model.km(code).toFixed(2)} km`),
+      make("text", { x: x + 24, y: y + 4, class: "dg-name segment-name segment-station-label" }, `${name} • ${model.km(code).toFixed(2)} km`),
     )
   }
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
   svg.append(base, make("g", { id: "segment-train-layer" }))
+  const labelRoom = width - x - 32
+  for (const label of svg.querySelectorAll(".segment-station-label")) {
+    const measured = label.getComputedTextLength()
+    if (measured <= labelRoom) continue
+    const size = parseFloat(getComputedStyle(label).fontSize)
+    label.style.fontSize = `${Math.max(8, size * labelRoom / measured)}px`
+    if (label.getComputedTextLength() > labelRoom) {
+      label.setAttribute("textLength", String(labelRoom))
+      label.setAttribute("lengthAdjust", "spacingAndGlyphs")
+    }
+  }
   segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm }
   segmentTrainNodes = new Map()
   syncSegmentTrains()

@@ -713,8 +713,24 @@ svg.diagram {
 .td-section { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
 .td-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
 .td-vcc .td-summary { margin-bottom: 10px; }
+.td-vcc .td-summary + h3 { margin-top: 12px; }
 .td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .td-row { padding: 9px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel-2); }
+.td-row.td-compact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.td-row.td-compact::-webkit-scrollbar { display: none; }
+.td-compact .td-main { flex-wrap: nowrap; gap: 4px; }
+.td-compact .td-meta { margin-top: 0; }
 .td-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; }
 .td-meta { margin-top: 4px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .td-note { margin: 6px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
@@ -753,8 +769,13 @@ svg.diagram {
   .td-summary { padding: 8px; }
   .td-section { padding-top: 10px; }
   .td-row { padding: 8px; }
+  .td-row.td-compact { gap: 2px; padding: 3px 0; }
   .td-main { font-size: 11.5px; }
+  .td-compact .td-main { font-size: 8px; }
+  .td-compact .td-meta { font-size: 8px; }
   .ep-chip { padding: 2px 5px; font-size: 9.5px; }
+  .ep-row .ep-chip { gap: 1px; padding: 0 1px 0 0; border: 0; background: none; font-size: 7.2px; }
+  .ep-row .ep-chip::before { width: 4px; height: 4px; }
 }
 
 @media (max-height: 650px) {

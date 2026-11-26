@@ -2073,6 +2073,16 @@ function chainageText(value) {
   return values.filter((v) => v != null).map((v) => Number(v).toFixed(3)).join(" / ")
 }
 
+function neutralZoneRangeText(zone) {
+  const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
+  if (limits.length === 2) {
+    const low = Math.min(...limits)
+    const high = Math.max(...limits)
+    return `${chainageText(high)}–${chainageText(low)} km`
+  }
+  return `${chainageText(zone.chainageKm)} km`
+}
+
 function tdNote(item) {
   return item?.note ? `<p class="td-note">${escapeHtml(item.note)}</p>` : ""
 }
@@ -2118,7 +2128,9 @@ function segmentInfoHtml(segment) {
   }
   const { records, range } = segment
   if (!records || !range) return s.tdLoading
-  const entryPoints = segment.dir === "DOWN" ? [...records.entryPoints].reverse() : records.entryPoints
+  // Every technical list follows the diagram from the TUM side at the top to
+  // the WKS side at the bottom, so reverse the ascending query results.
+  const entryPoints = [...records.entryPoints].reverse()
   const epButton = (direction, code, id, label, showLabel) => {
     const route = segment.routes?.EP
     const itemId = `${direction}:${id}`
@@ -2141,12 +2153,10 @@ function segmentInfoHtml(segment) {
       `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
-  const emergencyAccessPoints = segment.dir === "DOWN"
-    ? [...(records.emergencyAccessPoints ?? [])].reverse()
-    : records.emergencyAccessPoints ?? []
+  const emergencyAccessPoints = [...(records.emergencyAccessPoints ?? [])].reverse()
   const eapRows = emergencyAccessPoints.map((point) =>
     `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
-  const cpds = segment.dir === "DOWN" ? [...records.cpds].reverse() : records.cpds
+  const cpds = [...records.cpds].reverse()
   const cpdRows = cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const connectorSwitch = (kind) => {
@@ -2154,16 +2164,16 @@ function segmentInfoHtml(segment) {
     const label = `顯示 ${kind} 連線`
     return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${kind.toLowerCase()}-connectors aria-checked="${segment[key] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
   }
-  const neutralRows = records.neutralZones.map((zone) => {
-    const where = zone.downLimitKm != null && zone.upLimitKm != null
-      ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
-      : `${chainageText(zone.chainageKm)} km`
+  const neutralRows = [...records.neutralZones].reverse().map((zone) => {
+    const where = neutralZoneRangeText(zone)
     return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where}</div>${tdNote(zone)}</li>`
   })
-  const vccRows = records.vccBoundaries.map((boundary) =>
+  const vccRows = [...records.vccBoundaries].reverse().map((boundary) =>
     `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`)
-  const vccLabel = records.vccFrom && records.vccTo
-    ? records.vccFrom === records.vccTo ? `VCC ${records.vccFrom}` : s.tdVccAreas(records.vccFrom, records.vccTo)
+  const vccTop = segment.dir === "UP" ? records.vccTo : records.vccFrom
+  const vccBottom = segment.dir === "UP" ? records.vccFrom : records.vccTo
+  const vccLabel = vccTop && vccBottom
+    ? vccTop === vccBottom ? `VCC ${vccTop}` : s.tdVccAreas(vccTop, vccBottom)
     : s.tdNone
   return (
     tdVccSection(vccLabel, vccRows, s.tdNone) +
@@ -2185,9 +2195,11 @@ function paintSegmentInfo() {
     info.innerHTML = segmentInfoHtml(segment)
     info.scrollTop = scrollTop
   }
-  if (range) range.textContent = segment.range
-    ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo))
-    : segment.status === "error" ? t().tdFailed : t().tdLoading
+  if (range && segment.range) {
+    const topChainage = segment.dir === "UP" ? segment.range.chainageTo : segment.range.chainageFrom
+    const bottomChainage = segment.dir === "UP" ? segment.range.chainageFrom : segment.range.chainageTo
+    range.textContent = t().tdRange(chainageText(topChainage), chainageText(bottomChainage))
+  } else range.textContent = segment.status === "error" ? t().tdFailed : t().tdLoading
   paintSegmentConnectors()
 }
 
@@ -2206,6 +2218,10 @@ function buildSegmentDiagram() {
   const bottom = height - margin
   const fromKm = model.km(segment.from)
   const toKm = model.km(segment.to)
+  const topCode = segment.dir === "UP" ? segment.to : segment.from
+  const bottomCode = segment.dir === "UP" ? segment.from : segment.to
+  const topKm = segment.dir === "UP" ? toKm : fromKm
+  const bottomKm = segment.dir === "UP" ? fromKm : toKm
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
   svg.replaceChildren()
 
@@ -2221,15 +2237,25 @@ function buildSegmentDiagram() {
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing" }),
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${segment.dir === "UP" ? "up" : "down"}` }),
   )
+  // Match the main line: UP travels toward TUM at the top, DOWN toward WKS
+  // at the bottom.
   for (let y = top + 28; y < bottom; y += 54) {
     base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
   }
   const stationHits = []
-  for (const [endpoint, code, y] of [["from", segment.from, top], ["to", segment.to, bottom]]) {
+  for (const [position, code, y] of [["top", topCode, top], ["bottom", bottomCode, bottom]]) {
     const name = network.name(code, LANG)
-    const opposite = segment.dir === "UP" ? "DOWN" : "UP"
-    const jumpFrom = endpoint === "from" ? adjacentStation(code, opposite) : code
-    const jumpTo = endpoint === "from" ? code : adjacentStation(code, segment.dir)
+    let jumpFrom = null
+    let jumpTo = null
+    if (position === "top") {
+      const above = adjacentStation(code, "UP")
+      jumpFrom = segment.dir === "UP" ? code : above
+      jumpTo = segment.dir === "UP" ? above : code
+    } else {
+      const below = adjacentStation(code, "DOWN")
+      jumpFrom = segment.dir === "DOWN" ? code : below
+      jumpTo = segment.dir === "DOWN" ? below : code
+    }
     const jumpLabel = jumpFrom && jumpTo
       ? segment.dir === "UP"
         ? s.segmentUp(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
@@ -2240,7 +2266,7 @@ function buildSegmentDiagram() {
       make("text", { x: x + 24, y: y + 4, class: "dg-name segment-name segment-station-label" }, `${name} • ${model.km(code).toFixed(2)} km`),
     )
     if (jumpFrom && jumpTo) {
-      const jumpKind = endpoint === "from" ? "previous" : "next"
+      const jumpKind = position === "top" ? "previous" : "next"
       const hit = make("rect", {
         x: x - 22,
         y: y - 18,
@@ -2286,7 +2312,7 @@ function buildSegmentDiagram() {
       label.setAttribute("lengthAdjust", "spacingAndGlyphs")
     }
   }
-  segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm }
+  segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm, topKm, bottomKm }
   paintSegmentInfrastructure()
   segmentTrainNodes = new Map()
   syncSegmentTrains()
@@ -2339,9 +2365,11 @@ function paintSegmentInfrastructure() {
   if (!segment?.range || !segment.records || !layer) return
   const { svg, x, top, bottom } = segment.geometry
   const { range, records } = segment
-  const span = range.chainageTo - range.chainageFrom
+  const topChainage = segment.dir === "UP" ? range.chainageTo : range.chainageFrom
+  const bottomChainage = segment.dir === "UP" ? range.chainageFrom : range.chainageTo
+  const span = bottomChainage - topChainage
   if (!Number.isFinite(span) || span === 0) return
-  const yForChainage = (km) => top + ((km - range.chainageFrom) / span) * (bottom - top)
+  const yForChainage = (km) => top + ((km - topChainage) / span) * (bottom - top)
   layer.replaceChildren()
   const defs = make("defs")
   layer.append(defs)
@@ -2365,7 +2393,7 @@ function paintSegmentInfrastructure() {
     }
     defs.append(gradient)
     const group = make("g", { class: "segment-neutral-zone-group", "data-neutral-zone": zone.isolator })
-    const rangeText = limits.length === 2 ? `${chainageText(low)}–${chainageText(high)} km` : `${chainageText(zone.chainageKm)} km`
+    const rangeText = neutralZoneRangeText(zone)
     const labelX = swatchX - 1
     const label = make("text", { x: labelX, y: center - 1, class: "segment-neutral-label", "text-anchor": "end", "aria-label": "Neutral Zone" }, "Neutral")
     label.append(make("tspan", { x: labelX, dy: 10 }, "Zone"))
@@ -2377,8 +2405,8 @@ function paintSegmentInfrastructure() {
     layer.append(group)
   }
 
-  const vccFrom = records.vccFrom
-  const vccTo = records.vccTo
+  const vccFrom = segment.dir === "UP" ? records.vccTo : records.vccFrom
+  const vccTo = segment.dir === "UP" ? records.vccFrom : records.vccTo
   for (const boundary of records.vccBoundaries) {
     const values = chainageValues(boundary.values).filter(Number.isFinite)
     if (!values.length) continue
@@ -2515,15 +2543,15 @@ let segmentTrainNodes = new Map()
 function syncSegmentTrains() {
   const segment = state.segment
   if (!segment?.geometry || state.sheetKind !== "segment") return
-  const { svg, x, top, bottom, fromKm, toKm } = segment.geometry
+  const { svg, x, top, bottom, topKm, bottomKm } = segment.geometry
   const layer = svg.querySelector("#segment-train-layer")
   if (!layer) return
-  const low = Math.min(fromKm, toKm)
-  const high = Math.max(fromKm, toKm)
+  const low = Math.min(topKm, bottomKm)
+  const high = Math.max(topKm, bottomKm)
   const seen = new Set()
   const items = state.runs
     .filter((run) => run.dir === segment.dir && Number.isFinite(run.km) && run.km >= low - 0.001 && run.km <= high + 0.001)
-    .map((run) => ({ run, y: top + ((run.km - fromKm) / (toKm - fromKm)) * (bottom - top) }))
+    .map((run) => ({ run, y: top + ((run.km - topKm) / (bottomKm - topKm)) * (bottom - top) }))
     .sort((a, b) => a.y - b.y)
   for (let i = 1; i < items.length; i++) {
     if (items[i].y - items[i - 1].y < 24) items[i].y = items[i - 1].y + 24

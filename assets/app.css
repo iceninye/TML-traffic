@@ -772,11 +772,22 @@ svg.diagram {
 .segment-neutral-zone { opacity: 1; stroke: #fff; stroke-width: 1; }
 .segment-neutral-label { fill: var(--text); font-size: 8px; font-weight: 700; }
 .segment-ep-control { opacity: 1; pointer-events: none; }
-.segment-ep-dot { stroke: #fff; stroke-width: 0.75; animation: segment-marker-flash 3.6s steps(1, end) infinite; }
-.segment-ep-dot.green { fill: #2f9e5b; --marker-color: #2f9e5b; }
-.segment-ep-dot.yellow { fill: #d79a16; --marker-color: #d79a16; }
+.segment-ep-dot { stroke: #fff; stroke-width: 2; animation: segment-ep-flash 3.6s steps(1, end) infinite; }
+.segment-ep-dot.green { fill: #58c77a; --ep-color: #58c77a; }
+.segment-ep-dot.yellow { fill: #f5c451; --ep-color: #f5c451; }
 .segment-cpd-dot { fill: #168aad; stroke: #fff; stroke-width: 0.75; --marker-color: #168aad; animation: segment-marker-flash 3.6s steps(1, end) infinite; }
 .segment-eap-dot { fill: #c64d32; stroke: #fff; stroke-width: 0.75; --marker-color: #c64d32; animation: segment-marker-flash 3.6s steps(1, end) infinite; }
+@keyframes segment-ep-flash {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 12px var(--ep-color)) drop-shadow(0 0 2px var(--ep-color)); }
+  11% { opacity: 1; filter: drop-shadow(0 0 4px var(--ep-color)); }
+  22% { opacity: 1; filter: none; }
+  33% { opacity: 0.75; filter: none; }
+  44% { opacity: 0.5; filter: none; }
+  55% { opacity: 0.75; filter: none; }
+  66% { opacity: 1; filter: none; }
+  77% { opacity: 1; filter: drop-shadow(0 0 4px var(--ep-color)); }
+  88% { opacity: 1; filter: drop-shadow(0 0 12px var(--ep-color)) drop-shadow(0 0 2px var(--ep-color)); }
+}
 @keyframes segment-marker-flash {
   0%, 100% { opacity: 1; filter: drop-shadow(0 0 3px var(--marker-color)); }
   11% { opacity: 1; filter: drop-shadow(0 0 1px var(--marker-color)); }

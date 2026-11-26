@@ -17,7 +17,8 @@ release commits stamped in the page footer.
 - Neutral Zone 改為統一 `19.4 × 12` 左至右彩虹圖，路軌文字統一為 `Neutral Zone`；實際 1× 界線改為閃動白色線。EP／CPD／EAP 路軌標記加入柔和閃動，並改為各自獨立嘅全部／單項／收起三態，可同時存在。
 - Neutral Zone 移除中間白點，加 1px 白邊；文字改成兩行放喺路線左邊，冇白底。EP／CPD／EAP 閃動改為較細但更清楚，CPD／EAP 改用白邊；路軌本體透明度改為 80%。
 - Neutral Zone 文字改用主題文字顏色，深夜模式可以清楚顯示；彩虹圖縮小 20% 至 `15.52 × 9.6`。EP／CPD／EAP 改為九段式 glow／sharp／透明度閃爍，即使開啟減少動態效果仍然保留閃爍。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v83`。
+- 路軌 EP 保留 6px 核心尺寸，但改用右側掣嘅明亮綠／黃色、2px 白邊同 12px glow，令夜間模式都清楚可見。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v84`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

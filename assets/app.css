@@ -761,7 +761,17 @@ svg.diagram {
 .ep-code { font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .ep-direction { color: var(--muted); font-size: 8.5px; }
 .td-ep-group .td-meta { margin-top: 2px; }
-.segment-neutral-zone { fill: none; stroke-width: 7; stroke-linecap: round; }
+.cpd-dot { display: inline-block; flex: 0 0 auto; width: 10px; height: 10px; border: 1px solid rgba(255, 255, 255, 0.75); border-radius: 50%; background: #67c7ff; box-shadow: 0 0 8px rgba(103, 199, 255, 0.75); }
+.segment-neutral-zone-glow { fill: none; stroke-width: 17; stroke-linecap: round; opacity: 0.55; }
+.segment-neutral-zone { fill: none; stroke-width: 9; stroke-linecap: round; opacity: 1; }
+.segment-ep-control { cursor: pointer; opacity: 0.4; }
+.segment-ep-control.active { opacity: 1; }
+.segment-ep-dot { stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.5; }
+.segment-ep-dot.green { fill: #58c77a; }
+.segment-ep-dot.yellow { fill: #f5c451; }
+.segment-ep-control:focus-visible { outline: none; }
+.segment-ep-control:focus-visible .segment-ep-dot { stroke: #fff; stroke-width: 3; }
+.segment-ep-code { fill: #fff; font-size: 9.5px; font-weight: 700; paint-order: stroke; stroke: #041018; stroke-width: 3px; stroke-linejoin: round; }
 .segment-vcc-line { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 5 5; }
 .segment-vcc-label { fill: var(--bad); font-size: 9.5px; font-weight: 700; }
 .segment-vcc-km { font-variant-numeric: tabular-nums; }

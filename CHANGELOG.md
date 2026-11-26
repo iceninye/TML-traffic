@@ -10,7 +10,8 @@ release commits stamped in the page footer.
 - 放大圖左欄填滿可用高度；移除列車數量文字。VCC 只標示實際交界 chainage，並整合區段資料；來源去重後收起喺最底，空資料顯示 `n/a`，不再顯示審核狀態同軌道名稱。
 - 技術欄改為 VCC 區域／交界優先、Neutral Zone 第二；移除 Neutral Zone 類型同 CPD「兩軌」，車站 label、CPD 同 EP 資料改為單行緊湊顯示。
 - EP 改用綠色／黃色圓形掣，支援全區段方向 glow 切換；CPD／EP 字型放大。單軌圖加 Neutral Zone 彩虹段，VCC 交界以紅色虛線、左右 label 同 chainage 標示。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v76`。
+- Neutral Zone 彩虹加粗並提高不透明度；EP 方向文字只顯示喺第一組，路軌 EP 位置加可切換圓形掣同編號，CPD 加青色圓點。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v77`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

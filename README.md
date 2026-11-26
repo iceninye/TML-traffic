@@ -24,11 +24,10 @@
 - 列車按位置畫出；地圖視圖按真實比例畫 8 卡列車，沿 OSM 路軌行駛。
 - 慢過時間表 60 秒以上變紅並標「+ Xs」，180 秒以上紅色閃爍；搵唔到對應班次但班距偏長則標黃色「班距 +Xs」。
 - 虛線圈＝短程車；L＝尾程（之後回廠，顏色較淡）。
-- 每站雙向倒數；撳站睇詳情，撳左／右軌放大相鄰站段，右邊列 EP／CPD／Neutral Zone／VCC 交界。
-- 撳列車睇車次同前方各站推算到站時間；可跟隨列車、暫停。
+- 每站雙向倒數；撳站睇詳情，撳列車睇車次同前方各站推算到站時間；可跟隨列車、暫停。
 
 **Run 同更份（Duty Sheet）**
-- 有適用 Duty Sheet 時，列車圖同列車卡直接顯示 Run 編號，並可用「全日更份 ›」。
+- 撳標題左邊橙點開／關 Run 編號（會記住）；開咗之後列車卡有「全日更份 ›」。
 - 畫面上方「Duty Sheet …」標籤：當值更份、今日全部、所有編號；今日冇適用 Duty Sheet 會顯示「不適用」並隱藏 Run 功能。
 
 **狀態同提示**
@@ -69,14 +68,11 @@ lib/mtr-*.js          抽取返嚟嘅估算引擎（串連各站倒數 → 列�
 worker/               可選：港鐵班次邊緣快取 Worker（預設關閉，見 worker/README.md）
 lib/tml-model.js      時間表位置模型（行車 + 停站 + S 曲線 + 時段）
 lib/tml-timetable.js  時間表對應：讀數 → 班次 → 延誤 → 位置
-lib/td-infrastructure.js TD_TML EP／CPD／Neutral Zone／VCC 站段查詢
 lib/tml-motion.js     追蹤 + 列車時鐘平滑
 lib/maplibre/*.mjs    vendored MapLibre GL 6.12.0（1.2 MB，lazy load）
 data/tml-network.json 27 站
 data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 生成）
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
-data/td-segments.json TD_TML 27 段官方 chainage 對照
-data/td-tml-v2_3_4.json TD_TML 全線技術資料（EP／CPD／NZ／VCC）
 data/timetables/       工作時間表（index.json 清單 + 每份一個 <代號>.json）
 data/duties/           更份卡片（index.json + DS<代號>.json）
 data/calendar.json    公眾假期同「某日用邊份」（人手維護）
@@ -156,8 +152,6 @@ node tools/probe-tml.mjs     # 列車位置（v0.1 引擎）
 node tools/probe-runs.mjs    # 動畫層平滑度
 node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀數）
 node tools/validate_data.mjs       # 全部 JSON 讀得通、index 同卡片 sha256／數量一致（CI 都行）
-node tools/validate_td.mjs         # TD_TML 27 段 chainage、EP／CPD／NZ／VCC 對應
-node tools/validate_tool_paths.mjs # 路徑有空格時工具仍正常
 node tools/validate_duties.mjs     # 更份卡片資料同當值判斷（真資料）
 node tools/validate-hours.mjs      # 官表（duty-basic.json）同更份卡片工時一致
 node tools/validate_position.mjs   # 被扣列車嘅列車點位置（合成讀數）

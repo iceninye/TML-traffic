@@ -18,7 +18,6 @@ try {
   const cases = [
     { script: "validate_data.mjs", args: [], allowed: [0] },
     { script: "validate_calendar.mjs", args: [], allowed: [0] },
-    { script: "validate_td.mjs", args: [], allowed: [0] },
     { script: "validate_proxy.mjs", args: [], allowed: [0] },
     { script: "coverage.mjs", args: ["--days", "1"], allowed: [0, 2] },
   ]

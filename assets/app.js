@@ -2237,8 +2237,8 @@ function paintSegmentInfrastructure() {
     const limitY1 = Math.max(top, Math.min(bottom, Math.min(yForChainage(low), yForChainage(high))))
     const limitY2 = Math.max(top, Math.min(bottom, Math.max(yForChainage(low), yForChainage(high))))
     const center = (limitY1 + limitY2) / 2
-    const swatchWidth = 19.4
-    const swatchHeight = 12
+    const swatchWidth = 15.52
+    const swatchHeight = 9.6
     const swatchX = x - swatchWidth / 2
     const gradientId = `segment-neutral-gradient-${index}`
     const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: swatchX, y1: center, x2: swatchX + swatchWidth, y2: center })

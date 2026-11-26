@@ -352,7 +352,7 @@ svg.diagram {
 .dg-chev { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.75; pointer-events: none; }
 
 .dg-tunnel { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.55; }
-.dg-tunnel-label { font-size: 11px; fill: var(--muted); font-weight: 600; dominant-baseline: middle; letter-spacing: 0.04em; }
+.dg-tunnel-label { font-size: 11px; fill: var(--muted); font-weight: 600; dominant-baseline: middle; letter-spacing: 0.04em; pointer-events: none; }
 
 .dg-station { fill: #f7fbff; stroke: #041018; stroke-width: 1.6; }
 .dg-row[data-hover="1"] .dg-station,

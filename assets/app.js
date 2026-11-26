@@ -1000,6 +1000,22 @@ function buildDiagram() {
         make("text", { x: NAME_X, y: mid + 16, class: "dg-tunnel-label" }, TUNNEL.name),
       )
     }
+    const segmentTop = ya + 24
+    const segmentBottom = yb - 24
+    if (segmentBottom > segmentTop) {
+      for (const [dir, x, from] of [["UP", TRACK_UP_X, b], ["DOWN", TRACK_DN_X, a]]) {
+        const segmentHit = make("rect", { x: x - 16, y: segmentTop, width: 32, height: segmentBottom - segmentTop, class: "dg-hit dg-segment-hit", "data-dir": dir, "aria-hidden": "true" })
+        segmentHit.addEventListener("click", () => openSegment(from, dir))
+        base.append(segmentHit)
+      }
+      const labelWidth = upColX - NAME_X - 8
+      const half = labelWidth / 2
+      for (const [dir, from] of [["UP", b], ["DOWN", a]]) {
+        const labelHit = make("rect", { x: NAME_X - 8 + (dir === "UP" ? 0 : half), y: mid - 10, width: half, height: 20, class: "dg-hit dg-segment-hit", "data-dir": dir, "aria-hidden": "true" })
+        labelHit.addEventListener("click", () => openSegment(from, dir))
+        base.append(labelHit)
+      }
+    }
   }
 
   // Two tracks, casing under colour.
@@ -1056,15 +1072,13 @@ function buildDiagram() {
     hit.addEventListener("pointerenter", () => group.setAttribute("data-hover", "1"))
     hit.addEventListener("pointerleave", () => group.removeAttribute("data-hover"))
     group.append(hit)
-    for (const [dir, x, colX, dest] of [["UP", TRACK_UP_X, upColX, adjacentStation(code, "UP")], ["DOWN", TRACK_DN_X, dnColX, adjacentStation(code, "DOWN")]]) {
-      if (!dest) continue
-      for (const [hitX, hitW] of [[x - 16, 32], [colX, COL_W]]) {
-        const segmentHit = make("rect", { x: hitX, y: y - 22, width: hitW, height: 44, class: "dg-hit dg-dir-hit", "data-dir": dir, "aria-hidden": "true" })
-        segmentHit.addEventListener("click", () => openSegment(code, dir))
-        segmentHit.addEventListener("pointerenter", () => group.setAttribute("data-hover", "1"))
-        segmentHit.addEventListener("pointerleave", () => group.removeAttribute("data-hover"))
-        group.append(segmentHit)
-      }
+    const capsuleHit = make("rect", { x: TRACK_UP_X - 12, y: y - 12, width: TRACK_DN_X - TRACK_UP_X + 24, height: 24, class: "dg-hit", "aria-hidden": "true" })
+    capsuleHit.addEventListener("click", () => openStation(code))
+    group.append(capsuleHit)
+    for (const colX of [upColX, dnColX]) {
+      const countdownHit = make("rect", { x: colX, y: y - 22, width: COL_W, height: 44, class: "dg-hit", "aria-hidden": "true" })
+      countdownHit.addEventListener("click", () => openStation(code))
+      group.append(countdownHit)
     }
     rows.append(group)
   }
@@ -1946,7 +1960,7 @@ function openSegment(code, dir) {
   state.segment = { from: code, to: dest, dir, status: "loading", range: null, records: null, geometry: null }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
-  requestAnimationFrame(buildSegmentDiagram)
+  buildSegmentDiagram()
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
     if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return

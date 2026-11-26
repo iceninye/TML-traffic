@@ -105,6 +105,33 @@ button {
   min-width: 0;
 }
 
+.brand-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tml);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tml) 26%, transparent);
+  flex: none;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease, background 0.25s ease;
+}
+/* A finger-sized hit area around the 10 px dot. */
+.brand-dot::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+.brand-dot:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: 4px; }
+/* On: a soft glow while Run numbers are shown on the train dots. */
+.brand-dot[data-on="1"] {
+  background: var(--tml-lite);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tml-lite) 35%, transparent),
+    0 0 12px 3px color-mix(in srgb, var(--tml-lite) 70%, transparent);
+}
+
 .brand-text { min-width: 0; }
 
 .brand h1 {
@@ -637,128 +664,6 @@ svg.diagram {
   color: #fff;
   padding: 1px 6px;
   border-radius: 4px;
-}
-
-.station-segment-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.segment-open { font-size: 12.5px; }
-
-/* Station segment: one live direction on the left, technical records on the right. */
-.sheet[data-kind="segment"] {
-  max-width: 980px;
-  height: 92vh;
-  max-height: 92vh;
-  overflow: hidden;
-}
-
-.segment-head { padding-right: 38px; margin-bottom: 10px; }
-.segment-head .sub { margin-bottom: 0; }
-
-.segment-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-  gap: 14px;
-  height: calc(92vh - 122px);
-  min-height: 430px;
-}
-
-.segment-route {
-  align-self: start;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  background: var(--panel-2);
-}
-
-.segment-range {
-  min-height: 18px;
-  color: var(--muted);
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.segment-diagram { display: block; width: 100%; height: 360px; }
-.segment-name { font-size: 13px; }
-.segment-live { color: var(--muted); font-size: 12px; text-align: center; }
-
-.segment-info {
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 4px;
-}
-
-.td-summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 4px;
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  background: var(--panel-2);
-  color: var(--muted);
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.td-section { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
-.td-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
-.td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.td-row { padding: 9px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel-2); }
-.td-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; }
-.td-meta { margin-top: 4px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-.td-source { margin-top: 6px; color: var(--muted); font-size: 10.5px; }
-.td-source summary { cursor: pointer; }
-.td-source div { margin-top: 3px; overflow-wrap: anywhere; }
-
-.ep-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  border: 1px solid var(--edge);
-  border-radius: 999px;
-  background: var(--panel);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-}
-.ep-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
-.ep-chip.yellow::before { background: #f5c451; }
-.ep-chip.green::before { background: #58c77a; }
-.segment-error { padding: 18px 4px; color: var(--muted); }
-.segment-error .btn { margin-top: 8px; }
-
-@media (max-width: 699px) {
-  .sheet[data-kind="segment"] { height: 94vh; max-height: 94vh; }
-  .segment-layout {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 8px;
-    height: calc(94vh - 122px);
-    min-height: 0;
-  }
-  .segment-route { padding: 8px; }
-  .segment-diagram { height: 340px; }
-  .segment-range, .segment-live { font-size: 10.5px; }
-  .td-summary { display: block; padding: 8px; }
-  .td-summary span { display: block; margin-top: 3px; }
-  .td-section { padding-top: 10px; }
-  .td-row { padding: 8px; }
-  .td-main { font-size: 11.5px; }
-  .ep-chip { padding: 2px 5px; font-size: 9.5px; }
-}
-
-@media (max-height: 650px) {
-  .sheet[data-kind="segment"] { height: 96vh; max-height: 96vh; }
-  .segment-layout { height: calc(96vh - 112px); min-height: 0; }
-  .segment-route { max-height: 100%; overflow-y: auto; }
-  .segment-diagram { height: 300px; }
 }
 
 /* Train card: docked, live-updating, no backdrop so the line stays visible. */

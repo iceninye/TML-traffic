@@ -35,8 +35,6 @@ sw.js                     offline app shell（只 cache 同源 GET）
 lib/mtr-*.js              抽取返嚟嘅引擎（唔改）
 lib/maplibre/*.mjs        vendored MapLibre GL 6.12.0
 data/tml-*.json           靜態資料
-data/td-*.json            TD_TML 技術資料同 27 段官方 chainage
-lib/td-infrastructure.js  EP／CPD／Neutral Zone／VCC 站段查詢
 ```
 
 `app.js` 直接 `import` 引擎檔：
@@ -80,11 +78,9 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 | 動作 | 結果 |
 |---|---|
-| 點站名／站點 | bottom sheet：兩個方向各 4 班，含月台、預定/實時、延誤；亦有兩個站段放大入口 |
-| 點左／上行軌或上行倒數 | 放大顯示該站往上一站嘅單軌動態圖；右邊列 EP／CPD／Neutral Zone／VCC 交界 |
-| 點右／下行軌或下行倒數 | 放大顯示該站往下一站嘅單軌動態圖；總站只提供有效方向 |
+| 點站名／站點 | bottom sheet：兩個方向各 4 班，含月台、預定/實時、延誤 |
 | 點列車圓點 | 列車卡：目的地、現時位置（A → B）、最近一站倒數、車速、月台 |
-| Run 編號／全日更份 | 有適用 Duty Sheet 時直接可用，唔再需要橙色掣 |
+| 標題左邊橙點 | 開／關 Run 編號（記入 localStorage）；開咗先會喺列車卡左上角顯示 Run 編號同「全日更份 ›」 |
 | 暫停 | 停止輪詢同動畫推進，保留畫面 |
 | 路綫圖 / 地圖 | 切換 view，記入 localStorage |
 
@@ -194,15 +190,13 @@ tiles.openfreemap.org  →  server: cloudflare, cf-cache-status: HIT, cf-ray: ..
 python3 -m http.server 8790 --bind 127.0.0.1
 
 # 2. 開 http://127.0.0.1:8790/  → 應該 3 秒內出 27 行 + 列車點
-# 3. 點站名 → 站卡；點左／右軌 → 站段放大圖；點列車點 → 列車卡
-#    Run 編號同全日更份有 Duty Sheet 時直接可用
+# 3. 點站名 → 彈窗；點列車點 → 列車卡；撳橙點 → 列車點同列車卡顯示 Run 編號
 # 4. 切地圖 → 應該出真地圖；再切回路綫圖 → 列車點仍然貼住路軌
 
 # 5. 語法檢查（無 bundler，所以逐檔 parse）
 node --input-type=module --check < assets/app.js
 node --input-type=module --check < lib/mtr-estimate.js
 node --input-type=module --check < lib/mtr-run.js
-node tools/validate_td.mjs
 
 # 6. 引擎仍然正常
 node tools/probe-tml.mjs

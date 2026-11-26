@@ -26,7 +26,9 @@ release commits stamped in the page footer.
 - 修正路軌圖像攔截點擊：主軌同 casing 不再接收 pointer events，52 個站段中線恢復開啟放大圖。
 - EP 編號改用主題文字顏色，深色模式保持清晰；CPD 列表亦按行車方向排列。
 - CPD 查詢支援官方 `U`／`D`／`U/D` 軌道編碼，36 個方向性 CPD 不再遺漏；validator 加入真實編碼迴歸。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v90`。
+- EAP 標題旁加入獨立連線開關，只控制 EAP 連線，同 EP 開關互不影響。
+- 放大圖上／下車站圖示可跳轉到所選方向嘅前／後相鄰站段，支援鍵盤操作；點擊層置於列車上方，終站冇相鄰段時唔顯示跳轉。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v91`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

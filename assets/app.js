@@ -2018,6 +2018,7 @@ function openSegment(code, dir) {
     to: dest,
     dir,
     epConnectors: true,
+    eapConnectors: true,
     routes: {
       EP: { status: "off", direction: "WKS", selectedId: null },
       CPD: { status: "off", selectedId: null },
@@ -2148,7 +2149,11 @@ function segmentInfoHtml(segment) {
   const cpds = segment.dir === "DOWN" ? [...records.cpds].reverse() : records.cpds
   const cpdRows = cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
-  const connectorSwitch = `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-ep-connectors aria-checked="${segment.epConnectors !== false}" aria-label="顯示 EP 連線" title="顯示／隱藏 EP 連線"><span></span></button></div>`
+  const connectorSwitch = (kind) => {
+    const key = `${kind.toLowerCase()}Connectors`
+    const label = `顯示 ${kind} 連線`
+    return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${kind.toLowerCase()}-connectors aria-checked="${segment[key] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
+  }
   const neutralRows = records.neutralZones.map((zone) => {
     const where = zone.downLimitKm != null && zone.upLimitKm != null
       ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
@@ -2163,8 +2168,8 @@ function segmentInfoHtml(segment) {
   return (
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
-    tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch) +
-    tdSection(s.tdEap, eapRows, s.tdNone) +
+    tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
+    tdSection(s.tdEap, eapRows, s.tdNone, connectorSwitch("EAP")) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
     tdSources(range, records)
   )
@@ -2190,6 +2195,7 @@ function buildSegmentDiagram() {
   const segment = state.segment
   const svg = document.getElementById("segment-diagram")
   if (!segment || !svg) return
+  const s = t()
   const box = svg.getBoundingClientRect()
   const width = Math.max(120, Math.round(box.width || 260))
   const height = Math.max(140, Math.round(box.height || 360))
@@ -2218,15 +2224,57 @@ function buildSegmentDiagram() {
   for (let y = top + 28; y < bottom; y += 54) {
     base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
   }
-  for (const [code, y] of [[segment.from, top], [segment.to, bottom]]) {
+  const stationHits = []
+  for (const [endpoint, code, y] of [["from", segment.from, top], ["to", segment.to, bottom]]) {
     const name = network.name(code, LANG)
+    const opposite = segment.dir === "UP" ? "DOWN" : "UP"
+    const jumpFrom = endpoint === "from" ? adjacentStation(code, opposite) : code
+    const jumpTo = endpoint === "from" ? code : adjacentStation(code, segment.dir)
+    const jumpLabel = jumpFrom && jumpTo
+      ? segment.dir === "UP"
+        ? s.segmentUp(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
+        : s.segmentDown(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
+      : ""
     base.append(
       make("rect", { x: x - 12, y: y - 7, width: 24, height: 14, rx: 7, class: "dg-station" }),
       make("text", { x: x + 24, y: y + 4, class: "dg-name segment-name segment-station-label" }, `${name} • ${model.km(code).toFixed(2)} km`),
     )
+    if (jumpFrom && jumpTo) {
+      const jumpKind = endpoint === "from" ? "previous" : "next"
+      const hit = make("rect", {
+        x: x - 22,
+        y: y - 18,
+        width: 44,
+        height: 36,
+        rx: 18,
+        class: "segment-station-hit",
+        role: "button",
+        tabindex: "0",
+        "aria-label": `${name}：${jumpLabel}`,
+        "data-segment-jump": jumpKind,
+        "data-from": jumpFrom,
+        "data-to": jumpTo,
+        "data-dir": segment.dir,
+      })
+      hit.append(make("title", {}, jumpLabel))
+      const openAdjacent = (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        openSegment(jumpFrom, segment.dir)
+        const nextFocus = document.querySelector(`[data-segment-jump="${jumpKind}"]`) ?? document.querySelector(".segment-station-hit")
+        nextFocus?.focus({ preventScroll: true })
+      }
+      hit.addEventListener("click", openAdjacent)
+      hit.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") openAdjacent(event)
+      })
+      stationHits.push(hit)
+    }
   }
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
-  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), make("g", { id: "segment-train-layer" }))
+  const stationLayer = make("g", { id: "segment-station-layer" })
+  stationLayer.append(...stationHits)
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), make("g", { id: "segment-train-layer" }), stationLayer)
   const labelRoom = width - x - 32
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()
@@ -2450,14 +2498,16 @@ function paintSegmentConnectors() {
     }
   }
 
-  const eapButtons = new Map([...info.querySelectorAll(".eap-dot")].map((button) => [
-    button.dataset.routeId,
-    button,
-  ]))
-  for (const dot of document.querySelectorAll(".segment-eap-dot[data-route-id]")) {
-    const id = dot.dataset.routeId
-    const button = eapButtons.get(id)
-    if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
+  if (segment.eapConnectors !== false) {
+    const eapButtons = new Map([...info.querySelectorAll(".eap-dot")].map((button) => [
+      button.dataset.routeId,
+      button,
+    ]))
+    for (const dot of document.querySelectorAll(".segment-eap-dot[data-route-id]")) {
+      const id = dot.dataset.routeId
+      const button = eapButtons.get(id)
+      if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
+    }
   }
 }
 
@@ -3115,6 +3165,11 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-connectors]")) {
       state.segment.epConnectors = state.segment.epConnectors === false
       paintSegmentInfo()
+      document.querySelector("[data-ep-connectors]")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-eap-connectors]")) {
+      state.segment.eapConnectors = state.segment.eapConnectors === false
+      paintSegmentInfo()
+      document.querySelector("[data-eap-connectors]")?.focus({ preventScroll: true })
     } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
       const button = event.target.closest("[data-route-kind]")
       setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)

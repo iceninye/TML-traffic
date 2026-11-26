@@ -22,7 +22,8 @@ release commits stamped in the page footer.
 - 移除 EP 連線開關旁邊嘅可見文字，只保留 switch。
 - 所有卡頂部橫線支援滑鼠／手指向下拖動：卡即時跟隨，拖過門檻就關閉，未過則彈返原位；原有關閉掣、背景點擊同 Escape 維持不變。
 - EAP 路軌標記同右側對應掣之間加入珊瑚色連線，跟隨 EAP 顯示狀態同右欄滾動；EP 連線開關只控制 EP 連線。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v88`。
+- EAP 技術列表按所選行車方向排列，令路軌標記同右側掣保持上下次序，避免連線交叉。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v89`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

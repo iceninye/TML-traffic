@@ -2140,7 +2140,10 @@ function segmentInfoHtml(segment) {
       `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
-  const eapRows = (records.emergencyAccessPoints ?? []).map((point) =>
+  const emergencyAccessPoints = segment.dir === "DOWN"
+    ? [...(records.emergencyAccessPoints ?? [])].reverse()
+    : records.emergencyAccessPoints ?? []
+  const eapRows = emergencyAccessPoints.map((point) =>
     `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpdRows = records.cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)

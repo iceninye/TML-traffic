@@ -2190,6 +2190,7 @@ function setSegmentRouteItem(kind, id, direction) {
   const route = segment.routes[kind]
   if (kind === "EP") {
     if (!["WKS", "TUM"].includes(direction)) return
+    // Buttons carry the raw EP ID; prefix the direction only when storing the selection.
     const itemId = `${direction}:${id}`
     if (route.status === "off") {
       route.status = "all"

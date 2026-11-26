@@ -1821,7 +1821,21 @@ async function showView(view) {
 
 /* ----------------------------------------------------------------- sheet */
 
+let sheetDrag = null
+
+function resetSheetDrag() {
+  const pointerId = sheetDrag?.pointerId
+  sheetDrag = null
+  els.sheet.dataset.dragging = "0"
+  els.sheet.style.removeProperty("transform")
+  els.sheetBackdrop.style.removeProperty("opacity")
+  if (pointerId != null && els.sheet.hasPointerCapture(pointerId)) {
+    els.sheet.releasePointerCapture(pointerId)
+  }
+}
+
 function openSheet(html, kind) {
+  resetSheetDrag()
   state.sheetKind = kind
   els.sheetBody.innerHTML = html
   els.sheet.dataset.open = "1"
@@ -1831,6 +1845,7 @@ function openSheet(html, kind) {
 }
 
 function closeSheet() {
+  resetSheetDrag()
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
   state.sheetKind = null
@@ -1838,6 +1853,47 @@ function closeSheet() {
   state.station = null
   state.segment = null
   setFollow(false)
+}
+
+function beginSheetDrag(event) {
+  if (
+    sheetDrag ||
+    !event.isPrimary ||
+    event.button !== 0 ||
+    els.sheet.dataset.open !== "1" ||
+    !event.target.closest(".sheet-grip")
+  ) return
+
+  event.preventDefault()
+  sheetDrag = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    offset: 0,
+  }
+  els.sheet.dataset.dragging = "1"
+  els.sheet.setPointerCapture(event.pointerId)
+}
+
+function moveSheetDrag(event) {
+  if (!sheetDrag || event.pointerId !== sheetDrag.pointerId) return
+  event.preventDefault()
+
+  const height = els.sheet.getBoundingClientRect().height
+  const offset = Math.min(Math.max(0, event.clientY - sheetDrag.startY), height)
+  sheetDrag.offset = offset
+  els.sheet.style.transform = `translateY(${offset}px)`
+  if (els.sheetBackdrop.dataset.open === "1") {
+    els.sheetBackdrop.style.opacity = String(Math.max(0, 1 - offset / Math.max(height, 1)))
+  }
+}
+
+function finishSheetDrag(event, cancelled = false) {
+  if (!sheetDrag || event.pointerId !== sheetDrag.pointerId) return
+  const offset = sheetDrag.offset
+  const height = els.sheet.getBoundingClientRect().height
+  const threshold = Math.min(160, Math.max(72, height * 0.18))
+  if (!cancelled && offset >= threshold) closeSheet()
+  else resetSheetDrag()
 }
 
 function minutesLabel(value) {
@@ -3013,6 +3069,13 @@ function wireControls() {
     if (!state.paused) refresh(false)
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)
+  els.sheet.addEventListener("pointerdown", beginSheetDrag)
+  els.sheet.addEventListener("pointermove", moveSheetDrag)
+  els.sheet.addEventListener("pointerup", (event) => finishSheetDrag(event))
+  els.sheet.addEventListener("pointercancel", (event) => finishSheetDrag(event, true))
+  els.sheet.addEventListener("lostpointercapture", (event) => {
+    if (sheetDrag?.pointerId === event.pointerId) resetSheetDrag()
+  })
   els.periodTag.addEventListener("click", openDutySheet)
   els.sheet.addEventListener("input", (event) => {
     if (state.sheetKind !== "duty" || !event.target.matches(".duty-search")) return

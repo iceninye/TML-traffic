@@ -116,7 +116,7 @@ check(allTravelRanges.length === 52 && allTravelRanges.every((range) => range.tr
 "27 站全部相鄰站段嘅上下行查詢均可用")
 const allRecords = allTravelRanges.map((range) => attempt(() => recordsForRange(technical, range, range.dir)))
 check(allRecords.length === 52 && allRecords.every((records) => records
-  && ["entryPoints", "cpds", "neutralZones", "vccBoundaries"].every((key) => Array.isArray(records[key]))),
+  && ["entryPoints", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((key) => Array.isArray(records[key]))),
 "27 站全部相鄰站段嘅技術資料查詢均可用")
 const badRanges = segments.filter((segment) => {
   const up = segment.up
@@ -150,7 +150,7 @@ for (const expected of smokeCases) {
   const records = attempt(() => recordsForRange(technical, range, expected.dir))
   check(records && records.vccFrom === expected.vccFrom && records.vccTo === expected.vccTo,
     `recordsForRange ${key} 端點 VCC 正確`)
-  check(records && ["entryPoints", "cpds", "neutralZones", "vccBoundaries"].every((name) => {
+  check(records && ["entryPoints", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((name) => {
     const values = records[name].map((row) => Math.min(...chainageValues(name === "vccBoundaries" ? row.values : row.chainageKm)))
     return values.every((km, index) => index === 0 || values[index - 1] <= km)
   }), `recordsForRange ${key} 各結果按 chainage 排序`)
@@ -161,10 +161,20 @@ const wksEp = wksRecords?.entryPoints.find((row) => row.chainageKm === 81.928)
 check(wksEp?.yellowEP === "16-28" && wksEp.greenEP === "16-30"
   && wksEp.yellowEPId === "1628" && wksEp.greenEPId === "1630"
   && wksRecords.entryPoints.every((row) => row.track === "up"), "WKS→MOS UP 保留所選軌道的黃／綠 EP，不互換或按方向刪除")
+check(wksRecords?.emergencyAccessPoints.some((row) => row.id === "WKS EAP 13" && row.chainageKm === 81.237),
+  "WKS→MOS UP 包含方向可用嘅 WKS EAP 13")
 
 const wksDownRange = attempt(() => travelRange(segments, "MOS", "WKS", "down"))
 check(wksDownRange?.chainageFrom === 82.736 && wksDownRange?.chainageTo === 81.224
   && same(wksDownRange.segmentIds, ["02", "01"]), "MOS→WKS DOWN 對稱延至 WKS 81.224 止衝擋")
+
+const tshUpRange = attempt(() => travelRange(segments, "TSH", "SHM", "up"))
+const tshDownRange = attempt(() => travelRange(segments, "SHM", "TSH", "down"))
+const tshUpRecords = attempt(() => recordsForRange(technical, tshUpRange, "up"))
+const tshDownRecords = attempt(() => recordsForRange(technical, tshDownRange, "down"))
+check(!tshUpRecords?.emergencyAccessPoints.some((row) => row.id === "TSH Nullah")
+  && tshDownRecords?.emergencyAccessPoints.some((row) => row.id === "TSH Nullah" && row.chainageKm === 85.319),
+  "EAP 按方向 access 同 chainage 過濾：TSH Nullah 只出現喺下行")
 
 const yulRecords = attempt(() => recordsForRange(technical, ranges.get("YUL>LOP"), "up"))
 check(yulRecords?.entryPoints.some((row) => row.chainageKm === 127.964)
@@ -194,6 +204,11 @@ check(same(arrayBoundary?.values, [98.842, 98.84]) && arrayBoundary.transitionGa
 
 const descendingRecords = attempt(() => recordsForRange({
   entryPointLines: [{ track: "down", chainageKm: [5, 4], yellowEP: "1603", greenEP: "1605" }],
+  emergencyAccessPoints: [
+    { id: "EAP A", downChainageKm: 4.5, downAccess: true },
+    { id: "EAP B", downChainageKm: 4.6, downAccess: false },
+    { id: "EAP C", downChainageKm: 4.7, upAccess: true },
+  ],
   crossPassageDoors: [
     { type: "crossPassageDoor", track: "down", chainageKm: [4.5, 4.4] },
     { type: "platformEdgeReference", track: "-", chainageKm: 4.5 },
@@ -205,9 +220,10 @@ const descendingRecords = attempt(() => recordsForRange({
   ],
   vcc: { areas: [], boundaries: [{ between: [1, 2], downChainageKm: [5.1, 4.9], source: "test" }] },
 }, { from: "A", to: "B", track: "down", chainageFrom: 5, chainageTo: 4 }, "down"))
-check(descendingRecords?.entryPoints.length === 1 && descendingRecords.cpds.length === 1
-  && descendingRecords.neutralZones.length === 1 && same(descendingRecords.vccBoundaries[0]?.values, [5.1, 4.9]),
-"遞減里程及 number[] 可用；CPD 類型、軌道、中性區相交及 VCC 過濾正確")
+check(descendingRecords?.entryPoints.length === 1 && descendingRecords.emergencyAccessPoints.length === 1
+  && descendingRecords.cpds.length === 1 && descendingRecords.neutralZones.length === 1
+  && same(descendingRecords.vccBoundaries[0]?.values, [5.1, 4.9]),
+"遞減里程及 number[] 可用；EAP 方向、CPD 類型、軌道、中性區相交及 VCC 過濾正確")
 
 if (failed) {
   console.error(`✗ 技術資料驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

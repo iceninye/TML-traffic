@@ -156,6 +156,7 @@ export const STRINGS = {
     tdRetry: "重試",
     tdRange: (from, to) => `${from} → ${to} km`,
     tdEntryPoints: "Entry Point",
+    tdEap: "EAP",
     tdCpd: "CPD",
     tdNeutralZones: "Neutral Zone",
     tdVcc: "VCC 交界",

@@ -2021,7 +2021,7 @@ function tdSources(range, records) {
     }
   }
   for (const page of range.sourcePages ?? []) add(page)
-  for (const rows of [records.entryPoints, records.cpds, records.neutralZones, records.vccBoundaries]) {
+  for (const rows of [records.entryPoints, records.emergencyAccessPoints ?? [], records.cpds, records.neutralZones, records.vccBoundaries]) {
     for (const item of rows) {
       if (item.sourcePages?.length) item.sourcePages.forEach(add)
       else add(item.sourcePage || item.source)
@@ -2055,6 +2055,8 @@ function segmentInfoHtml(segment) {
       `<div class="ep-line">${epButton("TUM", yellow, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
+  const eapRows = (records.emergencyAccessPoints ?? []).map((point) =>
+    `<li class="td-row td-compact eap-row"><div class="td-main"><span class="eap-dot" aria-hidden="true"></span>${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpdRows = records.cpds.map((cpd) =>
     `<li class="td-row td-compact cpd-row"><div class="td-main"><span class="cpd-dot" aria-hidden="true"></span>${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const neutralRows = records.neutralZones.map((zone) => {
@@ -2072,6 +2074,7 @@ function segmentInfoHtml(segment) {
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone) +
+    tdSection(s.tdEap, eapRows, s.tdNone) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
     tdSources(range, records)
   )

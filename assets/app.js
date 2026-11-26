@@ -2400,7 +2400,6 @@ function paintSegmentConnectors() {
   const svg = document.getElementById("segment-connectors")
   if (!svg || state.sheetKind !== "segment" || !segment) return
   svg.replaceChildren()
-  if (segment.epConnectors === false) return
   const layout = document.querySelector(".segment-layout")
   const info = document.getElementById("segment-info")
   if (!layout || !info) return
@@ -2408,34 +2407,53 @@ function paintSegmentConnectors() {
   const infoRect = info.getBoundingClientRect()
   if (!layoutRect.width || !layoutRect.height) return
   svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
-  const rightButtons = new Map([...info.querySelectorAll(".ep-dot")].map((button) => [
-    `${button.dataset.epDir}:${button.dataset.routeId}`,
-    button,
-  ]))
-  for (const control of document.querySelectorAll(".segment-ep-control[data-route-id]")) {
-    const itemId = control.dataset.routeId
-    const button = rightButtons.get(itemId)
-    const dot = control.querySelector(".segment-ep-dot")
-    if (!button || !dot) continue
+
+  const appendConnector = (dot, button, color, kind, id, direction = null) => {
     const dotRect = dot.getBoundingClientRect()
     const buttonRect = button.getBoundingClientRect()
     const buttonY = buttonRect.top + buttonRect.height / 2
-    if (buttonY < infoRect.top || buttonY > infoRect.bottom) continue
+    if (buttonY < infoRect.top || buttonY > infoRect.bottom) return
     const x1 = dotRect.right + 6 - layoutRect.left
     const x2 = buttonRect.left - 6 - layoutRect.left
-    if (x2 <= x1) continue
-    const direction = itemId.split(":")[0]
+    if (x2 <= x1) return
     svg.append(make("line", {
       x1,
       y1: dotRect.top + dotRect.height / 2 - layoutRect.top,
       x2,
       y2: buttonY - layoutRect.top,
-      class: "segment-ep-connector",
-      stroke: direction === "WKS" ? "#58c77a" : "#f5c451",
+      class: `segment-${kind.toLowerCase()}-connector`,
+      stroke: color,
       "stroke-opacity": 0.72,
       "vector-effect": "non-scaling-stroke",
-      "data-ep-direction": direction,
+      "data-route-kind": kind,
+      "data-route-id": id,
+      ...(direction ? { "data-ep-direction": direction } : {}),
     }))
+  }
+
+  if (segment.epConnectors !== false) {
+    const rightButtons = new Map([...info.querySelectorAll(".ep-dot")].map((button) => [
+      `${button.dataset.epDir}:${button.dataset.routeId}`,
+      button,
+    ]))
+    for (const control of document.querySelectorAll(".segment-ep-control[data-route-id]")) {
+      const itemId = control.dataset.routeId
+      const button = rightButtons.get(itemId)
+      const dot = control.querySelector(".segment-ep-dot")
+      if (!button || !dot) continue
+      const direction = itemId.split(":")[0]
+      appendConnector(dot, button, direction === "WKS" ? "#58c77a" : "#f5c451", "EP", itemId, direction)
+    }
+  }
+
+  const eapButtons = new Map([...info.querySelectorAll(".eap-dot")].map((button) => [
+    button.dataset.routeId,
+    button,
+  ]))
+  for (const dot of document.querySelectorAll(".segment-eap-dot[data-route-id]")) {
+    const id = dot.dataset.routeId
+    const button = eapButtons.get(id)
+    if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
   }
 }
 

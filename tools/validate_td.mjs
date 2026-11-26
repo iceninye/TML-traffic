@@ -225,6 +225,44 @@ check(descendingRecords?.entryPoints.length === 1 && descendingRecords.emergency
   && same(descendingRecords.vccBoundaries[0]?.values, [5.1, 4.9]),
 "遞減里程及 number[] 可用；EAP 方向、CPD 類型、軌道、中性區相交及 VCC 過濾正確")
 
+const cpdTrackFixture = {
+  crossPassageDoors: [
+    { id: "BOTH", type: "crossPassageDoor", track: "U/D", chainageKm: 4.5 },
+    { id: "DOWN", type: "crossPassageDoor", track: "D", chainageKm: 4.5 },
+    { id: "UP", type: "crossPassageDoor", track: "U", chainageKm: 4.5 },
+    { id: "ANY", type: "crossPassageDoor", track: "-", chainageKm: 4.5 },
+    { id: "LEGACY-DOWN", type: "crossPassageDoor", track: "down", chainageKm: 4.5 },
+    { id: "LEGACY-UP", type: "crossPassageDoor", track: "up", chainageKm: 4.5 },
+    { id: "PLATFORM", type: "platformEdgeReference", track: "Platform Edge", chainageKm: 4.5 },
+    { id: "OTHER", type: "other", track: "U/D", chainageKm: 4.5 },
+  ],
+}
+const cpdDownRecords = attempt(() => recordsForRange(cpdTrackFixture, {
+  from: "A", to: "B", chainageFrom: 5, chainageTo: 4,
+}, "down"))
+const cpdUpRecords = attempt(() => recordsForRange(cpdTrackFixture, {
+  from: "B", to: "A", chainageFrom: 4, chainageTo: 5,
+}, "up"))
+check(same(cpdDownRecords?.cpds.map((row) => row.id).sort(), ["ANY", "BOTH", "DOWN", "LEGACY-DOWN"])
+  && same(cpdUpRecords?.cpds.map((row) => row.id).sort(), ["ANY", "BOTH", "LEGACY-UP", "UP"]),
+"CPD 支援官方 U／D／U/D 軌道編碼，並兼容舊 up／down 值")
+const cpdUpperTrackRecords = attempt(() => recordsForRange(cpdTrackFixture, {
+  from: "B", to: "A", track: "UP", chainageFrom: 4, chainageTo: 5,
+}, "up"))
+check(same(cpdUpperTrackRecords?.cpds.map((row) => row.id).sort(), ["ANY", "BOTH", "LEGACY-UP", "UP"]),
+"CPD track override 大小寫唔會改變方向篩選")
+check(technical.crossPassageDoors.filter((row) => row.type === "crossPassageDoor"
+  && ["U", "D", "U/D"].includes(row.track)).length === 36,
+"真實資料 36 個方向性 CPD 會按軌道篩選，不會遺漏")
+const ausUpCpds = attempt(() => recordsForRange(technical, travelRange(segments, "AUS", "NAC", "up"), "up")?.cpds)
+const ausDownCpds = attempt(() => recordsForRange(technical, travelRange(segments, "NAC", "AUS", "down"), "down")?.cpds)
+check(ausUpCpds?.length === 39 && ausDownCpds?.length === 39
+  && ausUpCpds.filter((row) => row.track === "U").length === 4
+  && ausUpCpds.every((row) => row.track !== "D")
+  && ausDownCpds.filter((row) => row.track === "D").length === 4
+  && ausDownCpds.every((row) => row.track !== "U"),
+"AUS↔NAC 雙向各收錄 39 個 CPD，方向性 CPD 唔會漏收或跨軌")
+
 if (failed) {
   console.error(`✗ 技術資料驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)
   process.exit(1)

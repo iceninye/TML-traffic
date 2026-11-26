@@ -2145,7 +2145,8 @@ function segmentInfoHtml(segment) {
     : records.emergencyAccessPoints ?? []
   const eapRows = emergencyAccessPoints.map((point) =>
     `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
-  const cpdRows = records.cpds.map((cpd) =>
+  const cpds = segment.dir === "DOWN" ? [...records.cpds].reverse() : records.cpds
+  const cpdRows = cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const connectorSwitch = `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-ep-connectors aria-checked="${segment.epConnectors !== false}" aria-label="顯示 EP 連線" title="顯示／隱藏 EP 連線"><span></span></button></div>`
   const neutralRows = records.neutralZones.map((zone) => {

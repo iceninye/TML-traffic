@@ -24,14 +24,13 @@ import { GROUPS, CLASSES, dutyState, handoverMates, inGroup, matchesQuery, mealM
 import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
+import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
 const LANG = "tc"
 const VIEW_KEY = "tml-traffic-view"
 const PAUSE_KEY = "tml-traffic-paused"
-// The brand dot toggles Run numbers on the train dots; remembered.
-const RUNS_KEY = "tml-traffic-show-runs"
 // Hop-time calibration learned from the feed, kept so a reload starts warm.
 // v2: corrections are now relative to the working timetable's own hop
 // times; v1 values were relative to the old single-table model.
@@ -60,7 +59,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.8.39", commit: "ad79417" }
+const BUILD = { version: "0.9.0", commit: "dev" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -79,7 +78,6 @@ const INTERCHANGE = {
 const TUNNEL = { from: "KSR", to: "TWW", name: "大欖隧道" }
 
 const els = {
-  brandDot: document.querySelector(".brand-dot"),
   title: document.getElementById("title"),
   sub: document.getElementById("sub"),
   clock: document.getElementById("clock"),
@@ -112,7 +110,6 @@ const els = {
 const state = {
   view: readPref(VIEW_KEY) === "map" ? "map" : "diagram",
   paused: readPref(PAUSE_KEY) === "1",
-  showRuns: readPref(RUNS_KEY) === "1",
   runs: [],
   data: null,
   loadedAtMs: 0,
@@ -131,6 +128,7 @@ const state = {
   duty: { page: 1, group: "all", cls: null, query: "", detail: null },
   sheetKind: null,
   station: null,
+  segment: null,
 }
 
 let network = null
@@ -821,7 +819,6 @@ function applyStrings() {
   els.helpBtn.textContent = s.help
   els.pauseBtn.textContent = state.paused ? s.resume : s.pause
   els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
-  paintRunsToggle()
   els.mapNote.textContent = s.mapLoading
   els.mapFallback.querySelector("p").textContent = s.mapUnavailable
   els.colLegend.innerHTML =
@@ -840,13 +837,6 @@ function applyStrings() {
 }
 
 els.foot.addEventListener("click", onFootTap)
-
-function paintRunsToggle() {
-  els.brandDot.dataset.on = state.showRuns ? "1" : "0"
-  els.brandDot.setAttribute("aria-pressed", String(state.showRuns))
-  els.brandDot.setAttribute("aria-label", t().showRuns)
-  els.brandDot.title = t().showRuns
-}
 
 // Why the last pass got nothing, for the "can't reach" line.
 function failureReason(s) {
@@ -1010,6 +1000,22 @@ function buildDiagram() {
         make("text", { x: NAME_X, y: mid + 16, class: "dg-tunnel-label" }, TUNNEL.name),
       )
     }
+    const segmentTop = ya + 24
+    const segmentBottom = yb - 24
+    if (segmentBottom > segmentTop) {
+      for (const [dir, x, from] of [["UP", TRACK_UP_X, b], ["DOWN", TRACK_DN_X, a]]) {
+        const segmentHit = make("rect", { x: x - 16, y: segmentTop, width: 32, height: segmentBottom - segmentTop, class: "dg-hit dg-segment-hit", "data-dir": dir, "aria-hidden": "true" })
+        segmentHit.addEventListener("click", () => openSegment(from, dir))
+        base.append(segmentHit)
+      }
+      const labelWidth = upColX - NAME_X - 8
+      const half = labelWidth / 2
+      for (const [dir, from] of [["UP", b], ["DOWN", a]]) {
+        const labelHit = make("rect", { x: NAME_X - 8 + (dir === "UP" ? 0 : half), y: mid - 10, width: half, height: 20, class: "dg-hit dg-segment-hit", "data-dir": dir, "aria-hidden": "true" })
+        labelHit.addEventListener("click", () => openSegment(from, dir))
+        base.append(labelHit)
+      }
+    }
   }
 
   // Two tracks, casing under colour.
@@ -1055,7 +1061,7 @@ function buildDiagram() {
       make("text", { x: upColX + COL_W / 2, y: y + 1, class: "dg-ttnt" }),
       make("text", { x: dnColX + COL_W / 2, y: y + 1, class: "dg-ttnt" }),
     )
-    const hit = make("rect", { x: 0, y: y - 22, width: upColX - 4, height: 44, class: "dg-hit", role: "button", tabindex: 0, "aria-label": primary })
+    const hit = make("rect", { x: NAME_X - 8, y: y - 22, width: upColX - NAME_X - 8, height: 44, class: "dg-hit", role: "button", tabindex: 0, "aria-label": primary })
     hit.addEventListener("click", () => openStation(code))
     hit.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -1066,6 +1072,14 @@ function buildDiagram() {
     hit.addEventListener("pointerenter", () => group.setAttribute("data-hover", "1"))
     hit.addEventListener("pointerleave", () => group.removeAttribute("data-hover"))
     group.append(hit)
+    const capsuleHit = make("rect", { x: TRACK_UP_X - 12, y: y - 12, width: TRACK_DN_X - TRACK_UP_X + 24, height: 24, class: "dg-hit", "aria-hidden": "true" })
+    capsuleHit.addEventListener("click", () => openStation(code))
+    group.append(capsuleHit)
+    for (const colX of [upColX, dnColX]) {
+      const countdownHit = make("rect", { x: colX, y: y - 22, width: COL_W, height: 44, class: "dg-hit", "aria-hidden": "true" })
+      countdownHit.addEventListener("click", () => openStation(code))
+      group.append(countdownHit)
+    }
     rows.append(group)
   }
 
@@ -1207,7 +1221,7 @@ function sheetActive() {
 }
 
 function runsOn() {
-  return state.showRuns && sheetActive()
+  return sheetActive()
 }
 
 function isShortTrip(run) {
@@ -1261,9 +1275,8 @@ function syncTrains() {
       node.dataset.phase = run.pos.phase
       node.dataset.level = String(lateLevel(run))
       node.dataset.last = isLastTrip(run) ? "1" : "0"
-      // The brand dot switches each train's Run number on in place of its
-      // arrow. A train no timetable trip claims (countdown model) has no Run
-      // number and shows a dash.
+      // A Duty Sheet supplies Run numbers in place of the arrow. A train no
+      // timetable trip claims (countdown model) has no Run and shows a dash.
       const reveal = runsOn()
       node.dataset.reveal = reveal ? "1" : "0"
       if (reveal) {
@@ -1331,6 +1344,7 @@ function loop(stamp) {
   } else {
     flashMap(stamp)
   }
+  if (state.sheetKind === "segment") syncSegmentTrains()
   if (state.view === "map" && stamp - lastMapPaint > 250) {
     lastMapPaint = stamp
     paintMap()
@@ -1807,7 +1821,21 @@ async function showView(view) {
 
 /* ----------------------------------------------------------------- sheet */
 
+let sheetDrag = null
+
+function resetSheetDrag() {
+  const pointerId = sheetDrag?.pointerId
+  sheetDrag = null
+  els.sheet.dataset.dragging = "0"
+  els.sheet.style.removeProperty("transform")
+  els.sheetBackdrop.style.removeProperty("opacity")
+  if (pointerId != null && els.sheet.hasPointerCapture(pointerId)) {
+    els.sheet.releasePointerCapture(pointerId)
+  }
+}
+
 function openSheet(html, kind) {
+  resetSheetDrag()
   state.sheetKind = kind
   els.sheetBody.innerHTML = html
   els.sheet.dataset.open = "1"
@@ -1817,12 +1845,55 @@ function openSheet(html, kind) {
 }
 
 function closeSheet() {
+  resetSheetDrag()
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
   state.sheetKind = null
   state.selected = null
   state.station = null
+  state.segment = null
   setFollow(false)
+}
+
+function beginSheetDrag(event) {
+  if (
+    sheetDrag ||
+    !event.isPrimary ||
+    event.button !== 0 ||
+    els.sheet.dataset.open !== "1" ||
+    !event.target.closest(".sheet-grip")
+  ) return
+
+  event.preventDefault()
+  sheetDrag = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    offset: 0,
+  }
+  els.sheet.dataset.dragging = "1"
+  els.sheet.setPointerCapture(event.pointerId)
+}
+
+function moveSheetDrag(event) {
+  if (!sheetDrag || event.pointerId !== sheetDrag.pointerId) return
+  event.preventDefault()
+
+  const height = els.sheet.getBoundingClientRect().height
+  const offset = Math.min(Math.max(0, event.clientY - sheetDrag.startY), height)
+  sheetDrag.offset = offset
+  els.sheet.style.transform = `translateY(${offset}px)`
+  if (els.sheetBackdrop.dataset.open === "1") {
+    els.sheetBackdrop.style.opacity = String(Math.max(0, 1 - offset / Math.max(height, 1)))
+  }
+}
+
+function finishSheetDrag(event, cancelled = false) {
+  if (!sheetDrag || event.pointerId !== sheetDrag.pointerId) return
+  const offset = sheetDrag.offset
+  const height = els.sheet.getBoundingClientRect().height
+  const threshold = Math.min(160, Math.max(72, height * 0.18))
+  if (!cancelled && offset >= threshold) closeSheet()
+  else resetSheetDrag()
 }
 
 function minutesLabel(value) {
@@ -1867,10 +1938,16 @@ function stationSheetHtml(code) {
   }
   const notice = board?.message ? `<p class="sub"><b>${s.notice}</b> ${escapeHtml(board.message)}</p>` : ""
   const lines = (INTERCHANGE[code] ?? []).map(([line, color]) => `<span class="xfer" style="background:${color}">${line}</span>`).join("")
+  const segmentLinks = ["UP", "DOWN"].flatMap((dir) => {
+    const dest = adjacentStation(code, dir)
+    if (!dest) return []
+    const label = dir === "UP" ? s.segmentUp(name, network.name(dest, LANG)) : s.segmentDown(name, network.name(dest, LANG))
+    return [`<button type="button" class="btn segment-open" data-segment-dir="${dir}">${label}</button>`]
+  }).join("")
   return (
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
     `<h2>${name} ${lines}</h2><div class="sub">${code} · TML · ${model.km(code).toFixed(2)} km${board ? "" : ` · ${s.noTrains}`}</div>` +
-    notice + blocks.join("")
+    notice + `<div class="station-segment-links">${segmentLinks}</div>` + blocks.join("")
   )
 }
 
@@ -1888,6 +1965,615 @@ function paintStationSheet() {
   if (html === stationHtmlShown) return
   stationHtmlShown = html
   els.sheetBody.innerHTML = html
+}
+
+/* -------------------------------------------------------- station segment */
+
+function adjacentStation(code, dir) {
+  const index = order.indexOf(code)
+  if (index < 0) return null
+  if (dir === "UP") return index > 0 ? order[index - 1] : null
+  return index < order.length - 1 ? order[index + 1] : null
+}
+
+let tdDataPromise = null
+function loadTdData() {
+  tdDataPromise ??= Promise.all([
+    fetchJson("data/td-segments.json"),
+    fetchJson("data/td-tml-v2_3_4.json"),
+  ]).then(([segmentDoc, technical]) => ({ segments: segmentDoc.segments, technical }))
+    .catch((error) => {
+      tdDataPromise = null
+      throw error
+    })
+  return tdDataPromise
+}
+
+function segmentShellHtml(from, to, dir) {
+  const s = t()
+  const fromName = network.name(from, LANG)
+  const toName = network.name(to, LANG)
+  const direction = dir === "UP" ? `▲ ${s.up} · ${s.toTum}` : `▼ ${s.down} · ${s.toWks}`
+  return (
+    `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
+    `<div class="segment-head"><h2>${fromName} → ${toName}</h2><div class="sub">${direction} · TML</div></div>` +
+    `<div class="segment-layout">` +
+    `<section class="segment-route" aria-label="${s.segmentRoute}">` +
+    `<div class="segment-range" id="segment-range">${s.tdLoading}</div>` +
+    `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${fromName} → ${toName}"></svg>` +
+    `</section>` +
+    `<aside class="segment-info" id="segment-info" aria-live="polite">${s.tdLoading}</aside>` +
+    `<svg class="segment-connectors" id="segment-connectors" aria-hidden="true"></svg>` +
+    `</div>`
+  )
+}
+
+function openSegment(code, dir) {
+  const dest = adjacentStation(code, dir)
+  if (!dest) return
+  state.selected = null
+  state.station = null
+  state.segment = {
+    from: code,
+    to: dest,
+    dir,
+    epConnectors: true,
+    eapConnectors: true,
+    routes: {
+      EP: { status: "off", direction: "WKS", selectedId: null },
+      CPD: { status: "off", selectedId: null },
+      EAP: { status: "off", selectedId: null },
+    },
+    status: "loading",
+    range: null,
+    records: null,
+    geometry: null,
+  }
+  setFollow(false)
+  openSheet(segmentShellHtml(code, dest, dir), "segment")
+  buildSegmentDiagram()
+  const svg = document.getElementById("segment-diagram")
+  const info = document.getElementById("segment-info")
+  const layout = document.querySelector(".segment-layout")
+  info?.addEventListener("scroll", paintSegmentConnectors, { passive: true })
+  if (svg && "ResizeObserver" in window) {
+    const observer = new ResizeObserver(() => {
+      if (state.sheetKind !== "segment" || state.segment?.geometry?.svg !== svg) {
+        observer.disconnect()
+        return
+      }
+      buildSegmentDiagram()
+      paintSegmentConnectors()
+    })
+    observer.observe(svg)
+    if (layout) observer.observe(layout)
+  }
+  loadTdData().then(({ segments, technical }) => {
+    const current = state.segment
+    if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return
+    const range = travelRange(segments, code, dest, dir)
+    if (!range) throw new Error("no matching technical segment")
+    current.range = range
+    current.records = recordsForRange(technical, range, dir)
+    current.status = "ok"
+    paintSegmentInfo()
+    paintSegmentInfrastructure()
+    syncSegmentTrains()
+  }).catch((error) => {
+    const current = state.segment
+    if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return
+    current.status = "error"
+    console.warn("segment data unavailable", error)
+    paintSegmentInfo()
+  })
+}
+
+function chainageText(value) {
+  const values = Array.isArray(value) ? value : [value]
+  return values.filter((v) => v != null).map((v) => Number(v).toFixed(3)).join(" / ")
+}
+
+function tdNote(item) {
+  return item?.note ? `<p class="td-note">${escapeHtml(item.note)}</p>` : ""
+}
+
+function tdSection(title, rows, empty, headingExtra = "") {
+  const heading = headingExtra ? `<div class="td-section-head"><h3>${title}</h3>${headingExtra}</div>` : `<h3>${title}</h3>`
+  return `<section class="td-section">${heading}${rows.length ? `<ul class="td-list">${rows.join("")}</ul>` : `<p class="empty">${empty}</p>`}</section>`
+}
+
+function tdVccSection(label, rows, empty) {
+  const s = t()
+  return `<section class="td-section td-vcc"><h3>${s.tdVccAreasHeading}</h3><div class="td-summary">${label}</div><h3>${s.tdVcc}</h3>${rows.length
+    ? `<ul class="td-list">${rows.join("")}</ul>`
+    : `<p class="empty">${empty}</p>`}</section>`
+}
+
+function tdSources(range, records) {
+  const s = t()
+  const sources = new Set()
+  const add = (value) => {
+    if (!value) return
+    for (const part of String(value).split(/,\s*/)) {
+      sources.add(/^1A\d/.test(part) ? `TD_TML ${part}` : part)
+    }
+  }
+  for (const page of range.sourcePages ?? []) add(page)
+  for (const rows of [records.entryPoints, records.emergencyAccessPoints ?? [], records.cpds, records.neutralZones, records.vccBoundaries]) {
+    for (const item of rows) {
+      if (item.sourcePages?.length) item.sourcePages.forEach(add)
+      else add(item.sourcePage || item.source)
+    }
+  }
+  const list = [...sources].sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
+  return `<details class="td-sources"><summary>${s.tdSource}</summary>${list.length
+    ? `<ul>${list.map((source) => `<li>${escapeHtml(source)}</li>`).join("")}</ul>`
+    : `<p class="empty">${s.tdNone}</p>`}</details>`
+}
+
+function segmentInfoHtml(segment) {
+  const s = t()
+  if (segment.status === "error") {
+    return `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
+  }
+  const { records, range } = segment
+  if (!records || !range) return s.tdLoading
+  const entryPoints = segment.dir === "DOWN" ? [...records.entryPoints].reverse() : records.entryPoints
+  const epButton = (direction, code, id, label, showLabel) => {
+    const route = segment.routes?.EP
+    const itemId = `${direction}:${id}`
+    const active = route?.status === "all" ? route.direction === direction : route?.status === "single" && route.selectedId === itemId
+    return `<button type="button" class="ep-dot ${direction === "WKS" ? "green" : "yellow"}" data-route-kind="EP" data-route-id="${escapeHtml(id)}" data-ep-dir="${direction}" aria-pressed="${active}" aria-label="${escapeHtml(`${label} ${code}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>` +
+      `<span class="ep-code">EP ${escapeHtml(code)}</span>${showLabel ? `<span class="ep-direction">${escapeHtml(label)}</span>` : ""}`
+  }
+  const pointButton = (kind, id, label) => {
+    const route = segment.routes?.[kind]
+    const active = route?.status === "all" || (route?.status === "single" && route.selectedId === id)
+    return `<button type="button" class="point-dot ${kind === "CPD" ? "cpd-dot" : "eap-dot"}" data-route-kind="${kind}" data-route-id="${escapeHtml(id)}" aria-pressed="${active}" aria-label="${escapeHtml(`${label}：${id}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>`
+  }
+  const epRows = entryPoints.map((ep, index) => {
+    const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
+    const green = formatEp(ep.greenEPId ?? ep.greenEP)
+    const yellowId = String(ep.yellowEPId ?? ep.yellowEP)
+    const greenId = String(ep.greenEPId ?? ep.greenEP)
+    const showLabel = index === 0
+    return `<li class="td-row td-ep-group"><div class="ep-line">${epButton("WKS", green, greenId, s.tdWksDirection, showLabel)}</div>` +
+      `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
+      `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
+  })
+  const emergencyAccessPoints = segment.dir === "DOWN"
+    ? [...(records.emergencyAccessPoints ?? [])].reverse()
+    : records.emergencyAccessPoints ?? []
+  const eapRows = emergencyAccessPoints.map((point) =>
+    `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
+  const cpds = segment.dir === "DOWN" ? [...records.cpds].reverse() : records.cpds
+  const cpdRows = cpds.map((cpd) =>
+    `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
+  const connectorSwitch = (kind) => {
+    const key = `${kind.toLowerCase()}Connectors`
+    const label = `顯示 ${kind} 連線`
+    return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${kind.toLowerCase()}-connectors aria-checked="${segment[key] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
+  }
+  const neutralRows = records.neutralZones.map((zone) => {
+    const where = zone.downLimitKm != null && zone.upLimitKm != null
+      ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
+      : `${chainageText(zone.chainageKm)} km`
+    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where}</div>${tdNote(zone)}</li>`
+  })
+  const vccRows = records.vccBoundaries.map((boundary) =>
+    `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`)
+  const vccLabel = records.vccFrom && records.vccTo
+    ? records.vccFrom === records.vccTo ? `VCC ${records.vccFrom}` : s.tdVccAreas(records.vccFrom, records.vccTo)
+    : s.tdNone
+  return (
+    tdVccSection(vccLabel, vccRows, s.tdNone) +
+    tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
+    tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
+    tdSection(s.tdEap, eapRows, s.tdNone, connectorSwitch("EAP")) +
+    tdSection(s.tdCpd, cpdRows, s.tdNone) +
+    tdSources(range, records)
+  )
+}
+
+function paintSegmentInfo() {
+  const segment = state.segment
+  if (!segment || state.sheetKind !== "segment") return
+  const info = document.getElementById("segment-info")
+  const range = document.getElementById("segment-range")
+  const scrollTop = info?.scrollTop ?? 0
+  if (info) {
+    info.innerHTML = segmentInfoHtml(segment)
+    info.scrollTop = scrollTop
+  }
+  if (range) range.textContent = segment.range
+    ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo))
+    : segment.status === "error" ? t().tdFailed : t().tdLoading
+  paintSegmentConnectors()
+}
+
+function buildSegmentDiagram() {
+  const segment = state.segment
+  const svg = document.getElementById("segment-diagram")
+  if (!segment || !svg) return
+  const s = t()
+  const box = svg.getBoundingClientRect()
+  const width = Math.max(120, Math.round(box.width || 260))
+  const height = Math.max(140, Math.round(box.height || 360))
+  if (segment.geometry?.svg === svg && segment.geometry.width === width && segment.geometry.height === height) return
+  const x = Math.min(62, Math.max(42, width * 0.24))
+  const margin = Math.min(64, Math.max(28, height * 0.16))
+  const top = margin
+  const bottom = height - margin
+  const fromKm = model.km(segment.from)
+  const toKm = model.km(segment.to)
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
+  svg.replaceChildren()
+
+  const defs = make("defs")
+  const filter = make("filter", { id: "segment-glow", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: width + 120, height: height + 120 })
+  filter.append(make("feGaussianBlur", { stdDeviation: 4 }))
+  defs.append(filter)
+  svg.append(defs)
+
+  const color = segment.dir === "UP" ? COLORS.UP : COLORS.DOWN
+  const base = make("g", { class: "segment-route-base" })
+  base.append(
+    make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing" }),
+    make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${segment.dir === "UP" ? "up" : "down"}` }),
+  )
+  for (let y = top + 28; y < bottom; y += 54) {
+    base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
+  }
+  const stationHits = []
+  for (const [endpoint, code, y] of [["from", segment.from, top], ["to", segment.to, bottom]]) {
+    const name = network.name(code, LANG)
+    const opposite = segment.dir === "UP" ? "DOWN" : "UP"
+    const jumpFrom = endpoint === "from" ? adjacentStation(code, opposite) : code
+    const jumpTo = endpoint === "from" ? code : adjacentStation(code, segment.dir)
+    const jumpLabel = jumpFrom && jumpTo
+      ? segment.dir === "UP"
+        ? s.segmentUp(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
+        : s.segmentDown(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
+      : ""
+    base.append(
+      make("rect", { x: x - 12, y: y - 7, width: 24, height: 14, rx: 7, class: "dg-station" }),
+      make("text", { x: x + 24, y: y + 4, class: "dg-name segment-name segment-station-label" }, `${name} • ${model.km(code).toFixed(2)} km`),
+    )
+    if (jumpFrom && jumpTo) {
+      const jumpKind = endpoint === "from" ? "previous" : "next"
+      const hit = make("rect", {
+        x: x - 22,
+        y: y - 18,
+        width: 44,
+        height: 36,
+        rx: 18,
+        class: "segment-station-hit",
+        role: "button",
+        tabindex: "0",
+        "aria-label": `${name}：${jumpLabel}`,
+        "data-segment-jump": jumpKind,
+        "data-from": jumpFrom,
+        "data-to": jumpTo,
+        "data-dir": segment.dir,
+      })
+      hit.append(make("title", {}, jumpLabel))
+      const openAdjacent = (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        openSegment(jumpFrom, segment.dir)
+        const nextFocus = document.querySelector(`[data-segment-jump="${jumpKind}"]`) ?? document.querySelector(".segment-station-hit")
+        nextFocus?.focus({ preventScroll: true })
+      }
+      hit.addEventListener("click", openAdjacent)
+      hit.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") openAdjacent(event)
+      })
+      stationHits.push(hit)
+    }
+  }
+  base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
+  const stationLayer = make("g", { id: "segment-station-layer" })
+  stationLayer.append(...stationHits)
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), make("g", { id: "segment-train-layer" }), stationLayer)
+  const labelRoom = width - x - 32
+  for (const label of svg.querySelectorAll(".segment-station-label")) {
+    const measured = label.getComputedTextLength()
+    if (measured <= labelRoom) continue
+    const size = parseFloat(getComputedStyle(label).fontSize)
+    label.style.fontSize = `${Math.max(8, size * labelRoom / measured)}px`
+    if (label.getComputedTextLength() > labelRoom) {
+      label.setAttribute("textLength", String(labelRoom))
+      label.setAttribute("lengthAdjust", "spacingAndGlyphs")
+    }
+  }
+  segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm }
+  paintSegmentInfrastructure()
+  segmentTrainNodes = new Map()
+  syncSegmentTrains()
+}
+
+function setSegmentRouteItem(kind, id, direction) {
+  const segment = state.segment
+  if (!segment || !["EP", "CPD", "EAP"].includes(kind) || !id) return
+  if (!segment.routes) segment.routes = {
+    EP: { status: "off", direction: "WKS", selectedId: null },
+    CPD: { status: "off", selectedId: null },
+    EAP: { status: "off", selectedId: null },
+  }
+  const route = segment.routes[kind]
+  if (kind === "EP") {
+    if (!["WKS", "TUM"].includes(direction)) return
+    // Buttons carry the raw EP ID; prefix the direction only when storing the selection.
+    const itemId = `${direction}:${id}`
+    if (route.status === "off") {
+      route.status = "all"
+      route.direction = direction
+      route.selectedId = null
+    } else if (route.status === "all") {
+      if (route.direction !== direction) {
+        route.direction = direction
+        route.selectedId = null
+      } else {
+        route.status = "single"
+        route.selectedId = itemId
+      }
+    } else if (route.selectedId === itemId) route.status = "off"
+    else {
+      route.status = "single"
+      route.direction = direction
+      route.selectedId = itemId
+    }
+  } else if (route.status === "off") route.status = "all"
+  else if (route.status === "all") {
+    route.status = "single"
+    route.selectedId = id
+  } else if (route.selectedId === id) route.status = "off"
+  else route.selectedId = id
+  paintSegmentInfo()
+  paintSegmentInfrastructure()
+}
+
+function paintSegmentInfrastructure() {
+  const segment = state.segment
+  const layer = segment?.geometry?.svg?.querySelector("#segment-infrastructure-layer")
+  if (!segment?.range || !segment.records || !layer) return
+  const { svg, x, top, bottom } = segment.geometry
+  const { range, records } = segment
+  const span = range.chainageTo - range.chainageFrom
+  if (!Number.isFinite(span) || span === 0) return
+  const yForChainage = (km) => top + ((km - range.chainageFrom) / span) * (bottom - top)
+  layer.replaceChildren()
+  const defs = make("defs")
+  layer.append(defs)
+
+  for (const [index, zone] of records.neutralZones.entries()) {
+    const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
+    const values = limits.length === 2 ? limits : chainageValues(zone.chainageKm).filter(Number.isFinite)
+    if (!values.length) continue
+    const low = Math.min(...values)
+    const high = Math.max(...values)
+    const limitY1 = Math.max(top, Math.min(bottom, Math.min(yForChainage(low), yForChainage(high))))
+    const limitY2 = Math.max(top, Math.min(bottom, Math.max(yForChainage(low), yForChainage(high))))
+    const center = (limitY1 + limitY2) / 2
+    const swatchWidth = 15.52
+    const swatchHeight = 9.6
+    const swatchX = x - swatchWidth / 2
+    const gradientId = `segment-neutral-gradient-${index}`
+    const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: swatchX, y1: center, x2: swatchX + swatchWidth, y2: center })
+    for (const [offset, color] of [["0%", "#d73a49"], ["20%", "#e67e22"], ["40%", "#d4ac0d"], ["60%", "#2e9e5b"], ["80%", "#218fb5"], ["100%", "#7d3c98"]]) {
+      gradient.append(make("stop", { offset, "stop-color": color }))
+    }
+    defs.append(gradient)
+    const group = make("g", { class: "segment-neutral-zone-group", "data-neutral-zone": zone.isolator })
+    const rangeText = limits.length === 2 ? `${chainageText(low)}–${chainageText(high)} km` : `${chainageText(zone.chainageKm)} km`
+    const labelX = swatchX - 1
+    const label = make("text", { x: labelX, y: center - 1, class: "segment-neutral-label", "text-anchor": "end", "aria-label": "Neutral Zone" }, "Neutral")
+    label.append(make("tspan", { x: labelX, dy: 10 }, "Zone"))
+    group.append(
+      make("title", {}, `${zone.isolator} ${rangeText}`),
+      make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
+      label,
+    )
+    layer.append(group)
+  }
+
+  const vccFrom = records.vccFrom
+  const vccTo = records.vccTo
+  for (const boundary of records.vccBoundaries) {
+    const values = chainageValues(boundary.values).filter(Number.isFinite)
+    if (!values.length) continue
+    const km = values[0]
+    const y = Math.max(top + 12, Math.min(bottom - 12, yForChainage(km)))
+    const left = 4
+    const right = svg.viewBox.baseVal.width - 4
+    layer.append(
+      make("line", { x1: left, y1: y, x2: right, y2: y, class: "segment-vcc-line" }),
+      make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
+      make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
+      make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+    )
+  }
+
+  const epRoute = segment.routes?.EP
+  if (epRoute?.status === "all" || epRoute?.status === "single") {
+    const epDir = epRoute.direction ?? "WKS"
+    for (const ep of records.entryPoints) {
+      const id = String(epDir === "WKS" ? ep.greenEPId ?? ep.greenEP : ep.yellowEPId ?? ep.yellowEP)
+      const itemId = `${epDir}:${id}`
+      if (epRoute.status === "single" && epRoute.selectedId !== itemId) continue
+      const km = chainageValues(ep.chainageKm).find(Number.isFinite)
+      if (!Number.isFinite(km)) continue
+      const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
+      const code = formatEp(id)
+      const overlapsVcc = records.vccBoundaries.some((boundary) =>
+        chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
+      const control = make("g", {
+        class: "segment-ep-control active",
+        "aria-hidden": "true",
+        "data-route-marker": "EP",
+        "data-route-id": itemId,
+      })
+      control.append(
+        make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
+        make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+      )
+      layer.append(control)
+      layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
+    }
+  }
+
+  const markerX = x + (segment.dir === "DOWN" ? -2.75 : 2.75)
+  for (const kind of ["CPD", "EAP"]) {
+    const route = segment.routes?.[kind]
+    if (route?.status !== "all" && route?.status !== "single") continue
+    const rows = kind === "CPD" ? records.cpds : records.emergencyAccessPoints ?? []
+    for (const point of rows) {
+      if (route.status === "single" && route.selectedId !== point.id) continue
+      const km = chainageValues(point.chainageKm).find(Number.isFinite)
+      if (!Number.isFinite(km)) continue
+      const y = Math.max(top, Math.min(bottom, yForChainage(km)))
+      const marker = make("circle", {
+        cx: markerX,
+        cy: y,
+        r: kind === "CPD" ? 1.15 : 1.3,
+        class: `segment-${kind.toLowerCase()}-dot`,
+        "data-route-marker": kind,
+        "data-route-id": point.id,
+      })
+      marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
+      layer.append(marker)
+    }
+  }
+  paintSegmentConnectors()
+}
+
+function paintSegmentConnectors() {
+  const segment = state.segment
+  const svg = document.getElementById("segment-connectors")
+  if (!svg || state.sheetKind !== "segment" || !segment) return
+  svg.replaceChildren()
+  const layout = document.querySelector(".segment-layout")
+  const info = document.getElementById("segment-info")
+  if (!layout || !info) return
+  const layoutRect = layout.getBoundingClientRect()
+  const infoRect = info.getBoundingClientRect()
+  if (!layoutRect.width || !layoutRect.height) return
+  svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
+
+  const appendConnector = (dot, button, color, kind, id, direction = null) => {
+    const dotRect = dot.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const buttonY = buttonRect.top + buttonRect.height / 2
+    if (buttonY < infoRect.top || buttonY > infoRect.bottom) return
+    const x1 = dotRect.right + 6 - layoutRect.left
+    const x2 = buttonRect.left - 6 - layoutRect.left
+    if (x2 <= x1) return
+    svg.append(make("line", {
+      x1,
+      y1: dotRect.top + dotRect.height / 2 - layoutRect.top,
+      x2,
+      y2: buttonY - layoutRect.top,
+      class: `segment-${kind.toLowerCase()}-connector`,
+      stroke: color,
+      "stroke-opacity": 0.72,
+      "vector-effect": "non-scaling-stroke",
+      "data-route-kind": kind,
+      "data-route-id": id,
+      ...(direction ? { "data-ep-direction": direction } : {}),
+    }))
+  }
+
+  if (segment.epConnectors !== false) {
+    const rightButtons = new Map([...info.querySelectorAll(".ep-dot")].map((button) => [
+      `${button.dataset.epDir}:${button.dataset.routeId}`,
+      button,
+    ]))
+    for (const control of document.querySelectorAll(".segment-ep-control[data-route-id]")) {
+      const itemId = control.dataset.routeId
+      const button = rightButtons.get(itemId)
+      const dot = control.querySelector(".segment-ep-dot")
+      if (!button || !dot) continue
+      const direction = itemId.split(":")[0]
+      appendConnector(dot, button, direction === "WKS" ? "#58c77a" : "#f5c451", "EP", itemId, direction)
+    }
+  }
+
+  if (segment.eapConnectors !== false) {
+    const eapButtons = new Map([...info.querySelectorAll(".eap-dot")].map((button) => [
+      button.dataset.routeId,
+      button,
+    ]))
+    for (const dot of document.querySelectorAll(".segment-eap-dot[data-route-id]")) {
+      const id = dot.dataset.routeId
+      const button = eapButtons.get(id)
+      if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
+    }
+  }
+}
+
+let segmentTrainNodes = new Map()
+function syncSegmentTrains() {
+  const segment = state.segment
+  if (!segment?.geometry || state.sheetKind !== "segment") return
+  const { svg, x, top, bottom, fromKm, toKm } = segment.geometry
+  const layer = svg.querySelector("#segment-train-layer")
+  if (!layer) return
+  const low = Math.min(fromKm, toKm)
+  const high = Math.max(fromKm, toKm)
+  const seen = new Set()
+  const items = state.runs
+    .filter((run) => run.dir === segment.dir && Number.isFinite(run.km) && run.km >= low - 0.001 && run.km <= high + 0.001)
+    .map((run) => ({ run, y: top + ((run.km - fromKm) / (toKm - fromKm)) * (bottom - top) }))
+    .sort((a, b) => a.y - b.y)
+  for (let i = 1; i < items.length; i++) {
+    if (items[i].y - items[i - 1].y < 24) items[i].y = items[i - 1].y + 24
+  }
+  for (const { run, y } of items) {
+    seen.add(run.id)
+    let node = segmentTrainNodes.get(run.id)
+    if (!node) {
+      node = make("g", { class: "dg-train segment-train", role: "button", tabindex: 0, "data-dir": segment.dir })
+      node.append(
+        make("circle", { r: TRAIN_R + 7, class: "dg-train-glow", filter: "url(#segment-glow)" }),
+        make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
+        make("circle", { r: TRAIN_R, class: "dg-train-body", fill: segment.dir === "UP" ? COLORS.UP : COLORS.DOWN }),
+        make("path", { d: segment.dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
+        make("text", { class: "dg-train-run" }),
+        make("circle", { r: 15, fill: "transparent" }),
+        make("g", { class: "dg-late" }),
+      )
+      node.addEventListener("click", () => openTrain(run.id))
+      node.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          openTrain(run.id)
+        }
+      })
+      layer.append(node)
+      segmentTrainNodes.set(run.id, node)
+    }
+    node.setAttribute("transform", `translate(${x} ${Math.max(top, Math.min(bottom, y)).toFixed(1)})`)
+    node.dataset.delay = run.delay ? "1" : "0"
+    node.dataset.short = isShortTrip(run) ? "1" : "0"
+    node.dataset.phase = run.pos.phase
+    node.dataset.level = String(lateLevel(run))
+    node.dataset.last = isLastTrip(run) ? "1" : "0"
+    const reveal = runsOn()
+    node.dataset.reveal = reveal ? "1" : "0"
+    if (reveal) {
+      const label = run.kind === "sched" ? String(run.trip.run) : "–"
+      const text = node.querySelector(".dg-train-run")
+      if (text.textContent !== label) text.textContent = label
+    }
+    paintLateTag(node, run)
+    node.setAttribute("aria-label", `${network.name(run.dest, LANG)} · ${positionText(run)}`)
+  }
+  for (const [id, node] of segmentTrainNodes) {
+    if (!seen.has(id)) {
+      node.remove()
+      segmentTrainNodes.delete(id)
+    }
+  }
 }
 
 function positionText(run) {
@@ -1934,7 +2620,7 @@ function dutyRow(run) {
   const s = t()
   const sheet = timetables?.books[state.book]?.dutysheet
   const later = next ? ` <span class="meta">${s.relief(placeName(next[2] ?? next[1]), dutyLink(next[0], sheet))}</span>` : ""
-  // The link to the day's duty list only shows with Run numbers switched on.
+  // The link to the day's duty list is available whenever a Duty Sheet is active.
   const more = runsOn() ? ` <button type="button" class="link duty-more">${s.dutyAll}</button>` : ""
   return `<dt>${s.duty}</dt><dd>${dutyLink(duties[current][0], sheet)}${later}${more}</dd>`
 }
@@ -2006,6 +2692,8 @@ function dutyPage(run) {
 
 function openTrain(runId) {
   state.selected = runId
+  state.station = null
+  state.segment = null
   lastPicked = runId
   state.sheetKind = "train"
   state.trainPage = 1
@@ -2059,10 +2747,10 @@ function repaintKeepingFocus(html) {
   next?.focus({ preventScroll: true })
 }
 
-// The chip left of the destination. With Run numbers switched on (brand
-// dot) it shows the train's Run number and flips the card to the Run's duty
-// list and back; a countdown-model train has no Run and shows a dash.
-// Switched off, it is a plain direction triangle.
+// The chip left of the destination. With an active Duty Sheet it shows the
+// train's Run number and flips the card to the Run's duty list and back; a
+// countdown-model train has no Run and shows a dash. Otherwise it is a plain
+// direction triangle.
 function trainChip(run, s, page) {
   const dirClass = run.dir === "UP" ? "up" : "down"
   if (runsOn() && run.kind === "sched") {
@@ -2436,15 +3124,6 @@ function handleDutyClick(event) {
 /* -------------------------------------------------------------- controls */
 
 function wireControls() {
-  els.brandDot.addEventListener("click", () => {
-    state.showRuns = !state.showRuns
-    writePref(RUNS_KEY, state.showRuns ? "1" : "0")
-    paintRunsToggle()
-    if (state.view === "diagram") syncTrains()
-    // The duty list sits behind the switch too: switching off leaves it.
-    if (!state.showRuns) state.trainPage = 1
-    if (state.sheetKind === "train") paintTrainSheet()
-  })
   els.viewSeg.addEventListener("click", (event) => {
     const button = event.target.closest("button")
     if (button) showView(button.dataset.view)
@@ -2462,6 +3141,13 @@ function wireControls() {
     if (!state.paused) refresh(false)
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)
+  els.sheet.addEventListener("pointerdown", beginSheetDrag)
+  els.sheet.addEventListener("pointermove", moveSheetDrag)
+  els.sheet.addEventListener("pointerup", (event) => finishSheetDrag(event))
+  els.sheet.addEventListener("pointercancel", (event) => finishSheetDrag(event, true))
+  els.sheet.addEventListener("lostpointercapture", (event) => {
+    if (sheetDrag?.pointerId === event.pointerId) resetSheetDrag()
+  })
   els.periodTag.addEventListener("click", openDutySheet)
   els.sheet.addEventListener("input", (event) => {
     if (state.sheetKind !== "duty" || !event.target.matches(".duty-search")) return
@@ -2471,7 +3157,23 @@ function wireControls() {
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
-    else if (event.target.closest(".duty-open")) {
+    else if (state.sheetKind === "station" && event.target.closest("[data-segment-dir]")) {
+      openSegment(state.station, event.target.closest("[data-segment-dir]").dataset.segmentDir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
+      const { from, dir } = state.segment
+      openSegment(from, dir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-connectors]")) {
+      state.segment.epConnectors = state.segment.epConnectors === false
+      paintSegmentInfo()
+      document.querySelector("[data-ep-connectors]")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-eap-connectors]")) {
+      state.segment.eapConnectors = state.segment.eapConnectors === false
+      paintSegmentInfo()
+      document.querySelector("[data-eap-connectors]")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
+      const button = event.target.closest("[data-route-kind]")
+      setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)
+    } else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")
       openDutyCard(open.dataset.sheet, open.dataset.duty)
     }

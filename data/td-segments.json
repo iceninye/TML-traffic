@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "source": "TML_full_line_technical_reference_v2_3_4.md §3",
+  "segments": [
+    {
+      "id": "01",
+      "from": "WKS",
+      "to": "WKS",
+      "up": { "from": 81.224, "to": 81.355 },
+      "down": { "from": 81.350, "to": 81.224 },
+      "sourcePage": "1A2-17"
+    },
+    {
+      "id": "02",
+      "from": "WKS",
+      "to": "MOS",
+      "up": { "from": 81.355, "to": 82.755 },
+      "down": { "from": 82.736, "to": 81.350 },
+      "sourcePage": "1A2-17"
+    },
+    {
+      "id": "03",
+      "from": "MOS",
+      "to": "HEO",
+      "up": { "from": 82.755, "to": 83.839 },
+      "down": { "from": 83.814, "to": 82.736 },
+      "sourcePage": "1A2-16/17"
+    },
+    {
+      "id": "04",
+      "from": "HEO",
+      "to": "TSH",
+      "up": { "from": 83.839, "to": 84.851 },
+      "down": { "from": 84.830, "to": 83.814 },
+      "sourcePage": "1A2-16"
+    },
+    {
+      "id": "05",
+      "from": "TSH",
+      "to": "SHM",
+      "up": { "from": 84.851, "to": 87.814 },
+      "down": { "from": 87.801, "to": 84.830 },
+      "sourcePage": "1A2-15/16"
+    },
+    {
+      "id": "06",
+      "from": "SHM",
+      "to": "CIO",
+      "up": { "from": 87.814, "to": 88.529 },
+      "down": { "from": 88.526, "to": 87.801 },
+      "sourcePage": "1A2-15"
+    },
+    {
+      "id": "07",
+      "from": "CIO",
+      "to": "STW",
+      "up": { "from": 88.529, "to": 89.638 },
+      "down": { "from": 89.625, "to": 88.526 },
+      "sourcePage": "1A2-15"
+    },
+    {
+      "id": "08",
+      "from": "STW",
+      "to": "CKT",
+      "up": { "from": 89.638, "to": 90.621 },
+      "down": { "from": 90.616, "to": 89.625 },
+      "sourcePage": "1A2-14/15"
+    },
+    {
+      "id": "09",
+      "from": "CKT",
+      "to": "TAW",
+      "up": { "from": 90.621, "to": 91.438 },
+      "down": { "from": 91.430, "to": 90.616 },
+      "sourcePage": "1A2-14"
+    },
+    {
+      "id": "10",
+      "from": "TAW",
+      "to": "HIK",
+      "up": { "from": 91.438, "to": 92.735 },
+      "down": { "from": 92.722, "to": 91.430 },
+      "sourcePage": "1A2-14"
+    },
+    {
+      "id": "11",
+      "from": "HIK",
+      "to": "DIH",
+      "up": { "from": 92.735, "to": 97.194 },
+      "down": { "from": 97.184, "to": 92.722 },
+      "sourcePage": "1A2-12/13/14"
+    },
+    {
+      "id": "12",
+      "from": "DIH",
+      "to": "KAT",
+      "up": { "from": 97.194, "to": 98.441 },
+      "down": { "from": 98.453, "to": 97.184 },
+      "sourcePage": "1A2-12"
+    },
+    {
+      "id": "13",
+      "from": "KAT",
+      "to": "SUW",
+      "up": { "from": 98.441, "to": 99.443 },
+      "down": { "from": 99.461, "to": 98.453 },
+      "sourcePage": "1A2-12"
+    },
+    {
+      "id": "14",
+      "from": "SUW",
+      "to": "TKW",
+      "up": { "from": 99.443, "to": 100.602 },
+      "down": { "from": 100.591, "to": 99.461 },
+      "sourcePage": "1A2-11/12"
+    },
+    {
+      "id": "15",
+      "from": "TKW",
+      "to": "HOM",
+      "up": { "from": 100.602, "to": 101.641 },
+      "down": { "from": 101.617, "to": 100.591 },
+      "sourcePage": "1A2-11"
+    },
+    {
+      "id": "16",
+      "from": "HOM",
+      "to": "HUH",
+      "up": { "from": 101.641, "to": 102.420 },
+      "down": { "from": 102.391, "to": 101.617 },
+      "sourcePage": "1A2-11"
+    },
+    {
+      "id": "17",
+      "from": "HUH",
+      "to": "ETS",
+      "up": { "from": 102.420, "to": 103.551 },
+      "down": { "from": 103.568, "to": 102.391 },
+      "sourcePage": "1A2-10/11"
+    },
+    {
+      "id": "18",
+      "from": "ETS",
+      "to": "AUS",
+      "up": { "from": 103.551, "to": 105.322 },
+      "down": { "from": 105.312, "to": 103.568 },
+      "sourcePage": "1A2-10"
+    },
+    {
+      "id": "19",
+      "from": "AUS",
+      "to": "NAC",
+      "up": { "from": 105.322, "to": 108.013 },
+      "down": { "from": 108.019, "to": 105.312 },
+      "sourcePage": "1A2-9"
+    },
+    {
+      "id": "20",
+      "from": "NAC",
+      "to": "MEF",
+      "up": { "from": 108.013, "to": 110.426 },
+      "down": { "from": 110.424, "to": 108.019 },
+      "sourcePage": "1A2-8/9"
+    },
+    {
+      "id": "21",
+      "from": "MEF",
+      "to": "TWW",
+      "up": { "from": 110.426, "to": 114.811 },
+      "down": { "from": 114.800, "to": 110.424 },
+      "sourcePage": "1A2-7/8"
+    },
+    {
+      "id": "22",
+      "from": "TWW",
+      "to": "KSR",
+      "up": { "from": 114.811, "to": 123.718 },
+      "down": { "from": 123.750, "to": 114.800 },
+      "sourcePage": "1A2-4/5/6/7"
+    },
+    {
+      "id": "23",
+      "from": "KSR",
+      "to": "YUL",
+      "up": { "from": 123.718, "to": 127.258 },
+      "down": { "from": 127.260, "to": 123.750 },
+      "sourcePage": "1A2-3/4"
+    },
+    {
+      "id": "24",
+      "from": "YUL",
+      "to": "LOP",
+      "up": { "from": 127.258, "to": 128.313 },
+      "down": { "from": 128.311, "to": 127.260 },
+      "sourcePage": "1A2-3"
+    },
+    {
+      "id": "25",
+      "from": "LOP",
+      "to": "TIS",
+      "up": { "from": 128.313, "to": 130.609 },
+      "down": { "from": 130.666, "to": 128.311 },
+      "sourcePage": "1A2-2/3"
+    },
+    {
+      "id": "26",
+      "from": "TIS",
+      "to": "SIH",
+      "up": { "from": 130.609, "to": 135.596 },
+      "down": { "from": 135.597, "to": 130.666 },
+      "sourcePage": "1A2-1/2"
+    },
+    {
+      "id": "27",
+      "from": "SIH",
+      "to": "TUM",
+      "up": { "from": 135.596, "to": 137.549 },
+      "down": { "from": 137.552, "to": 135.597 },
+      "extendedTo": 137.800,
+      "extendedFrom": 137.800,
+      "sourcePage": "1A2-1"
+    }
+  ]
+}

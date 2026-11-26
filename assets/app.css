@@ -668,8 +668,11 @@ svg.diagram {
 }
 
 .segment-route {
-  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   min-width: 0;
+  min-height: 0;
   padding: 12px;
   border: 1px solid var(--edge);
   border-radius: var(--radius);
@@ -683,9 +686,8 @@ svg.diagram {
   font-variant-numeric: tabular-nums;
 }
 
-.segment-diagram { display: block; width: 100%; height: 360px; }
+.segment-diagram { display: block; flex: 1 1 0; width: 100%; min-height: 0; }
 .segment-name { font-size: 13px; }
-.segment-live { color: var(--muted); font-size: 12px; text-align: center; }
 
 .segment-info {
   min-width: 0;
@@ -710,13 +712,16 @@ svg.diagram {
 
 .td-section { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
 .td-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.td-vcc .td-summary { margin-bottom: 10px; }
 .td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .td-row { padding: 9px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel-2); }
 .td-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; }
 .td-meta { margin-top: 4px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-.td-source { margin-top: 6px; color: var(--muted); font-size: 10.5px; }
-.td-source summary { cursor: pointer; }
-.td-source div { margin-top: 3px; overflow-wrap: anywhere; }
+.td-note { margin: 6px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.td-sources { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--edge); color: var(--muted); font-size: 10.5px; }
+.td-sources summary { cursor: pointer; }
+.td-sources ul { margin: 6px 0 0; padding-left: 18px; }
+.td-sources li + li { margin-top: 3px; overflow-wrap: anywhere; }
 
 .ep-chip {
   display: inline-flex;
@@ -744,10 +749,8 @@ svg.diagram {
     min-height: 0;
   }
   .segment-route { padding: 8px; }
-  .segment-diagram { height: 340px; }
-  .segment-range, .segment-live { font-size: 10.5px; }
-  .td-summary { display: block; padding: 8px; }
-  .td-summary span { display: block; margin-top: 3px; }
+  .segment-range { font-size: 10.5px; }
+  .td-summary { padding: 8px; }
   .td-section { padding-top: 10px; }
   .td-row { padding: 8px; }
   .td-main { font-size: 11.5px; }
@@ -757,8 +760,6 @@ svg.diagram {
 @media (max-height: 650px) {
   .sheet[data-kind="segment"] { height: 96vh; max-height: 96vh; }
   .segment-layout { height: calc(96vh - 112px); min-height: 0; }
-  .segment-route { max-height: 100%; overflow-y: auto; }
-  .segment-diagram { height: 300px; }
 }
 
 /* Train card: docked, live-updating, no backdrop so the line stays visible. */

@@ -1945,7 +1945,6 @@ function segmentShellHtml(from, to, dir) {
     `<section class="segment-route" aria-label="${s.segmentRoute}">` +
     `<div class="segment-range" id="segment-range">${s.tdLoading}</div>` +
     `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${fromName} → ${toName}"></svg>` +
-    `<div class="segment-live" id="segment-live">${s.tdLoading}</div>` +
     `</section>` +
     `<aside class="segment-info" id="segment-info" aria-live="polite">${s.tdLoading}</aside>` +
     `</div>`
@@ -1961,6 +1960,17 @@ function openSegment(code, dir) {
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
   buildSegmentDiagram()
+  const svg = document.getElementById("segment-diagram")
+  if (svg && "ResizeObserver" in window) {
+    const observer = new ResizeObserver(() => {
+      if (state.sheetKind !== "segment" || state.segment?.geometry?.svg !== svg) {
+        observer.disconnect()
+        return
+      }
+      buildSegmentDiagram()
+    })
+    observer.observe(svg)
+  }
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
     if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return
@@ -1985,17 +1995,41 @@ function chainageText(value) {
   return values.filter((v) => v != null).map((v) => Number(v).toFixed(3)).join(" / ")
 }
 
-function tdDetails(item) {
-  const s = t()
-  const source = item.sourcePages?.join(" / ") || item.sourcePage || item.source || ""
-  const review = item.reviewStatus ? `<div>${escapeHtml(item.reviewStatus)}</div>` : ""
-  const note = item.note ? `<div>${escapeHtml(item.note)}</div>` : ""
-  if (!source && !review && !note) return ""
-  return `<details class="td-source"><summary>${s.tdSource}</summary><div>${source ? escapeHtml(source) : ""}</div>${review}${note}</details>`
+function tdNote(item) {
+  return item?.note ? `<p class="td-note">${escapeHtml(item.note)}</p>` : ""
 }
 
 function tdSection(title, rows, empty) {
   return `<section class="td-section"><h3>${title}</h3>${rows.length ? `<ul class="td-list">${rows.join("")}</ul>` : `<p class="empty">${empty}</p>`}</section>`
+}
+
+function tdVccSection(label, rows, empty) {
+  const s = t()
+  return `<section class="td-section td-vcc"><div class="td-summary">${label}</div><h3>${s.tdVcc}</h3>${rows.length
+    ? `<ul class="td-list">${rows.join("")}</ul>`
+    : `<p class="empty">${empty}</p>`}</section>`
+}
+
+function tdSources(range, records) {
+  const s = t()
+  const sources = new Set()
+  const add = (value) => {
+    if (!value) return
+    for (const part of String(value).split(/,\s*/)) {
+      sources.add(/^1A\d/.test(part) ? `TD_TML ${part}` : part)
+    }
+  }
+  for (const page of range.sourcePages ?? []) add(page)
+  for (const rows of [records.entryPoints, records.cpds, records.neutralZones, records.vccBoundaries]) {
+    for (const item of rows) {
+      if (item.sourcePages?.length) item.sourcePages.forEach(add)
+      else add(item.sourcePage || item.source)
+    }
+  }
+  const list = [...sources].sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
+  return `<details class="td-sources"><summary>${s.tdSource}</summary>${list.length
+    ? `<ul>${list.map((source) => `<li>${escapeHtml(source)}</li>`).join("")}</ul>`
+    : `<p class="empty">${s.tdNone}</p>`}</details>`
 }
 
 function segmentInfoHtml(segment) {
@@ -2005,32 +2039,31 @@ function segmentInfoHtml(segment) {
   }
   const { records, range } = segment
   if (!records || !range) return s.tdLoading
-  const trackName = range.track === "up" ? s.tdUpTrack : s.tdDownTrack
   const epRows = records.entryPoints.map((ep) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
     const green = formatEp(ep.greenEPId ?? ep.greenEP)
     return `<li class="td-row"><div class="td-main"><span class="ep-chip yellow" title="${s.toTum}">${s.tdYellow} ${escapeHtml(yellow)}</span><span class="ep-chip green" title="${s.toWks}">${s.tdGreen} ${escapeHtml(green)}</span></div>` +
-      `<div class="td-meta">${chainageText(ep.chainageKm)} km · ${trackName}</div>${tdDetails(ep)}</li>`
+      `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
   const cpdRows = records.cpds.map((cpd) =>
-    `<li class="td-row"><div class="td-main">${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km · ${cpd.track === "-" ? s.tdBothTracks : trackName}</div>${tdDetails(cpd)}</li>`)
+    `<li class="td-row"><div class="td-main">${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km${cpd.track === "-" ? ` · ${s.tdBothTracks}` : ""}</div></li>`)
   const neutralRows = records.neutralZones.map((zone) => {
     const where = zone.downLimitKm != null && zone.upLimitKm != null
       ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
       : `${chainageText(zone.chainageKm)} km`
-    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where} · ${escapeHtml(zone.type)}</div>${tdDetails(zone)}</li>`
+    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where} · ${escapeHtml(zone.type)}</div>${tdNote(zone)}</li>`
   })
   const vccRows = records.vccBoundaries.map((boundary) =>
-    `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km · ${trackName}</div>${tdDetails(boundary)}</li>`)
+    `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`)
   const vccLabel = records.vccFrom && records.vccTo
     ? records.vccFrom === records.vccTo ? `VCC ${records.vccFrom}` : s.tdVccAreas(records.vccFrom, records.vccTo)
     : s.tdVcc
   return (
-    `<div class="td-summary">${vccLabel}<span>${chainageText(range.chainageFrom)} → ${chainageText(range.chainageTo)} km</span></div>` +
     tdSection(s.tdEntryPoints, epRows, s.tdNone) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
-    tdSection(s.tdVcc, vccRows, s.tdNone)
+    tdVccSection(vccLabel, vccRows, s.tdNone) +
+    tdSources(range, records)
   )
 }
 
@@ -2041,7 +2074,7 @@ function paintSegmentInfo() {
   const range = document.getElementById("segment-range")
   if (info) info.innerHTML = segmentInfoHtml(segment)
   if (range) range.textContent = segment.range
-    ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo), segment.range.track === "up" ? t().tdUpTrack : t().tdDownTrack)
+    ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo))
     : segment.status === "error" ? t().tdFailed : t().tdLoading
 }
 
@@ -2049,15 +2082,17 @@ function buildSegmentDiagram() {
   const segment = state.segment
   const svg = document.getElementById("segment-diagram")
   if (!segment || !svg) return
-  const width = Math.max(180, Math.round(svg.getBoundingClientRect().width || 260))
-  const height = 360
-  const x = Math.min(62, Math.max(28, width * 0.24))
-  const top = 64
-  const bottom = 296
+  const box = svg.getBoundingClientRect()
+  const width = Math.max(120, Math.round(box.width || 260))
+  const height = Math.max(140, Math.round(box.height || 360))
+  if (segment.geometry?.svg === svg && segment.geometry.width === width && segment.geometry.height === height) return
+  const x = Math.min(62, Math.max(24, width * 0.24))
+  const margin = Math.min(64, Math.max(28, height * 0.16))
+  const top = margin
+  const bottom = height - margin
   const fromKm = model.km(segment.from)
   const toKm = model.km(segment.to)
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
-  svg.setAttribute("height", String(height))
   svg.replaceChildren()
 
   const defs = make("defs")
@@ -2085,7 +2120,7 @@ function buildSegmentDiagram() {
   }
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
   svg.append(base, make("g", { id: "segment-train-layer" }))
-  segment.geometry = { svg, x, top, bottom, fromKm, toKm }
+  segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm }
   segmentTrainNodes = new Map()
   syncSegmentTrains()
 }
@@ -2153,8 +2188,6 @@ function syncSegmentTrains() {
       segmentTrainNodes.delete(id)
     }
   }
-  const live = document.getElementById("segment-live")
-  if (live) live.textContent = items.length ? t().segmentTrains(items.length) : t().segmentNoTrains
 }
 
 function positionText(run) {

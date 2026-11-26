@@ -7,7 +7,8 @@ release commits stamped in the page footer.
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。
 - 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。
 - 移除左上角橙色掣；有適用 Duty Sheet 時，Run 編號同「全日更份」直接可用。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v73`。
+- 放大圖左欄填滿可用高度；移除列車數量文字。VCC 只標示實際交界 chainage，並整合區段資料；來源去重後收起喺最底，空資料顯示 `n/a`，不再顯示審核狀態同軌道名稱。
+- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v74`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

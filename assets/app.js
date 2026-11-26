@@ -2124,7 +2124,7 @@ function buildSegmentDiagram() {
   const width = Math.max(120, Math.round(box.width || 260))
   const height = Math.max(140, Math.round(box.height || 360))
   if (segment.geometry?.svg === svg && segment.geometry.width === width && segment.geometry.height === height) return
-  const x = Math.min(62, Math.max(24, width * 0.24))
+  const x = Math.min(62, Math.max(42, width * 0.24))
   const margin = Math.min(64, Math.max(28, height * 0.16))
   const top = margin
   const bottom = height - margin
@@ -2136,16 +2136,11 @@ function buildSegmentDiagram() {
   const defs = make("defs")
   const filter = make("filter", { id: "segment-glow", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: width + 120, height: height + 120 })
   filter.append(make("feGaussianBlur", { stdDeviation: 4 }))
-  const epGlow = make("filter", { id: "segment-ep-glow", x: "-50%", y: "-50%", width: "200%", height: "200%" })
-  epGlow.append(make("feGaussianBlur", { in: "SourceGraphic", stdDeviation: 1.5, result: "blur" }))
-  const epMerge = make("feMerge")
-  epMerge.append(make("feMergeNode", { in: "blur" }), make("feMergeNode", { in: "SourceGraphic" }))
-  epGlow.append(epMerge)
-  defs.append(filter, epGlow)
+  defs.append(filter)
   svg.append(defs)
 
   const color = segment.dir === "UP" ? COLORS.UP : COLORS.DOWN
-  const base = make("g")
+  const base = make("g", { class: "segment-route-base" })
   base.append(
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing" }),
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${segment.dir === "UP" ? "up" : "down"}` }),
@@ -2253,11 +2248,13 @@ function paintSegmentInfrastructure() {
     defs.append(gradient)
     const group = make("g", { class: "segment-neutral-zone-group", "data-neutral-zone": zone.isolator })
     const rangeText = limits.length === 2 ? `${chainageText(low)}–${chainageText(high)} km` : `${chainageText(zone.chainageKm)} km`
+    const labelX = swatchX - 1
+    const label = make("text", { x: labelX, y: center - 1, class: "segment-neutral-label", "text-anchor": "end", "aria-label": "Neutral Zone" }, "Neutral")
+    label.append(make("tspan", { x: labelX, dy: 10 }, "Zone"))
     group.append(
-      make("title", {}, `${zone.isolator} ${rangeText}；白色界線為實際 1× 範圍`),
+      make("title", {}, `${zone.isolator} ${rangeText}`),
       make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
-      make("line", { x1: x, y1: limitY1, x2: x, y2: limitY2, class: "segment-neutral-boundary" }),
-      make("text", { x: swatchX, y: center + swatchHeight / 2 + 9, class: "segment-neutral-label" }, "Neutral zone"),
+      label,
     )
     layer.append(group)
   }
@@ -2300,7 +2297,7 @@ function paintSegmentInfrastructure() {
       })
       control.append(
         make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
-        make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}`, filter: "url(#segment-ep-glow)" }),
+        make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
       )
       layer.append(control)
       layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))

@@ -2221,8 +2221,10 @@ function buildSegmentDiagram() {
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing" }),
     make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${segment.dir === "UP" ? "up" : "down"}` }),
   )
+  // The enlarged diagram always places the origin above the destination, so
+  // both directions travel downward here regardless of their line direction.
   for (let y = top + 28; y < bottom; y += 54) {
-    base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
+    base.append(make("path", { d: `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
   }
   const stationHits = []
   for (const [endpoint, code, y] of [["from", segment.from, top], ["to", segment.to, bottom]]) {
@@ -2537,7 +2539,7 @@ function syncSegmentTrains() {
         make("circle", { r: TRAIN_R + 7, class: "dg-train-glow", filter: "url(#segment-glow)" }),
         make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
         make("circle", { r: TRAIN_R, class: "dg-train-body", fill: segment.dir === "UP" ? COLORS.UP : COLORS.DOWN }),
-        make("path", { d: segment.dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
+        make("path", { d: "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
         make("text", { class: "dg-train-run" }),
         make("circle", { r: 15, fill: "transparent" }),
         make("g", { class: "dg-late" }),

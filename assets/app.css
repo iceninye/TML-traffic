@@ -660,6 +660,7 @@ svg.diagram {
 .segment-head .sub { margin-bottom: 0; }
 
 .segment-layout {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
   gap: 14px;
@@ -689,6 +690,8 @@ svg.diagram {
 .segment-diagram { display: block; flex: 1 1 0; width: 100%; min-height: 0; }
 .segment-name { font-size: 13px; }
 
+.segment-connectors { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.segment-ep-connector { fill: none; stroke-width: 1.25; stroke-linecap: round; }
 .segment-info {
   min-width: 0;
   overflow-y: auto;
@@ -712,6 +715,14 @@ svg.diagram {
 
 .td-section { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
 .td-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.td-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.td-section-head h3 { margin: 0; }
+.td-switch-group { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--muted); font-size: 10.5px; }
+.td-switch { width: 30px; height: 18px; padding: 2px; border: 1px solid var(--edge); border-radius: 999px; background: var(--panel); cursor: pointer; }
+.td-switch span { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform 0.15s ease, background 0.15s ease; }
+.td-switch[aria-checked="true"] { background: color-mix(in srgb, var(--good) 28%, var(--panel)); border-color: color-mix(in srgb, var(--good) 55%, var(--edge)); }
+.td-switch[aria-checked="true"] span { background: var(--good); transform: translateX(12px); }
+.td-switch:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .td-section .empty { padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
 .td-vcc .td-summary { margin-bottom: 10px; }
 .td-vcc .td-summary + h3 { margin-top: 12px; }

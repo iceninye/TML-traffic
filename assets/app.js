@@ -1947,6 +1947,7 @@ function segmentShellHtml(from, to, dir) {
     `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${fromName} → ${toName}"></svg>` +
     `</section>` +
     `<aside class="segment-info" id="segment-info" aria-live="polite">${s.tdLoading}</aside>` +
+    `<svg class="segment-connectors" id="segment-connectors" aria-hidden="true"></svg>` +
     `</div>`
   )
 }
@@ -1960,6 +1961,7 @@ function openSegment(code, dir) {
     from: code,
     to: dest,
     dir,
+    epConnectors: true,
     routes: {
       EP: { status: "off", direction: "WKS", selectedId: null },
       CPD: { status: "off", selectedId: null },
@@ -1974,6 +1976,9 @@ function openSegment(code, dir) {
   openSheet(segmentShellHtml(code, dest, dir), "segment")
   buildSegmentDiagram()
   const svg = document.getElementById("segment-diagram")
+  const info = document.getElementById("segment-info")
+  const layout = document.querySelector(".segment-layout")
+  info?.addEventListener("scroll", paintSegmentConnectors, { passive: true })
   if (svg && "ResizeObserver" in window) {
     const observer = new ResizeObserver(() => {
       if (state.sheetKind !== "segment" || state.segment?.geometry?.svg !== svg) {
@@ -1981,8 +1986,10 @@ function openSegment(code, dir) {
         return
       }
       buildSegmentDiagram()
+      paintSegmentConnectors()
     })
     observer.observe(svg)
+    if (layout) observer.observe(layout)
   }
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
@@ -2013,8 +2020,9 @@ function tdNote(item) {
   return item?.note ? `<p class="td-note">${escapeHtml(item.note)}</p>` : ""
 }
 
-function tdSection(title, rows, empty) {
-  return `<section class="td-section"><h3>${title}</h3>${rows.length ? `<ul class="td-list">${rows.join("")}</ul>` : `<p class="empty">${empty}</p>`}</section>`
+function tdSection(title, rows, empty, headingExtra = "") {
+  const heading = headingExtra ? `<div class="td-section-head"><h3>${title}</h3>${headingExtra}</div>` : `<h3>${title}</h3>`
+  return `<section class="td-section">${heading}${rows.length ? `<ul class="td-list">${rows.join("")}</ul>` : `<p class="empty">${empty}</p>`}</section>`
 }
 
 function tdVccSection(label, rows, empty) {
@@ -2080,6 +2088,7 @@ function segmentInfoHtml(segment) {
     `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpdRows = records.cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
+  const connectorSwitch = `<div class="td-switch-group"><span>EP 連線</span><button type="button" class="td-switch" role="switch" data-ep-connectors aria-checked="${segment.epConnectors !== false}" aria-label="顯示 EP 連線" title="顯示／隱藏 EP 連線"><span></span></button></div>`
   const neutralRows = records.neutralZones.map((zone) => {
     const where = zone.downLimitKm != null && zone.upLimitKm != null
       ? `${chainageText(zone.downLimitKm)}–${chainageText(zone.upLimitKm)} km`
@@ -2094,7 +2103,7 @@ function segmentInfoHtml(segment) {
   return (
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
-    tdSection(s.tdEntryPoints, epRows, s.tdNone) +
+    tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch) +
     tdSection(s.tdEap, eapRows, s.tdNone) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
     tdSources(range, records)
@@ -2114,6 +2123,7 @@ function paintSegmentInfo() {
   if (range) range.textContent = segment.range
     ? t().tdRange(chainageText(segment.range.chainageFrom), chainageText(segment.range.chainageTo))
     : segment.status === "error" ? t().tdFailed : t().tdLoading
+  paintSegmentConnectors()
 }
 
 function buildSegmentDiagram() {
@@ -2325,6 +2335,51 @@ function paintSegmentInfrastructure() {
       marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
       layer.append(marker)
     }
+  }
+  paintSegmentConnectors()
+}
+
+function paintSegmentConnectors() {
+  const segment = state.segment
+  const svg = document.getElementById("segment-connectors")
+  if (!svg || state.sheetKind !== "segment" || !segment) return
+  svg.replaceChildren()
+  if (segment.epConnectors === false) return
+  const layout = document.querySelector(".segment-layout")
+  const info = document.getElementById("segment-info")
+  if (!layout || !info) return
+  const layoutRect = layout.getBoundingClientRect()
+  const infoRect = info.getBoundingClientRect()
+  if (!layoutRect.width || !layoutRect.height) return
+  svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
+  const rightButtons = new Map([...info.querySelectorAll(".ep-dot")].map((button) => [
+    `${button.dataset.epDir}:${button.dataset.routeId}`,
+    button,
+  ]))
+  for (const control of document.querySelectorAll(".segment-ep-control[data-route-id]")) {
+    const itemId = control.dataset.routeId
+    const button = rightButtons.get(itemId)
+    const dot = control.querySelector(".segment-ep-dot")
+    if (!button || !dot) continue
+    const dotRect = dot.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const buttonY = buttonRect.top + buttonRect.height / 2
+    if (buttonY < infoRect.top || buttonY > infoRect.bottom) continue
+    const x1 = dotRect.right + 6 - layoutRect.left
+    const x2 = buttonRect.left - 6 - layoutRect.left
+    if (x2 <= x1) continue
+    const direction = itemId.split(":")[0]
+    svg.append(make("line", {
+      x1,
+      y1: dotRect.top + dotRect.height / 2 - layoutRect.top,
+      x2,
+      y2: buttonY - layoutRect.top,
+      class: "segment-ep-connector",
+      stroke: direction === "WKS" ? "#58c77a" : "#f5c451",
+      "stroke-opacity": 0.72,
+      "vector-effect": "non-scaling-stroke",
+      "data-ep-direction": direction,
+    }))
   }
 }
 
@@ -2972,6 +3027,9 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
       const { from, dir } = state.segment
       openSegment(from, dir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-connectors]")) {
+      state.segment.epConnectors = state.segment.epConnectors === false
+      paintSegmentInfo()
     } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
       const button = event.target.closest("[data-route-kind]")
       setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)

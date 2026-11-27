@@ -37,6 +37,7 @@ lib/maplibre/*.mjs        vendored MapLibre GL 6.12.0
 data/tml-*.json           靜態資料
 data/td-*.json            TD_TML 技術資料同 27 段官方 chainage
 lib/td-infrastructure.js  EP／Niche Room／EAP／CPD／Neutral Zone／VCC 站段查詢
+lib/td-search.js          技術搜尋 index、chainage→站段／VCC、Neutral Zone 配對
 ```
 
 `app.js` 直接 `import` 引擎檔：
@@ -87,6 +88,21 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 | Run 編號／全日更份 | 有適用 Duty Sheet 時直接可用，唔再需要橙色掣 |
 | 暫停 | 停止輪詢同動畫推進，保留畫面 |
 | 路綫圖 / 地圖 | 切換 view，記入 localStorage |
+
+### 技術搜尋同雙軌放大圖（2026-11-27）
+
+右上角「尋找」取代原本嘅「？説明」入口，圖例同說明保留喺搜尋 sheet 頂部快捷列。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
+
+- 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。
+- CPD 結果按站段摺疊，頂層顯示車站、軌道、數量同 chainage 範圍；空查詢預設收合，搜尋時自動展開。
+- 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。
+- 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
+- VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
+- 雙軌圖頂部有上行／下行 switch，詳細資料跟 switch 切換。640px 以上維持左右獨立捲動同 SVG 連線；640px 以下直屏改為全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），直屏唔畫跨欄連線，改以 marker focus、類型 badge 同詳情卡配對。抽屜可撳或拖曳，旋轉保留狀態；667×375 矮橫屏使用緊湊頂列。
+- TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
+- EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
+- `tools/validate_search.mjs` 驗證 598 筆 index、594 筆主線可見結果、被排除 VCC 集合、站段解析、VCC 範圍、EP 分組、Neutral Zone 配對、格式迴歸同跨段 EAP metadata。
+- `tools/validate_sw.mjs` 驗證搜尋 critical-path 資源有納入離線 shell；lazy MapLibre 同動態更份／時間表唔納入呢個檢查。
 
 `prefers-reduced-motion` 會停用 sheet 過場。
 
@@ -196,6 +212,7 @@ python3 -m http.server 8790 --bind 127.0.0.1
 # 2. 開 http://127.0.0.1:8790/  → 應該 3 秒內出 27 行 + 列車點
 # 3. 點站名 → 站卡；點兩站之間左／右軌 → 站段放大圖；點列車點 → 列車卡
 #    Run 編號同全日更份有 Duty Sheet 時直接可用
+# 3a. 點「尋找」→ 搜尋 1-2／NAC43／HP 601；結果應自動 focus；VCC 交界同 Neutral Zone 應開雙軌並可切換方向
 # 4. 切地圖 → 應該出真地圖；再切回路綫圖 → 列車點仍然貼住路軌
 
 # 5. 語法檢查（無 bundler，所以逐檔 parse）

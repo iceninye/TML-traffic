@@ -22,6 +22,8 @@ jobs:
           node tools/validate_data.mjs
           node tools/validate_calendar.mjs
           node tools/validate_td.mjs
+          node tools/validate_search.mjs
+          node tools/validate_sw.mjs
       - name: Tool paths with spaces
         run: node tools/validate_tool_paths.mjs
       - name: Duty cards and hours

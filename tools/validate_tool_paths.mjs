@@ -11,7 +11,11 @@ const tmpDir = mkdtempSync(join(tmpdir(), "tml traffic "))
 const copyRoot = join(tmpDir, "repo")
 
 try {
-  for (const dir of ["tools", "lib", "data", "worker"]) {
+  for (const dir of [
+    "tools", "lib", "data", "worker", "assets", "index.html", "sw.js",
+    "site.webmanifest", "apple-touch-icon.png", "android-chrome-192x192.png",
+    "android-chrome-512x512.png", "android-chrome-maskable-512x512.png",
+  ]) {
     cpSync(join(root, dir), join(copyRoot, dir), { recursive: true })
   }
 
@@ -19,6 +23,8 @@ try {
     { script: "validate_data.mjs", args: [], allowed: [0] },
     { script: "validate_calendar.mjs", args: [], allowed: [0] },
     { script: "validate_td.mjs", args: [], allowed: [0] },
+    { script: "validate_search.mjs", args: [], allowed: [0] },
+    { script: "validate_sw.mjs", args: [], allowed: [0] },
     { script: "validate_proxy.mjs", args: [], allowed: [0] },
     { script: "coverage.mjs", args: ["--days", "1"], allowed: [0, 2] },
   ]

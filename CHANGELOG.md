@@ -3,6 +3,24 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.0 — 2026-11-27 (`a09a00c`, test branch)
+- 雙軌技術圖改為響應式介面：640px 以下直屏使用全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），640px 以上維持左右獨立捲動。
+- 直屏關閉跨欄 SVG 連線，改以 marker focus、設施類型 badge 同單項詳情卡配對；詳情卡支援上一項／下一項、展開全部同收起。
+- 抽屜支援按鈕同拖曳切換，隱藏內容設為 `hidden`／`inert`；旋轉保留抽屜、方向、設施 focus 同鍵盤 focus。
+- 667×375 矮橫屏使用緊湊頂列同獨立左右捲動；UP／DOWN switch 同步 `aria-pressed`。
+- 雙軌 Neutral Zone 詳情同時保留 UP／DOWN chainage 同來源；Shell cache renamed `v102`。
+
+## v0.10.0 — 2026-11-27 (`65378a0`, test branch)
+- 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明移到搜尋 sheet 頂部快捷列，並加入可點查詢範例。
+- 新增 598 筆前端技術搜尋 index；EP 先選主線 VCC 區域，再按實際 UP／DOWN 軌分組，並以黃／綠區分 EP 功能方向。
+- 搜尋結果跳到相關站段後自動啟動 marker／連線、捲到並 focus 該行；EP 行為與手動撳掣一致。
+- 搜尋支援全形字、大小寫、空格及分隔符正規化；EP 不接受無分隔符數字拆解，避免 `1-12`／`11-2` 日後撞位。扁平結果支援 ↑／↓、Enter、兩段式 Esc 同 IME 組字保護，Tab trap 排除 listbox options。
+- 類別 chip 同步已選狀態；新增 UP／DOWN 排列 switch，結果沿行車方向排序。
+- CPD 搜尋結果按站段摺疊，260 筆整理成 7 組；空查詢收合，搜尋時自動展開。
+- VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 改為雙軌站段圖；UP／DOWN 同時顯示即時列車，右欄右上角可切換方向，頂部保留雙向摘要。手機版改為全闊上下排版。
+- TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，顯示原因並可一鍵往返對向區段，保留同一 EAP focus。
+- 新增 `tools/validate_search.mjs`（59 項）同 `tools/validate_sw.mjs` 並加入 CI；Shell cache renamed `v101`。
+
 ## v0.9.0 — 2026-11-26 (`74f888b`, test branch)
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。
 - 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。

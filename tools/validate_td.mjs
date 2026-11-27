@@ -28,17 +28,18 @@ const attempt = (fn) => {
   }
 }
 
-const technical = readJson("../data/td-tml-v2_3_4.json")
+const technical = readJson("../data/td-tml-v2_3_5.json")
 const segmentData = readJson("../data/td-segments.json")
 if (!technical || !segmentData) {
   console.error(`✗ 技術資料驗證失敗：${failed} 個檢查未通過`)
   process.exit(1)
 }
 
-check(technical.schemaVersion === "2.3.4", "技術 JSON schemaVersion 為 2.3.4")
+check(technical.schemaVersion === "2.3.5", "技術 JSON schemaVersion 為 2.3.5")
 const expectedCounts = [
   ["entryPointLines", 120],
   ["entryPoints", 240],
+  ["nicheRooms", 17],
   ["crossPassageDoors", 261],
   ["neutralZones", 14],
 ]
@@ -53,6 +54,7 @@ check(technical.vcc?.boundaries?.length === 7, "VCC boundaries 數量為 7")
 
 const idCollections = [
   ["entryPoints", technical.entryPoints, (row) => row.id],
+  ["nicheRooms", technical.nicheRooms, (row) => row.uid],
   ["emergencyAccessPoints", technical.emergencyAccessPoints, (row) => row.id],
   ["crossPassageDoors", technical.crossPassageDoors, (row) => row.id],
   ["neutralZones", technical.neutralZones, (row) => row.isolator],
@@ -72,6 +74,19 @@ for (const [name, rows, idOf] of idCollections) {
   allIds.push(...ids)
 }
 check(new Set(allIds).size === allIds.length, "技術設施 ID 在各資料表之間唯一")
+const nicheRoomErrors = (technical.nicheRooms ?? []).filter((room) => room.type !== "nicheRoom"
+  || !/^[A-Z]+-NR-\d{2}-\d+\.\d{3}$/.test(room.uid)
+  || !/^\d{2}$/.test(room.id)
+  || room.name !== `Niche Room ${room.id}`
+  || !Number.isFinite(room.chainageKm)
+  || typeof room.section !== "string" || !room.section
+  || typeof room.sourcePage !== "string" || !room.sourcePage
+  || !Number.isInteger(room.sourcePdfPage)
+  || room.reviewStatus !== "verified-against-td-tml-3.3")
+check(nicheRoomErrors.length === 0, `Niche Room 必要欄位、UID、chainage 同審核狀態完整${nicheRoomErrors.length ? `：${nicheRoomErrors.slice(0, 5).map((row) => row.uid).join("、")}` : ""}`)
+check(technical.dataReview?.checks?.nicheRoomCount === 17
+  && technical.dataReview?.decision?.nicheRooms === "verified-after-structural-correction",
+"Niche Room review metadata 同 17 筆資料一致")
 
 const epById = new Map((technical.entryPoints ?? []).map((row) => [row.id, row]))
 const epErrors = []
@@ -116,8 +131,21 @@ check(allTravelRanges.length === 52 && allTravelRanges.every((range) => range.tr
 "27 站全部相鄰站段嘅上下行查詢均可用")
 const allRecords = allTravelRanges.map((range) => attempt(() => recordsForRange(technical, range, range.dir)))
 check(allRecords.length === 52 && allRecords.every((records) => records
-  && ["entryPoints", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((key) => Array.isArray(records[key]))),
+  && ["entryPoints", "nicheRooms", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((key) => Array.isArray(records[key]))),
 "27 站全部相鄰站段嘅技術資料查詢均可用")
+const nicheRoomCoverage = allRecords.flatMap((records) => records?.nicheRooms ?? []).map((room) => room.uid)
+check(nicheRoomCoverage.length === 34 && new Set(nicheRoomCoverage).size === 17
+  && nicheRoomCoverage.every((uid) => nicheRoomCoverage.filter((value) => value === uid).length === 2),
+"17 個 Niche Room 喺相鄰站段上下行查詢中各出現一次")
+const ausNicheUp = attempt(() => recordsForRange(technical, travelRange(segments, "AUS", "NAC", "up"), "up")?.nicheRooms)
+const ausNicheDown = attempt(() => recordsForRange(technical, travelRange(segments, "NAC", "AUS", "down"), "down")?.nicheRooms)
+check(same(ausNicheUp?.map((room) => room.uid), ["NAC-NR-02-107.795"])
+  && same(ausNicheDown?.map((room) => room.uid), ["NAC-NR-02-107.795"]),
+"AUS↔NAC 雙向收錄同一個 Niche Room，chainage 查詢不設方向")
+const twwKsrNiche = attempt(() => recordsForRange(technical, travelRange(segments, "TWW", "KSR", "up"), "up")?.nicheRooms)
+check(twwKsrNiche?.length === 7 && twwKsrNiche.every((room, index, rows) => index === 0
+  || rows[index - 1].chainageKm <= room.chainageKm),
+"TWW→KSR UP 收錄 7 個 Tai Lam Tunnel Niche Room 並按 chainage 排序")
 const badRanges = segments.filter((segment) => {
   const up = segment.up
   const down = segment.down
@@ -150,7 +178,7 @@ for (const expected of smokeCases) {
   const records = attempt(() => recordsForRange(technical, range, expected.dir))
   check(records && records.vccFrom === expected.vccFrom && records.vccTo === expected.vccTo,
     `recordsForRange ${key} 端點 VCC 正確`)
-  check(records && ["entryPoints", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((name) => {
+  check(records && ["entryPoints", "nicheRooms", "emergencyAccessPoints", "cpds", "neutralZones", "vccBoundaries"].every((name) => {
     const values = records[name].map((row) => Math.min(...chainageValues(name === "vccBoundaries" ? row.values : row.chainageKm)))
     return values.every((km, index) => index === 0 || values[index - 1] <= km)
   }), `recordsForRange ${key} 各結果按 chainage 排序`)
@@ -204,6 +232,11 @@ check(same(arrayBoundary?.values, [98.842, 98.84]) && arrayBoundary.transitionGa
 
 const descendingRecords = attempt(() => recordsForRange({
   entryPointLines: [{ track: "down", chainageKm: [5, 4], yellowEP: "1603", greenEP: "1605" }],
+  nicheRooms: [
+    { uid: "TEST-NR-02-4.6", id: "02", name: "Niche Room 02", type: "nicheRoom", chainageKm: 4.6 },
+    { uid: "TEST-NR-01-4.4", id: "01", name: "Niche Room 01", type: "nicheRoom", chainageKm: 4.4 },
+    { uid: "TEST-NR-03-3.9", id: "03", name: "Niche Room 03", type: "nicheRoom", chainageKm: 3.9 },
+  ],
   emergencyAccessPoints: [
     { id: "EAP A", downChainageKm: 4.5, downAccess: true },
     { id: "EAP B", downChainageKm: 4.6, downAccess: false },
@@ -220,10 +253,12 @@ const descendingRecords = attempt(() => recordsForRange({
   ],
   vcc: { areas: [], boundaries: [{ between: [1, 2], downChainageKm: [5.1, 4.9], source: "test" }] },
 }, { from: "A", to: "B", track: "down", chainageFrom: 5, chainageTo: 4 }, "down"))
-check(descendingRecords?.entryPoints.length === 1 && descendingRecords.emergencyAccessPoints.length === 1
+check(descendingRecords?.entryPoints.length === 1
+  && same(descendingRecords?.nicheRooms.map((row) => row.uid), ["TEST-NR-01-4.4", "TEST-NR-02-4.6"])
+  && descendingRecords.emergencyAccessPoints.length === 1
   && descendingRecords.cpds.length === 1 && descendingRecords.neutralZones.length === 1
   && same(descendingRecords.vccBoundaries[0]?.values, [5.1, 4.9]),
-"遞減里程及 number[] 可用；EAP 方向、CPD 類型、軌道、中性區相交及 VCC 過濾正確")
+"遞減里程及 number[] 可用；Niche Room chainage 過濾／排序、EAP 方向、CPD 類型、軌道、中性區相交及 VCC 過濾正確")
 
 const cpdTrackFixture = {
   crossPassageDoors: [

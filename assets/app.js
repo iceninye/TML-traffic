@@ -1983,7 +1983,7 @@ let tdDataPromise = null
 function loadTdData() {
   tdDataPromise ??= Promise.all([
     fetchJson("data/td-segments.json"),
-    fetchJson("data/td-tml-v2_3_4.json"),
+    fetchJson("data/td-tml-v2_3_5.json"),
   ]).then(([segmentDoc, technical]) => ({ segments: segmentDoc.segments, technical }))
     .catch((error) => {
       tdDataPromise = null
@@ -2021,9 +2021,11 @@ function openSegment(code, dir) {
     to: dest,
     dir,
     epConnectors: true,
+    nicheRoomConnectors: true,
     eapConnectors: true,
     routes: {
       EP: { status: "off", direction: "WKS", selectedId: null },
+      NR: { status: "off", selectedId: null },
       CPD: { status: "off", selectedId: null },
       EAP: { status: "off", selectedId: null },
     },
@@ -2112,7 +2114,7 @@ function tdSources(range, records) {
     }
   }
   for (const page of range.sourcePages ?? []) add(page)
-  for (const rows of [records.entryPoints, records.emergencyAccessPoints ?? [], records.cpds, records.neutralZones, records.vccBoundaries]) {
+  for (const rows of [records.entryPoints, records.nicheRooms ?? [], records.emergencyAccessPoints ?? [], records.cpds, records.neutralZones, records.vccBoundaries]) {
     for (const item of rows) {
       if (item.sourcePages?.length) item.sourcePages.forEach(add)
       else add(item.sourcePage || item.source)
@@ -2144,7 +2146,7 @@ function segmentInfoHtml(segment) {
   const pointButton = (kind, id, label) => {
     const route = segment.routes?.[kind]
     const active = route?.status === "all" || (route?.status === "single" && route.selectedId === id)
-    return `<button type="button" class="point-dot ${kind === "CPD" ? "cpd-dot" : "eap-dot"}" data-route-kind="${kind}" data-route-id="${escapeHtml(id)}" aria-pressed="${active}" aria-label="${escapeHtml(`${label}：${id}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>`
+    return `<button type="button" class="point-dot ${kind === "CPD" ? "cpd-dot" : kind === "EAP" ? "eap-dot" : "nr-dot"}" data-route-kind="${kind}" data-route-id="${escapeHtml(id)}" aria-pressed="${active}" aria-label="${escapeHtml(`${label}：${id}`)}" title="${escapeHtml(`${label}：全部／只顯示此項／收起`)}"></button>`
   }
   const epRows = entryPoints.map((ep, index) => {
     const yellow = formatEp(ep.yellowEPId ?? ep.yellowEP)
@@ -2156,16 +2158,18 @@ function segmentInfoHtml(segment) {
       `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
+  const nicheRooms = [...(records.nicheRooms ?? [])].reverse()
+  const nicheRoomRows = nicheRooms.map((room) =>
+    `<li class="td-row td-point-group nr-row"><div class="td-main">${pointButton("NR", room.uid, room.name)}${escapeHtml(room.name)}</div><div class="td-meta">${chainageText(room.chainageKm)} km</div></li>`)
   const emergencyAccessPoints = [...(records.emergencyAccessPoints ?? [])].reverse()
   const eapRows = emergencyAccessPoints.map((point) =>
     `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpds = [...records.cpds].reverse()
   const cpdRows = cpds.map((cpd) =>
     `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
-  const connectorSwitch = (kind) => {
-    const key = `${kind.toLowerCase()}Connectors`
+  const connectorSwitch = (kind, stateKey = `${kind.toLowerCase()}Connectors`, dataKey = kind.toLowerCase()) => {
     const label = `顯示 ${kind} 連線`
-    return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${kind.toLowerCase()}-connectors aria-checked="${segment[key] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
+    return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${dataKey}-connectors aria-checked="${segment[stateKey] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
   }
   const neutralRows = [...records.neutralZones].reverse().map((zone) => {
     const where = neutralZoneRangeText(zone)
@@ -2182,6 +2186,7 @@ function segmentInfoHtml(segment) {
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
+    tdSection(s.tdNicheRooms, nicheRoomRows, s.tdNone, connectorSwitch("Niche Room", "nicheRoomConnectors", "niche-room")) +
     tdSection(s.tdEap, eapRows, s.tdNone, connectorSwitch("EAP")) +
     tdSection(s.tdCpd, cpdRows, s.tdNone) +
     tdSources(range, records)
@@ -2339,9 +2344,10 @@ function buildSegmentDiagram() {
 
 function setSegmentRouteItem(kind, id, direction) {
   const segment = state.segment
-  if (!segment || !["EP", "CPD", "EAP"].includes(kind) || !id) return
+  if (!segment || !["EP", "NR", "CPD", "EAP"].includes(kind) || !id) return
   if (!segment.routes) segment.routes = {
     EP: { status: "off", direction: "WKS", selectedId: null },
+    NR: { status: "off", selectedId: null },
     CPD: { status: "off", selectedId: null },
     EAP: { status: "off", selectedId: null },
   }
@@ -2376,6 +2382,10 @@ function setSegmentRouteItem(kind, id, direction) {
   else route.selectedId = id
   paintSegmentInfo()
   paintSegmentInfrastructure()
+  const focusButton = [...document.querySelectorAll("#segment-info [data-route-kind]")].find((button) =>
+    button.dataset.routeKind === kind && button.dataset.routeId === id
+    && (kind !== "EP" || button.dataset.epDir === direction))
+  focusButton?.focus({ preventScroll: true })
 }
 
 function paintSegmentInfrastructure() {
@@ -2469,6 +2479,31 @@ function paintSegmentInfrastructure() {
     }
   }
 
+  const nicheRoomRoute = segment.routes?.NR
+  if (nicheRoomRoute?.status === "all" || nicheRoomRoute?.status === "single") {
+    for (const room of records.nicheRooms ?? []) {
+      if (nicheRoomRoute.status === "single" && nicheRoomRoute.selectedId !== room.uid) continue
+      const km = chainageValues(room.chainageKm).find(Number.isFinite)
+      if (!Number.isFinite(km)) continue
+      const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
+      const overlapsVcc = records.vccBoundaries.some((boundary) =>
+        chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
+      const control = make("g", {
+        class: "segment-nr-control active",
+        "aria-hidden": "true",
+        "data-route-marker": "NR",
+        "data-route-id": room.uid,
+      })
+      control.append(
+        make("title", {}, `${room.name} · ${chainageText(room.chainageKm)} km`),
+        make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
+        make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
+      )
+      layer.append(control)
+      layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`))
+    }
+  }
+
   const markerX = x + (segment.dir === "DOWN" ? -2.75 : 2.75)
   for (const kind of ["CPD", "EAP"]) {
     const route = segment.routes?.[kind]
@@ -2542,6 +2577,19 @@ function paintSegmentConnectors() {
       if (!button || !dot) continue
       const direction = itemId.split(":")[0]
       appendConnector(dot, button, direction === "WKS" ? "#58c77a" : "#f5c451", "EP", itemId, direction)
+    }
+  }
+
+  if (segment.nicheRoomConnectors !== false) {
+    const nicheRoomButtons = new Map([...info.querySelectorAll(".nr-dot")].map((button) => [
+      button.dataset.routeId,
+      button,
+    ]))
+    for (const control of document.querySelectorAll(".segment-nr-control[data-route-id]")) {
+      const id = control.dataset.routeId
+      const button = nicheRoomButtons.get(id)
+      const dot = control.querySelector(".segment-nr-dot")
+      if (button && dot) appendConnector(dot, button, "#d65db1", "NR", id)
     }
   }
 
@@ -3213,6 +3261,10 @@ function wireControls() {
       state.segment.epConnectors = state.segment.epConnectors === false
       paintSegmentInfo()
       document.querySelector("[data-ep-connectors]")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-niche-room-connectors]")) {
+      state.segment.nicheRoomConnectors = state.segment.nicheRoomConnectors === false
+      paintSegmentInfo()
+      document.querySelector("[data-niche-room-connectors]")?.focus({ preventScroll: true })
     } else if (state.sheetKind === "segment" && event.target.closest("[data-eap-connectors]")) {
       state.segment.eapConnectors = state.segment.eapConnectors === false
       paintSegmentInfo()

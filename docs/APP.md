@@ -36,7 +36,7 @@ lib/mtr-*.js              抽取返嚟嘅引擎（唔改）
 lib/maplibre/*.mjs        vendored MapLibre GL 6.12.0
 data/tml-*.json           靜態資料
 data/td-*.json            TD_TML 技術資料同 27 段官方 chainage
-lib/td-infrastructure.js  EP／CPD／Neutral Zone／VCC 站段查詢
+lib/td-infrastructure.js  EP／Niche Room／EAP／CPD／Neutral Zone／VCC 站段查詢
 ```
 
 `app.js` 直接 `import` 引擎檔：
@@ -81,7 +81,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 | 動作 | 結果 |
 |---|---|
 | 點站名／站點 | bottom sheet：兩個方向各 4 班，含月台、預定/實時、延誤；亦有兩個站段放大入口 |
-| 點兩站之間嘅上行軌 | 放大顯示呢段上行單軌動態圖；右邊列 EP／CPD／Neutral Zone／VCC 交界 |
+| 點兩站之間嘅上行軌 | 放大顯示呢段上行單軌動態圖；右邊列 EP／Niche Room／EAP／CPD／Neutral Zone／VCC 交界 |
 | 點兩站之間嘅下行軌 | 放大顯示呢段下行單軌動態圖；距離／行車時間標籤左右兩半亦可供點擊 |
 | 點列車圓點 | 列車卡：目的地、現時位置（A → B）、最近一站倒數、車速、月台 |
 | Run 編號／全日更份 | 有適用 Duty Sheet 時直接可用，唔再需要橙色掣 |

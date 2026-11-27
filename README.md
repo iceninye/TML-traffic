@@ -24,7 +24,8 @@
 - 列車按位置畫出；地圖視圖按真實比例畫 8 卡列車，沿 OSM 路軌行駛。
 - 慢過時間表 60 秒以上變紅並標「+ Xs」，180 秒以上紅色閃爍；搵唔到對應班次但班距偏長則標黃色「班距 +Xs」。
 - 虛線圈＝短程車；L＝尾程（之後回廠，顏色較淡）。
-- 每站雙向倒數；撳站睇詳情，撳兩站之間嘅左／右軌放大嗰段，右邊列 EP／CPD／Neutral Zone／VCC 交界。
+- 每站雙向倒數；撳站睇詳情，撳兩站之間嘅左／右軌放大嗰段，右邊列 EP／Niche Room／EAP／CPD／Neutral Zone／VCC 交界。
+- 右上角「尋找」可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；結果跳到相關站段並自動標記。VCC 交界同 Neutral Zone 會顯示雙軌，右上角可切換上行／下行。
 - 撳列車睇車次同前方各站推算到站時間；可跟隨列車、暫停。
 
 **Run 同更份（Duty Sheet）**
@@ -70,6 +71,7 @@ worker/               可選：港鐵班次邊緣快取 Worker（預設關閉，
 lib/tml-model.js      時間表位置模型（行車 + 停站 + S 曲線 + 時段）
 lib/tml-timetable.js  時間表對應：讀數 → 班次 → 延誤 → 位置
 lib/td-infrastructure.js TD_TML EP／Niche Room／EAP／CPD／Neutral Zone／VCC 站段查詢
+lib/td-search.js      TD_TML 技術搜尋 index、chainage→站段／VCC、Neutral Zone 配對
 lib/tml-motion.js     追蹤 + 列車時鐘平滑
 lib/maplibre/*.mjs    vendored MapLibre GL 6.12.0（1.2 MB，lazy load）
 data/tml-network.json 27 站
@@ -157,6 +159,7 @@ node tools/probe-runs.mjs    # 動畫層平滑度
 node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀數）
 node tools/validate_data.mjs       # 全部 JSON 讀得通、index 同卡片 sha256／數量一致（CI 都行）
 node tools/validate_td.mjs         # TD_TML 27 段 chainage、EP／CPD／NZ／VCC 對應
+node tools/validate_search.mjs    # 技術搜尋 index、站段／VCC 解析、Neutral Zone 配對
 node tools/validate_tool_paths.mjs # 路徑有空格時工具仍正常
 node tools/validate_duties.mjs     # 更份卡片資料同當值判斷（真資料）
 node tools/validate-hours.mjs      # 官表（duty-basic.json）同更份卡片工時一致

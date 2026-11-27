@@ -86,6 +86,8 @@ npx wrangler deploy             # 真正部署（要先 npx wrangler login）
 | `node tools/validate_position.mjs` | 被扣列車嘅列車點位置（合成讀數） | 否 |
 | `node tools/validate_duties.mjs` | 更份卡片資料同當值判斷（用 `data/duties/` 真資料） | 否 |
 | `node tools/validate_feed_errors.mjs` | 連唔到班次 API 時錯誤原因分類 | 否 |
+| `node tools/validate_td.mjs` | TD_TML 27 段 chainage、EP／CPD／NZ／VCC 對應 | 否 |
+| `node tools/validate_search.mjs` | 技術搜尋 index、chainage→站段／VCC、Neutral Zone 配對 | 否 |
 | `node tools/probe-tml.mjs` | 對實時 API 做一次完整讀取（`--json` 機讀） | **是** |
 | `node tools/probe-runs.mjs` | 動畫層平滑度 | 否 |
 | `python3 tools/validate_timetable.py data/timetables/TML1100B.json` | 單份時間表（站序、時間唔倒退、首尾班、Run 接續…）；通過 exit 0 | 否 |

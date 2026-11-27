@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.10.0 — 2026-11-27 (test branch)
+- 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明保留喺搜尋 sheet 底部。
+- 新增 598 筆前端技術搜尋 index；EP 先選主線 VCC 區域，再按實際 UP／DOWN 軌分組，並以黃／綠區分 EP 功能方向。
+- 搜尋結果跳到相關站段後自動啟動 marker／連線、捲到並 focus 該行；EP 行為與手動撳掣一致。
+- VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 改為雙軌站段圖；UP／DOWN 同時顯示即時列車，右欄右上角可切換方向，頂部保留雙向摘要。
+- 新增 `tools/validate_search.mjs`（34 項）並加入 CI；Shell cache renamed `v98`。
+
 ## v0.9.0 — 2026-11-26 (`74f888b`, test branch)
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。
 - 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。

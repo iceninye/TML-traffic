@@ -25,6 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, mainlineVccAreas, searchResultMode, searchTechnicalIndex } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -59,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.9.0", commit: "74f888b" }
+const BUILD = { version: "0.10.0", commit: "74f888b" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -99,7 +100,7 @@ const els = {
   viewSeg: document.getElementById("view-seg"),
   pauseBtn: document.getElementById("pause-btn"),
   bellBtn: document.getElementById("bell-btn"),
-  helpBtn: document.getElementById("help-btn"),
+  helpBtn: document.getElementById("search-btn"),
   colLegend: document.getElementById("col-legend"),
   sheet: document.getElementById("sheet"),
   sheetBody: document.getElementById("sheet-body"),
@@ -129,6 +130,7 @@ const state = {
   sheetKind: null,
   station: null,
   segment: null,
+  search: null,
 }
 
 let network = null
@@ -155,6 +157,7 @@ let mapPromise = null
 let lastMapPaint = 0
 let lastSheetPaint = 0
 let lastFollow = 0
+let sheetTrigger = null
 
 const t = () => STRINGS[LANG]
 
@@ -707,6 +710,174 @@ function openHelp() {
   )
 }
 
+function loadSearchIndex() {
+  if (tdSearchIndex) return Promise.resolve(tdSearchIndex)
+  if (!tdSearchIndexPromise) {
+    tdSearchIndexPromise = loadTdData().then(({ segments, technical }) =>
+      buildTechnicalSearchIndex(technical, segments, {
+        stationOrder: order,
+        stationName: (code) => network.name(code, LANG),
+      }))
+  }
+  return tdSearchIndexPromise
+}
+
+const SEARCH_CATEGORIES = [
+  ["ALL", "searchAll"],
+  ["VCC", "searchVcc"],
+  ["EP", "searchEp"],
+  ["CPD", "searchCpd"],
+  ["EAP", "searchEap"],
+  ["NZ", "searchNz"],
+  ["NR", "searchNr"],
+]
+
+function searchShellHtml() {
+  const s = t()
+  const search = state.search
+  const chips = SEARCH_CATEGORIES.map(([value, label]) =>
+    `<button type="button" class="search-chip" data-search-category="${value}" aria-pressed="${search.category === value}">${s[label]}</button>`).join("")
+  return `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
+    `<div class="search-head"><h2>${s.searchTitle}</h2><div class="sub">${s.searchIntro}</div></div>` +
+    `<label class="search-input-wrap"><input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
+    `<div class="search-chips" role="group" aria-label="${s.searchTitle}">${chips}</div>` +
+    `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>` +
+    `<button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button>`
+}
+
+function openSearch() {
+  state.selected = null
+  state.station = null
+  state.segment = null
+  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "" }
+  setFollow(false)
+  openSheet(searchShellHtml(), "search")
+  loadSearchIndex().then((index) => {
+    tdSearchIndex = index
+    if (state.sheetKind !== "search" || !state.search) return
+    state.search.status = "ready"
+    renderSearchResults()
+    document.getElementById("search-input")?.focus({ preventScroll: true })
+  }).catch((error) => {
+    tdSearchIndexPromise = null
+    if (state.sheetKind !== "search" || !state.search) return
+    state.search.status = "error"
+    state.search.error = error.message
+    renderSearchResults()
+  })
+}
+
+function searchKindLabel(kind) {
+  const s = t()
+  return {
+    VCC_AREA: s.searchVcc,
+    VCC_BOUNDARY: s.searchVcc,
+    EP: s.searchEp,
+    CPD: s.searchCpd,
+    EAP: s.searchEap,
+    NZ: s.searchNz,
+    NR: s.searchNr,
+  }[kind] ?? kind
+}
+
+function searchResultButton(item, defaultDir = item.defaultDir) {
+  const s = t()
+  const km = chainageValues(item.chainageKm).filter(Number.isFinite)
+  const kmText = km.length ? `${km[0].toFixed(3)}${km.length > 1 ? `–${km.at(-1).toFixed(3)}` : ""} km` : ""
+  const segment = item.segment
+  const where = segment ? `${network.name(segment.from, LANG)} → ${network.name(segment.to, LANG)}` : item.sublabel
+  const track = item.track === "BOTH" ? "UP / DOWN" : item.track
+  return `<button type="button" class="search-result" data-search-result="${escapeHtml(item.id)}"${defaultDir ? ` data-default-dir="${defaultDir}"` : ""}>` +
+    `<span class="search-result-badge ${item.kind.toLowerCase()}">${searchKindLabel(item.kind)}</span>` +
+    `<span class="search-result-main"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(where)}</span></span>` +
+    `<span class="search-result-meta">${track ? `<b>${track}</b>` : ""}${kmText ? `<span>${kmText}</span>` : ""}</span></button>`
+}
+
+function renderEpSearchHierarchy() {
+  const s = t()
+  const search = state.search
+  const groups = entryPointsByVccArea(tdSearchIndex)
+  if (search.vccArea == null) {
+    const areas = mainlineVccAreas(tdSearchIndex)
+    return `<h3 class="search-section-title">${s.searchVccArea}</h3><div class="search-vcc-grid">` +
+      areas.map((area) => `<button type="button" class="search-vcc-area" data-search-vcc="${area.vcc}"><strong>VCC ${area.vcc}</strong><span>${escapeHtml(area.stations.map((code) => network.name(code, LANG)).join(" · "))}</span></button>`).join("") +
+      `</div>`
+  }
+  const group = groups.get(search.vccArea)
+  if (!group) return `<p class="empty">${s.searchNoResults}</p>`
+  const directionSection = (dir, label) => {
+    const rows = group[dir]
+    const byChainage = new Map()
+    for (const item of rows) {
+      const key = chainageText(item.chainageKm)
+      const list = byChainage.get(key) ?? []
+      list.push(item)
+      byChainage.set(key, list)
+    }
+    return `<section class="search-ep-direction"><h3><i class="sw ${dir === "UP" ? "up" : "down"}"></i>${label}</h3>` +
+      [...byChainage.entries()].map(([km, items]) => `<div class="search-ep-line"><div class="search-ep-codes">` +
+        items.map((item) => `<button type="button" class="search-ep-code ${item.direction === "WKS" ? "green" : "yellow"}" data-search-result="${escapeHtml(item.id)}" data-default-dir="${dir}" title="${item.direction === "WKS" ? s.tdWksDirection : s.tdTumDirection}">${escapeHtml(item.label.replace(/^EP /u, ""))}</button>`).join("") +
+        `</div><span>${km} km</span></div>`).join("") + `</section>`
+  }
+  return `<button type="button" class="search-back" data-search-vcc="all">← ${s.searchBack}</button>` +
+    directionSection("UP", `${s.up} · ${s.toTum}`) + directionSection("DOWN", `${s.down} · ${s.toWks}`)
+}
+
+function renderSearchResults() {
+  const search = state.search
+  const body = document.getElementById("search-results")
+  if (!search || !body) return
+  if (search.status === "loading") {
+    body.innerHTML = `<p class="empty">${t().searchLoading}</p>`
+    return
+  }
+  if (search.status === "error") {
+    body.innerHTML = `<div class="segment-error"><p>${t().searchFailed}</p><button type="button" class="btn" data-search-retry>${t().searchRetry}</button></div>`
+    return
+  }
+  if (!tdSearchIndex) return
+  if (search.category === "EP" && !search.query.trim()) {
+    body.innerHTML = renderEpSearchHierarchy()
+    return
+  }
+  const rows = searchTechnicalIndex(tdSearchIndex, search.query, search.category)
+    .filter((item) => item.kind !== "VCC_AREA" || item.mainline)
+  if (!rows.length) {
+    body.innerHTML = `<p class="empty">${t().searchNoResults}</p>`
+    return
+  }
+  body.innerHTML = `<div class="search-count">${t().searchResultCount(rows.length)}</div>` +
+    rows.map((item) => searchResultButton(item)).join("")
+}
+
+function openSearchResult(id, defaultDir = null) {
+  const item = tdSearchIndex?.items.find((row) => row.id === id)
+  if (!item || !state.search) return
+  if (item.kind === "VCC_AREA") {
+    state.search.category = "EP"
+    state.search.vccArea = item.vccArea
+    state.search.query = ""
+    openSheet(searchShellHtml(), "search")
+    renderSearchResults()
+    return
+  }
+  if (!item.segment) return
+  const dir = ["UP", "DOWN"].includes(defaultDir) ? defaultDir
+    : ["UP", "DOWN"].includes(item.defaultDir) ? item.defaultDir
+      : item.track === "DOWN" ? "DOWN" : "UP"
+  const code = dir === "UP" ? item.segment.from : item.segment.to
+  const rawId = item.kind === "EP" ? item.data.id
+    : item.kind === "NR" ? item.data.uid
+      : item.kind === "VCC_BOUNDARY" ? item.data.between.join(":")
+        : item.kind === "NZ" ? item.data.base : item.data.id
+  openSegment(code, dir, {
+    dual: searchResultMode(item) === "dual",
+    segment: item.segment,
+    segmentId: item.segment.id,
+    focus: { kind: item.kind, id: rawId, dir, direction: item.direction, data: item.data },
+  })
+}
+
 // What the loaded data covers, from data/timetables/index.json: the regular
 // Duty Sheets in force and how far the one-day sheets go, so a stale site is visible.
 let dataInfo = ""
@@ -821,7 +992,9 @@ function applyStrings() {
   els.viewSeg.querySelector('[data-view="diagram"]').textContent = s.diagram
   els.viewSeg.querySelector('[data-view="map"]').textContent = s.map
   for (const button of els.viewSeg.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === state.view))
-  els.helpBtn.textContent = s.help
+  els.helpBtn.textContent = s.search
+  els.helpBtn.setAttribute("aria-label", s.searchTitle)
+  els.helpBtn.title = s.searchTitle
   els.pauseBtn.textContent = state.paused ? s.resume : s.pause
   els.pauseBtn.setAttribute("aria-pressed", String(state.paused))
   els.mapNote.textContent = s.mapLoading
@@ -1838,24 +2011,39 @@ function resetSheetDrag() {
 
 function openSheet(html, kind) {
   resetSheetDrag()
+  if (!state.sheetKind && document.activeElement instanceof HTMLElement) sheetTrigger = document.activeElement
   state.sheetKind = kind
   els.sheetBody.innerHTML = html
   els.sheet.dataset.open = "1"
   els.sheet.dataset.kind = kind
+  els.sheet.setAttribute("aria-modal", "true")
+  els.sheet.removeAttribute("aria-hidden")
+  els.sheet.removeAttribute("inert")
+  document.querySelector(".app")?.setAttribute("inert", "")
   // A train card stays docked and lets the line show behind it.
   els.sheetBackdrop.dataset.open = kind === "train" ? "0" : "1"
 }
 
 function closeSheet() {
+  const wasOpen = els.sheet.dataset.open === "1"
+  const returnTo = sheetTrigger
   resetSheetDrag()
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
   delete els.sheet.dataset.kind
+  delete els.sheet.dataset.mode
+  els.sheet.setAttribute("aria-modal", "false")
+  els.sheet.setAttribute("aria-hidden", "true")
+  els.sheet.setAttribute("inert", "")
+  document.querySelector(".app")?.removeAttribute("inert")
   state.sheetKind = null
   state.selected = null
   state.station = null
   state.segment = null
+  state.search = null
+  sheetTrigger = null
   setFollow(false)
+  if (wasOpen) setTimeout(() => returnTo?.isConnected && returnTo.focus({ preventScroll: true }), 0)
 }
 
 function beginSheetDrag(event) {
@@ -1980,6 +2168,8 @@ function adjacentStation(code, dir) {
 }
 
 let tdDataPromise = null
+let tdSearchIndex = null
+let tdSearchIndexPromise = null
 function loadTdData() {
   tdDataPromise ??= Promise.all([
     fetchJson("data/td-segments.json"),
@@ -1992,34 +2182,67 @@ function loadTdData() {
   return tdDataPromise
 }
 
+function segmentDirectionSwitchHtml() {
+  const segment = state.segment
+  if (segment?.mode !== "dual") return ""
+  const s = t()
+  return `<div class="segment-dir-switch" role="group" aria-label="${s.segmentDirection}">` +
+    `<button type="button" data-segment-direction="UP" aria-pressed="${segment.activeDir === "UP"}">▲ ${s.up}</button>` +
+    `<button type="button" data-segment-direction="DOWN" aria-pressed="${segment.activeDir === "DOWN"}">▼ ${s.down}</button></div>`
+}
+
 function segmentShellHtml(from, to, dir) {
   const s = t()
+  const segment = state.segment
+  const dual = segment?.mode === "dual"
   const fromName = network.name(from, LANG)
   const toName = network.name(to, LANG)
-  const direction = dir === "UP" ? `▲ ${s.up} · ${s.toTum}` : `▼ ${s.down} · ${s.toWks}`
+  const title = dual
+    ? `${network.name(segment.canonicalFrom, LANG)} ↔ ${network.name(segment.canonicalTo, LANG)}`
+    : `${fromName} → ${toName}`
+  const direction = dual ? s.segmentDual : dir === "UP" ? `▲ ${s.up} · ${s.toTum}` : `▼ ${s.down} · ${s.toWks}`
   return (
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
-    `<div class="segment-head"><h2>${fromName} → ${toName}</h2><div class="sub">${direction} · TML</div></div>` +
+    `<div class="segment-head"><h2>${title}</h2><div class="sub" id="segment-direction">${direction} · TML</div></div>` +
     `<div class="segment-layout">` +
     `<section class="segment-route" aria-label="${s.segmentRoute}">` +
     `<div class="segment-range" id="segment-range">${s.tdLoading}</div>` +
-    `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${fromName} → ${toName}"></svg>` +
+    `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${title}"></svg>` +
     `</section>` +
-    `<aside class="segment-info" id="segment-info" aria-live="polite">${s.tdLoading}</aside>` +
+    `<aside class="segment-info" id="segment-info" aria-live="polite">${segmentDirectionSwitchHtml()}${s.tdLoading}</aside>` +
     `<svg class="segment-connectors" id="segment-connectors" aria-hidden="true"></svg>` +
     `</div>`
   )
 }
 
-function openSegment(code, dir) {
+function segmentDirectionEndpoints(segment, dir) {
+  return dir === "UP"
+    ? { from: segment.canonicalFrom, to: segment.canonicalTo }
+    : { from: segment.canonicalTo, to: segment.canonicalFrom }
+}
+
+function openSegment(code, dir, options = {}) {
   const dest = adjacentStation(code, dir)
   if (!dest) return
+  const dual = options.dual === true
+  const openToken = `${code}:${dir}:${dual}:${options.segmentId ?? options.segment?.id ?? ""}`
+  const canonicalFrom = options.segment?.from ?? (dir === "UP" ? code : dest)
+  const canonicalTo = options.segment?.to ?? (dir === "UP" ? dest : code)
   state.selected = null
   state.station = null
   state.segment = {
     from: code,
     to: dest,
     dir,
+    mode: dual ? "dual" : "single",
+    activeDir: dir,
+    canonicalFrom,
+    canonicalTo,
+    openToken,
+    segmentId: options.segmentId ?? options.segment?.id ?? null,
+    focus: options.focus ?? null,
+    recordsByDir: null,
+    scrollByDir: { UP: 0, DOWN: 0 },
     epConnectors: true,
     nicheRoomConnectors: true,
     eapConnectors: true,
@@ -2036,18 +2259,23 @@ function openSegment(code, dir) {
   }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
+  els.sheet.dataset.mode = dual ? "dual" : "single"
   buildSegmentDiagram()
   const svg = document.getElementById("segment-diagram")
   const info = document.getElementById("segment-info")
   const layout = document.querySelector(".segment-layout")
-  info?.addEventListener("scroll", paintSegmentConnectors, { passive: true })
+  info?.addEventListener("scroll", () => {
+    if (!state.segment || state.sheetKind !== "segment") return
+    state.segment.scrollByDir[state.segment.activeDir] = info.scrollTop
+    paintSegmentConnectors()
+  }, { passive: true })
   if (svg && "ResizeObserver" in window) {
     const observer = new ResizeObserver(() => {
-      if (state.sheetKind !== "segment" || state.segment?.geometry?.svg !== svg) {
+      if (state.sheetKind !== "segment" || !state.segment || state.segment.geometry?.svg !== svg) {
         observer.disconnect()
         return
       }
-      buildSegmentDiagram()
+      buildSegmentDiagram(true)
       paintSegmentConnectors()
     })
     observer.observe(svg)
@@ -2055,18 +2283,27 @@ function openSegment(code, dir) {
   }
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
-    if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return
-    const range = travelRange(segments, code, dest, dir)
-    if (!range) throw new Error("no matching technical segment")
-    current.range = range
-    current.records = recordsForRange(technical, range, dir)
+    if (state.sheetKind !== "segment" || !current || current.openToken !== openToken) return
+    const directions = dual ? ["UP", "DOWN"] : [dir]
+    const byDir = {}
+    for (const direction of directions) {
+      const endpoints = segmentDirectionEndpoints(current, direction)
+      const range = travelRange(segments, endpoints.from, endpoints.to, direction)
+      byDir[direction] = { range, records: recordsForRange(technical, range, direction) }
+    }
+    current.recordsByDir = byDir
+    current.range = byDir[current.activeDir].range
+    current.records = byDir[current.activeDir].records
     current.status = "ok"
+    applySegmentFocus(current)
+    buildSegmentDiagram(true)
     paintSegmentInfo()
     paintSegmentInfrastructure()
     syncSegmentTrains()
+    focusSegmentItem(current)
   }).catch((error) => {
     const current = state.segment
-    if (state.sheetKind !== "segment" || !current || current.from !== code || current.to !== dest || current.dir !== dir) return
+    if (state.sheetKind !== "segment" || !current || current.openToken !== openToken) return
     current.status = "error"
     console.warn("segment data unavailable", error)
     paintSegmentInfo()
@@ -2126,13 +2363,39 @@ function tdSources(range, records) {
     : `<p class="empty">${s.tdNone}</p>`}</details>`
 }
 
+function segmentDualSummaryHtml(segment) {
+  if (segment.mode !== "dual" || !segment.recordsByDir) return ""
+  const focus = segment.focus
+  if (focus?.kind === "VCC_BOUNDARY") {
+    const boundary = focus.data
+    return `<section class="td-dual-summary"><h3>VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</h3>` +
+      `<div><b>▲ UP</b><span>${chainageText(boundary.upChainageKm)} km</span></div>` +
+      `<div><b>▼ DOWN</b><span>${chainageText(boundary.downChainageKm)} km</span></div>${tdNote(boundary)}</section>`
+  }
+  if (focus?.kind === "NZ") {
+    const pair = focus.data
+    const row = (dir, zone) => zone
+      ? `<div><b>${dir === "UP" ? "▲ UP" : "▼ DOWN"}</b><span>${escapeHtml(zone.isolator)} · ${neutralZoneRangeText(zone)}</span></div>`
+      : ""
+    return `<section class="td-dual-summary"><h3>${escapeHtml(pair.base)}</h3>${row("UP", pair.up)}${row("DOWN", pair.down)}</section>`
+  }
+  const up = segment.recordsByDir.UP?.range
+  const down = segment.recordsByDir.DOWN?.range
+  return `<section class="td-dual-summary"><h3>${t().segmentDual}</h3>` +
+    `<div><b>▲ UP</b><span>${up ? `${chainageText(up.chainageFrom)} → ${chainageText(up.chainageTo)} km` : "n/a"}</span></div>` +
+    `<div><b>▼ DOWN</b><span>${down ? `${chainageText(down.chainageFrom)} → ${chainageText(down.chainageTo)} km` : "n/a"}</span></div></section>`
+}
+
 function segmentInfoHtml(segment) {
   const s = t()
   if (segment.status === "error") {
-    return `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
+    return segmentDirectionSwitchHtml() + `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
   }
   const { records, range } = segment
-  if (!records || !range) return s.tdLoading
+  if (!records || !range) return segmentDirectionSwitchHtml() + s.tdLoading
+  const focusKind = segment.focus?.kind
+  const focusId = segment.focus?.id
+  const pointFocused = (kind, id) => focusKind === kind && String(focusId) === String(id)
   // Every technical list follows the diagram from the TUM side at the top to
   // the WKS side at the bottom, so reverse the ascending query results.
   const entryPoints = [...records.entryPoints].reverse()
@@ -2160,29 +2423,35 @@ function segmentInfoHtml(segment) {
   })
   const nicheRooms = [...(records.nicheRooms ?? [])].reverse()
   const nicheRoomRows = nicheRooms.map((room) =>
-    `<li class="td-row td-point-group nr-row"><div class="td-main">${pointButton("NR", room.uid, room.name)}${escapeHtml(room.name)}</div><div class="td-meta">${chainageText(room.chainageKm)} km</div></li>`)
+    `<li class="td-row td-point-group nr-row${pointFocused("NR", room.uid) ? " is-focused" : ""}" data-focus-kind="NR" data-focus-id="${escapeHtml(room.uid)}"><div class="td-main">${pointButton("NR", room.uid, room.name)}${escapeHtml(room.name)}</div><div class="td-meta">${chainageText(room.chainageKm)} km</div></li>`)
   const emergencyAccessPoints = [...(records.emergencyAccessPoints ?? [])].reverse()
   const eapRows = emergencyAccessPoints.map((point) =>
-    `<li class="td-row td-point-group eap-row"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
+    `<li class="td-row td-point-group eap-row${pointFocused("EAP", point.id) ? " is-focused" : ""}" data-focus-kind="EAP" data-focus-id="${escapeHtml(point.id)}"><div class="td-main">${pointButton("EAP", point.id, s.tdEap)}${escapeHtml(point.id)}</div><div class="td-meta">${chainageText(point.chainageKm)} km</div></li>`)
   const cpds = [...records.cpds].reverse()
   const cpdRows = cpds.map((cpd) =>
-    `<li class="td-row td-point-group cpd-row"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
+    `<li class="td-row td-point-group cpd-row${pointFocused("CPD", cpd.id) ? " is-focused" : ""}" data-focus-kind="CPD" data-focus-id="${escapeHtml(cpd.id)}"><div class="td-main">${pointButton("CPD", cpd.id, s.tdCpd)}${escapeHtml(cpd.id)}</div><div class="td-meta">${chainageText(cpd.chainageKm)} km</div></li>`)
   const connectorSwitch = (kind, stateKey = `${kind.toLowerCase()}Connectors`, dataKey = kind.toLowerCase()) => {
     const label = `顯示 ${kind} 連線`
     return `<div class="td-switch-group"><button type="button" class="td-switch" role="switch" data-${dataKey}-connectors aria-checked="${segment[stateKey] !== false}" aria-label="${label}" title="顯示／隱藏 ${kind} 連線"><span></span></button></div>`
   }
   const neutralRows = [...records.neutralZones].reverse().map((zone) => {
     const where = neutralZoneRangeText(zone)
-    return `<li class="td-row"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where}</div>${tdNote(zone)}</li>`
+    const base = String(zone.isolator).replace(/\s*(?:601|602)$/u, "")
+    const focused = focusKind === "NZ" && base === focusId
+    return `<li class="td-row${focused ? " is-focused" : ""}" data-focus-kind="NZ" data-focus-id="${escapeHtml(focusKind === "NZ" ? focusId : base)}"><div class="td-main">${escapeHtml(zone.isolator)}</div><div class="td-meta">${where}</div>${tdNote(zone)}</li>`
   })
-  const vccRows = [...records.vccBoundaries].reverse().map((boundary) =>
-    `<li class="td-row"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`)
+  const vccRows = [...records.vccBoundaries].reverse().map((boundary) => {
+    const id = boundary.between.join(":")
+    const focused = focusKind === "VCC_BOUNDARY" && id === focusId
+    return `<li class="td-row${focused ? " is-focused" : ""}" data-focus-kind="VCC_BOUNDARY" data-focus-id="${escapeHtml(focusKind === "VCC_BOUNDARY" ? focusId : id)}"><div class="td-main">VCC ${boundary.between[0]} ↔ ${boundary.between[1]}</div><div class="td-meta">${chainageText(boundary.values)} km</div>${tdNote(boundary)}</li>`
+  })
   const vccTop = segment.dir === "UP" ? records.vccTo : records.vccFrom
   const vccBottom = segment.dir === "UP" ? records.vccFrom : records.vccTo
   const vccLabel = vccTop && vccBottom
     ? vccTop === vccBottom ? `VCC ${vccTop}` : s.tdVccAreas(vccTop, vccBottom)
     : s.tdNone
   return (
+    segmentDirectionSwitchHtml() + segmentDualSummaryHtml(segment) +
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
@@ -2204,14 +2473,20 @@ function paintSegmentInfo() {
     info.scrollTop = scrollTop
   }
   if (range && segment.range) {
-    const topChainage = segment.dir === "UP" ? segment.range.chainageTo : segment.range.chainageFrom
-    const bottomChainage = segment.dir === "UP" ? segment.range.chainageFrom : segment.range.chainageTo
+    const topChainage = segment.activeDir === "UP" ? segment.range.chainageTo : segment.range.chainageFrom
+    const bottomChainage = segment.activeDir === "UP" ? segment.range.chainageFrom : segment.range.chainageTo
     range.textContent = t().tdRange(chainageText(topChainage), chainageText(bottomChainage))
   } else if (range) range.textContent = segment.status === "error" ? t().tdFailed : t().tdLoading
+  const direction = document.getElementById("segment-direction")
+  if (direction) {
+    direction.textContent = segment.mode === "dual"
+      ? `${t().segmentDual} · ${segment.activeDir === "UP" ? `▲ ${t().up}` : `▼ ${t().down}`} · TML`
+      : `${segment.activeDir === "UP" ? `▲ ${t().up} · ${t().toTum}` : `▼ ${t().down} · ${t().toWks}`} · TML`
+  }
   paintSegmentConnectors()
 }
 
-function buildSegmentDiagram() {
+function buildSegmentDiagram(force = false) {
   const segment = state.segment
   const svg = document.getElementById("segment-diagram")
   if (!segment || !svg) return
@@ -2219,17 +2494,31 @@ function buildSegmentDiagram() {
   const box = svg.getBoundingClientRect()
   const width = Math.max(120, Math.round(box.width || 260))
   const height = Math.max(140, Math.round(box.height || 360))
-  if (segment.geometry?.svg === svg && segment.geometry.width === width && segment.geometry.height === height) return
-  const x = Math.min(62, Math.max(42, width * 0.24))
+  if (!force && segment.geometry?.svg === svg && segment.geometry.width === width && segment.geometry.height === height) return
+  const dual = segment.mode === "dual"
+  svg.classList.toggle("is-dual", dual)
+  const singleX = Math.min(62, Math.max(42, width * 0.24))
+  const xUp = dual ? Math.max(36, width * 0.25) : singleX
+  const xDown = dual ? Math.max(xUp + 44, width * 0.55) : singleX
   const margin = Math.min(64, Math.max(28, height * 0.16))
   const top = margin
   const bottom = height - margin
-  const fromKm = model.km(segment.from)
-  const toKm = model.km(segment.to)
-  const topCode = segment.dir === "UP" ? segment.to : segment.from
-  const bottomCode = segment.dir === "UP" ? segment.from : segment.to
-  const topKm = segment.dir === "UP" ? toKm : fromKm
-  const bottomKm = segment.dir === "UP" ? fromKm : toKm
+  const topCode = segment.canonicalTo
+  const bottomCode = segment.canonicalFrom
+  const topKm = model.km(topCode)
+  const bottomKm = model.km(bottomCode)
+  const directions = dual ? ["UP", "DOWN"] : [segment.activeDir]
+  const tracks = {}
+  for (const dir of directions) {
+    const range = segment.recordsByDir?.[dir]?.range
+    tracks[dir] = {
+      x: dir === "UP" ? xUp : xDown,
+      topChainage: range ? (dir === "UP" ? range.chainageTo : range.chainageFrom) : topKm,
+      bottomChainage: range ? (dir === "UP" ? range.chainageFrom : range.chainageTo) : bottomKm,
+      topKm,
+      bottomKm,
+    }
+  }
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
   svg.replaceChildren()
 
@@ -2239,46 +2528,55 @@ function buildSegmentDiagram() {
   defs.append(filter)
   svg.append(defs)
 
-  const color = segment.dir === "UP" ? COLORS.UP : COLORS.DOWN
   const base = make("g", { class: "segment-route-base" })
-  base.append(
-    make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing" }),
-    make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${segment.dir === "UP" ? "up" : "down"}` }),
-  )
-  // Match the main line: UP travels toward TUM at the top, DOWN toward WKS
-  // at the bottom.
-  for (let y = top + 28; y < bottom; y += 54) {
-    base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
+  for (const dir of directions) {
+    const { x } = tracks[dir]
+    base.append(
+      make("line", { x1: x, y1: top, x2: x, y2: bottom, class: "dg-track-casing", "data-track": dir }),
+      make("line", { x1: x, y1: top, x2: x, y2: bottom, class: `dg-track ${dir === "UP" ? "up" : "down"}`, "data-track": dir }),
+      make("circle", { cx: x, cy: top, r: 3, fill: COLORS[dir] }),
+    )
+    for (let y = top + 28; y < bottom; y += 54) {
+      base.append(make("path", {
+        d: dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`,
+        class: "dg-chev",
+        "data-track": dir,
+      }))
+    }
   }
   const stationHits = []
   const jumpIcons = []
+  const stationX = dual ? xUp - 12 : singleX - 12
+  const stationWidth = dual ? xDown - xUp + 24 : 24
+  const jumpX = dual ? (xUp + xDown) / 2 : singleX
+  const labelX = (dual ? xDown : singleX) + 24
   for (const [position, code, y] of [["top", topCode, top], ["bottom", bottomCode, bottom]]) {
     const name = network.name(code, LANG)
     let jumpFrom = null
     let jumpTo = null
     if (position === "top") {
       const above = adjacentStation(code, "UP")
-      jumpFrom = segment.dir === "UP" ? code : above
-      jumpTo = segment.dir === "UP" ? above : code
+      jumpFrom = segment.activeDir === "UP" ? code : above
+      jumpTo = segment.activeDir === "UP" ? above : code
     } else {
       const below = adjacentStation(code, "DOWN")
-      jumpFrom = segment.dir === "DOWN" ? code : below
-      jumpTo = segment.dir === "DOWN" ? below : code
+      jumpFrom = segment.activeDir === "DOWN" ? code : below
+      jumpTo = segment.activeDir === "DOWN" ? below : code
     }
     const jumpLabel = jumpFrom && jumpTo
-      ? segment.dir === "UP"
+      ? segment.activeDir === "UP"
         ? s.segmentUp(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
         : s.segmentDown(network.name(jumpFrom, LANG), network.name(jumpTo, LANG))
       : ""
     base.append(
-      make("rect", { x: x - 12, y: y - 7, width: 24, height: 14, rx: 7, class: "dg-station" }),
-      make("text", { x: x + 24, y: y + 4, class: "dg-name segment-name segment-station-label" }, `${name} • ${model.km(code).toFixed(2)} km`),
+      make("rect", { x: stationX, y: y - 7, width: stationWidth, height: 14, rx: 7, class: "dg-station" }),
+      make("text", { x: labelX, y: y + 4, class: "dg-name segment-name segment-station-label" }, dual && width < 240 ? `${code} • ${model.km(code).toFixed(2)} km` : `${name} • ${model.km(code).toFixed(2)} km`),
     )
     if (jumpFrom && jumpTo) {
       const jumpKind = position === "top" ? "previous" : "next"
       const jumpIcon = make("g", {
         class: "segment-station-jump",
-        transform: `translate(${x + 12} ${y - 12})`,
+        transform: `translate(${jumpX + 12} ${y - 12})`,
         "aria-hidden": "true",
       })
       jumpIcon.append(
@@ -2287,25 +2585,25 @@ function buildSegmentDiagram() {
       )
       jumpIcons.push(jumpIcon)
       const hit = make("rect", {
-        x: x - 22,
+        x: jumpX - 22,
         y: y - 18,
         width: 44,
         height: 36,
         rx: 18,
         class: "segment-station-hit",
         role: "button",
-        tabindex: "0",
+        tabindex: 0,
         "aria-label": `${name}：${jumpLabel}`,
         "data-segment-jump": jumpKind,
         "data-from": jumpFrom,
         "data-to": jumpTo,
-        "data-dir": segment.dir,
+        "data-dir": segment.activeDir,
       })
       hit.append(make("title", {}, jumpLabel))
       const openAdjacent = (event) => {
         event.preventDefault()
         event.stopPropagation()
-        openSegment(jumpFrom, segment.dir)
+        openSegment(jumpFrom, segment.activeDir, { dual: segment.mode === "dual" })
         const nextFocus = document.querySelector(`[data-segment-jump="${jumpKind}"]`) ?? document.querySelector(".segment-station-hit")
         nextFocus?.focus({ preventScroll: true })
       }
@@ -2316,16 +2614,12 @@ function buildSegmentDiagram() {
       stationHits.push(hit)
     }
   }
-  base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
   const stationLayer = make("g", { id: "segment-station-layer" })
   stationLayer.append(...stationHits)
   const jumpIconLayer = make("g", { id: "segment-jump-icon-layer" })
   jumpIconLayer.append(...jumpIcons)
-  // Trains own the endpoint overlap: a dwell train must open its card instead
-  // of triggering the adjacent-segment hit underneath it. Icons stay above
-  // trains for discoverability but never receive pointer events.
   svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), jumpIconLayer)
-  const labelRoom = width - x - 32
+  const labelRoom = width - labelX - 8
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()
     if (measured <= labelRoom) continue
@@ -2336,15 +2630,73 @@ function buildSegmentDiagram() {
       label.setAttribute("lengthAdjust", "spacingAndGlyphs")
     }
   }
-  segment.geometry = { svg, width, height, x, top, bottom, fromKm, toKm, topKm, bottomKm }
+  segment.geometry = {
+    svg, width, height, x: dual ? xUp : singleX, top, bottom,
+    fromKm: bottomKm, toKm: topKm, topKm, bottomKm, tracks,
+  }
   paintSegmentInfrastructure()
   segmentTrainNodes = new Map()
   syncSegmentTrains()
 }
 
+function applySegmentFocus(segment) {
+  const focus = segment?.focus
+  if (!focus || !segment.routes) return
+  if (focus.kind === "EP") {
+    const direction = focus.direction === "TUM" ? "TUM" : "WKS"
+    segment.routes.EP = { status: "single", direction, selectedId: `${direction}:${focus.id}` }
+    segment.epConnectors = true
+  } else if (["NR", "CPD", "EAP"].includes(focus.kind)) {
+    segment.routes[focus.kind] = { status: "single", selectedId: focus.id }
+    if (focus.kind === "NR") segment.nicheRoomConnectors = true
+    if (focus.kind === "EAP") segment.eapConnectors = true
+  }
+}
+
+function focusSegmentItem(segment) {
+  if (!segment?.focus) return
+  const focus = segment.focus
+  setTimeout(() => {
+    const info = document.getElementById("segment-info")
+    if (!info || state.sheetKind !== "segment") return
+    let target = null
+    if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
+      target = [...info.querySelectorAll("[data-route-kind]")].find((button) =>
+        button.dataset.routeKind === focus.kind && button.dataset.routeId === focus.id
+        && (focus.kind !== "EP" || button.dataset.epDir === focus.direction))
+    } else {
+      target = info.querySelector(`[data-focus-kind="${focus.kind}"][data-focus-id="${CSS.escape(focus.id)}"]`)
+    }
+    if (!target) return
+    target.scrollIntoView({ block: "center", behavior: "auto" })
+    if (target.matches("button")) target.focus({ preventScroll: true })
+  })
+}
+
+function setSegmentDirection(dir) {
+  const segment = state.segment
+  if (!segment || segment.mode !== "dual" || !["UP", "DOWN"].includes(dir) || !segment.recordsByDir?.[dir]) return
+  const info = document.getElementById("segment-info")
+  if (info) segment.scrollByDir[segment.activeDir] = info.scrollTop
+  segment.activeDir = dir
+  segment.dir = dir
+  const endpoints = segmentDirectionEndpoints(segment, dir)
+  segment.from = endpoints.from
+  segment.to = endpoints.to
+  segment.range = segment.recordsByDir[dir].range
+  segment.records = segment.recordsByDir[dir].records
+  buildSegmentDiagram(true)
+  paintSegmentInfo()
+  paintSegmentInfrastructure()
+  syncSegmentTrains()
+  if (info) info.scrollTop = segment.scrollByDir[dir] ?? 0
+  document.querySelector(`[data-segment-direction="${dir}"]`)?.focus({ preventScroll: true })
+}
+
 function setSegmentRouteItem(kind, id, direction) {
   const segment = state.segment
   if (!segment || !["EP", "NR", "CPD", "EAP"].includes(kind) || !id) return
+  segment.focus = null
   if (!segment.routes) segment.routes = {
     EP: { status: "off", direction: "WKS", selectedId: null },
     NR: { status: "off", selectedId: null },
@@ -2391,140 +2743,168 @@ function setSegmentRouteItem(kind, id, direction) {
 function paintSegmentInfrastructure() {
   const segment = state.segment
   const layer = segment?.geometry?.svg?.querySelector("#segment-infrastructure-layer")
-  if (!segment?.range || !segment.records || !layer) return
-  const { svg, x, top, bottom } = segment.geometry
-  const { range, records } = segment
-  const topChainage = segment.dir === "UP" ? range.chainageTo : range.chainageFrom
-  const bottomChainage = segment.dir === "UP" ? range.chainageFrom : range.chainageTo
-  const span = bottomChainage - topChainage
-  if (!Number.isFinite(span) || span === 0) return
-  const yForChainage = (km) => top + ((km - topChainage) / span) * (bottom - top)
+  if (!segment?.geometry?.tracks || !layer) return
+  const { svg, top, bottom, tracks } = segment.geometry
   layer.replaceChildren()
   const defs = make("defs")
   layer.append(defs)
+  const focus = segment.focus
+  const focused = (kind, id) => focus?.kind === kind && String(focus.id) === String(id)
 
-  for (const [index, zone] of records.neutralZones.entries()) {
-    const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
-    const values = limits.length === 2 ? limits : chainageValues(zone.chainageKm).filter(Number.isFinite)
-    if (!values.length) continue
-    const low = Math.min(...values)
-    const high = Math.max(...values)
-    const limitY1 = Math.max(top, Math.min(bottom, Math.min(yForChainage(low), yForChainage(high))))
-    const limitY2 = Math.max(top, Math.min(bottom, Math.max(yForChainage(low), yForChainage(high))))
-    const center = (limitY1 + limitY2) / 2
-    const swatchWidth = 15.52
-    const swatchHeight = 9.6
-    const swatchX = x - swatchWidth / 2
-    const gradientId = `segment-neutral-gradient-${index}`
-    const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: swatchX, y1: center, x2: swatchX + swatchWidth, y2: center })
-    for (const [offset, color] of [["0%", "#d73a49"], ["20%", "#e67e22"], ["40%", "#d4ac0d"], ["60%", "#2e9e5b"], ["80%", "#218fb5"], ["100%", "#7d3c98"]]) {
-      gradient.append(make("stop", { offset, "stop-color": color }))
-    }
-    defs.append(gradient)
-    const group = make("g", { class: "segment-neutral-zone-group", "data-neutral-zone": zone.isolator })
-    const rangeText = neutralZoneRangeText(zone)
-    const labelX = swatchX - 1
-    const label = make("text", { x: labelX, y: center - 1, class: "segment-neutral-label", "text-anchor": "end", "aria-label": "Neutral Zone" }, "Neutral")
-    label.append(make("tspan", { x: labelX, dy: 10 }, "Zone"))
-    group.append(
-      make("title", {}, `${zone.isolator} ${rangeText}`),
-      make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
-      label,
-    )
-    layer.append(group)
-  }
+  for (const [dir, track] of Object.entries(tracks)) {
+    const records = segment.recordsByDir?.[dir]?.records ?? (dir === segment.activeDir ? segment.records : null)
+    if (!records) continue
+    const { x } = track
+    const topChainage = track.topChainage
+    const bottomChainage = track.bottomChainage
+    const span = bottomChainage - topChainage
+    if (!Number.isFinite(span) || span === 0) continue
+    const yForChainage = (km) => top + ((km - topChainage) / span) * (bottom - top)
+    const trackLayer = make("g", {
+      class: "segment-track-infra",
+      "data-track": dir,
+      "data-active": String(dir === segment.activeDir),
+    })
 
-  const vccFrom = segment.dir === "UP" ? records.vccTo : records.vccFrom
-  const vccTo = segment.dir === "UP" ? records.vccFrom : records.vccTo
-  for (const boundary of records.vccBoundaries) {
-    const values = chainageValues(boundary.values).filter(Number.isFinite)
-    if (!values.length) continue
-    const km = values[0]
-    const y = Math.max(top + 12, Math.min(bottom - 12, yForChainage(km)))
-    const left = 4
-    const right = svg.viewBox.baseVal.width - 4
-    layer.append(
-      make("line", { x1: left, y1: y, x2: right, y2: y, class: "segment-vcc-line" }),
-      make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
-      make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
-      make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
-    )
-  }
-
-  const epRoute = segment.routes?.EP
-  if (epRoute?.status === "all" || epRoute?.status === "single") {
-    const epDir = epRoute.direction ?? "WKS"
-    for (const ep of records.entryPoints) {
-      const id = String(epDir === "WKS" ? ep.greenEPId ?? ep.greenEP : ep.yellowEPId ?? ep.yellowEP)
-      const itemId = `${epDir}:${id}`
-      if (epRoute.status === "single" && epRoute.selectedId !== itemId) continue
-      const km = chainageValues(ep.chainageKm).find(Number.isFinite)
-      if (!Number.isFinite(km)) continue
-      const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
-      const code = formatEp(id)
-      const overlapsVcc = records.vccBoundaries.some((boundary) =>
-        chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
-      const control = make("g", {
-        class: "segment-ep-control active",
-        "aria-hidden": "true",
-        "data-route-marker": "EP",
-        "data-route-id": itemId,
+    for (const [index, zone] of (records.neutralZones ?? []).entries()) {
+      const limits = [zone.downLimitKm, zone.upLimitKm].filter(Number.isFinite)
+      const values = limits.length === 2 ? limits : chainageValues(zone.chainageKm).filter(Number.isFinite)
+      if (!values.length) continue
+      const low = Math.min(...values)
+      const high = Math.max(...values)
+      const limitY1 = Math.max(top, Math.min(bottom, Math.min(yForChainage(low), yForChainage(high))))
+      const limitY2 = Math.max(top, Math.min(bottom, Math.max(yForChainage(low), yForChainage(high))))
+      const center = (limitY1 + limitY2) / 2
+      const swatchWidth = 15.52
+      const swatchHeight = 9.6
+      const swatchX = x - swatchWidth / 2
+      const gradientId = `segment-neutral-gradient-${dir}-${index}`
+      const gradient = make("linearGradient", { id: gradientId, gradientUnits: "userSpaceOnUse", x1: swatchX, y1: center, x2: swatchX + swatchWidth, y2: center })
+      for (const [offset, color] of [["0%", "#d73a49"], ["20%", "#e67e22"], ["40%", "#d4ac0d"], ["60%", "#2e9e5b"], ["80%", "#218fb5"], ["100%", "#7d3c98"]]) {
+        gradient.append(make("stop", { offset, "stop-color": color }))
+      }
+      defs.append(gradient)
+      const base = String(zone.isolator).replace(/\s*(?:601|602)$/u, "")
+      const group = make("g", {
+        class: `segment-neutral-zone-group${focused("NZ", base) ? " is-focused" : ""}`,
+        "data-neutral-zone": zone.isolator,
+        "data-track": dir,
       })
-      control.append(
-        make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
-        make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+      const rangeText = neutralZoneRangeText(zone)
+      const labelX = swatchX - 1
+      const label = make("text", { x: labelX, y: center - 1, class: "segment-neutral-label", "text-anchor": "end", "aria-label": "Neutral Zone" }, "Neutral")
+      label.append(make("tspan", { x: labelX, dy: 10 }, "Zone"))
+      group.append(
+        make("title", {}, `${zone.isolator} ${rangeText}`),
+        make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
+        label,
       )
-      layer.append(control)
-      layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
+      trackLayer.append(group)
     }
-  }
 
-  const nicheRoomRoute = segment.routes?.NR
-  if (nicheRoomRoute?.status === "all" || nicheRoomRoute?.status === "single") {
-    for (const room of records.nicheRooms ?? []) {
-      if (nicheRoomRoute.status === "single" && nicheRoomRoute.selectedId !== room.uid) continue
-      const km = chainageValues(room.chainageKm).find(Number.isFinite)
-      if (!Number.isFinite(km)) continue
-      const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
-      const overlapsVcc = records.vccBoundaries.some((boundary) =>
-        chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
-      const control = make("g", {
-        class: "segment-nr-control active",
-        "aria-hidden": "true",
-        "data-route-marker": "NR",
-        "data-route-id": room.uid,
+    const vccFrom = dir === "UP" ? records.vccTo : records.vccFrom
+    const vccTo = dir === "UP" ? records.vccFrom : records.vccTo
+    for (const boundary of records.vccBoundaries) {
+      const values = chainageValues(boundary.values).filter(Number.isFinite)
+      if (!values.length) continue
+      const km = values[0]
+      const y = Math.max(top + 12, Math.min(bottom - 12, yForChainage(km)))
+      const left = 4
+      const right = svg.viewBox.baseVal.width - 4
+      const id = boundary.between.join(":")
+      const line = make("line", {
+        x1: left, y1: y, x2: right, y2: y,
+        class: `segment-vcc-line${focused("VCC_BOUNDARY", id) ? " is-focused" : ""}`,
+        "data-vcc-boundary": id,
+        "data-track": dir,
       })
-      control.append(
-        make("title", {}, `${room.name} · ${chainageText(room.chainageKm)} km`),
-        make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
-        make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
+      trackLayer.append(
+        line,
+        make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
+        make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
+        make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
       )
-      layer.append(control)
-      layer.append(make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`))
     }
-  }
 
-  const markerX = x + (segment.dir === "DOWN" ? -2.75 : 2.75)
-  for (const kind of ["CPD", "EAP"]) {
-    const route = segment.routes?.[kind]
-    if (route?.status !== "all" && route?.status !== "single") continue
-    const rows = kind === "CPD" ? records.cpds : records.emergencyAccessPoints ?? []
-    for (const point of rows) {
-      if (route.status === "single" && route.selectedId !== point.id) continue
-      const km = chainageValues(point.chainageKm).find(Number.isFinite)
-      if (!Number.isFinite(km)) continue
-      const y = Math.max(top, Math.min(bottom, yForChainage(km)))
-      const marker = make("circle", {
-        cx: markerX,
-        cy: y,
-        r: kind === "CPD" ? 1.15 : 1.3,
-        class: `segment-${kind.toLowerCase()}-dot`,
-        "data-route-marker": kind,
-        "data-route-id": point.id,
-      })
-      marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
-      layer.append(marker)
+    const epRoute = segment.routes?.EP
+    if (epRoute?.status === "all" || epRoute?.status === "single") {
+      const epDir = epRoute.direction ?? "WKS"
+      for (const ep of records.entryPoints) {
+        const id = String(epDir === "WKS" ? ep.greenEPId ?? ep.greenEP : ep.yellowEPId ?? ep.yellowEP)
+        const itemId = `${epDir}:${id}`
+        if (epRoute.status === "single" && epRoute.selectedId !== itemId) continue
+        const km = chainageValues(ep.chainageKm).find(Number.isFinite)
+        if (!Number.isFinite(km)) continue
+        const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
+        const code = formatEp(id)
+        const overlapsVcc = records.vccBoundaries.some((boundary) =>
+          chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
+        const control = make("g", {
+          class: `segment-ep-control active${focused("EP", id) ? " is-focused" : ""}`,
+          "aria-hidden": "true",
+          "data-route-marker": "EP",
+          "data-route-id": itemId,
+          "data-track": dir,
+        })
+        control.append(
+          make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
+          make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+        )
+        trackLayer.append(control)
+        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
+      }
     }
+
+    const nicheRoomRoute = segment.routes?.NR
+    if (nicheRoomRoute?.status === "all" || nicheRoomRoute?.status === "single") {
+      for (const room of records.nicheRooms ?? []) {
+        if (nicheRoomRoute.status === "single" && nicheRoomRoute.selectedId !== room.uid) continue
+        const km = chainageValues(room.chainageKm).find(Number.isFinite)
+        if (!Number.isFinite(km)) continue
+        const y = Math.max(top + 10, Math.min(bottom - 10, yForChainage(km)))
+        const overlapsVcc = records.vccBoundaries.some((boundary) =>
+          chainageValues(boundary.values).some((value) => Math.abs(value - km) < 0.0005))
+        const control = make("g", {
+          class: `segment-nr-control active${focused("NR", room.uid) ? " is-focused" : ""}`,
+          "aria-hidden": "true",
+          "data-route-marker": "NR",
+          "data-route-id": room.uid,
+          "data-track": dir,
+        })
+        control.append(
+          make("title", {}, `${room.name} · ${chainageText(room.chainageKm)} km`),
+          make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
+          make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
+        )
+        trackLayer.append(control)
+        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`))
+      }
+    }
+
+    const markerX = x + (dir === "DOWN" ? -2.75 : 2.75)
+    for (const kind of ["CPD", "EAP"]) {
+      const route = segment.routes?.[kind]
+      if (route?.status !== "all" && route?.status !== "single") continue
+      const rows = kind === "CPD" ? records.cpds : records.emergencyAccessPoints ?? []
+      for (const point of rows) {
+        if (route.status === "single" && route.selectedId !== point.id) continue
+        const km = chainageValues(point.chainageKm).find(Number.isFinite)
+        if (!Number.isFinite(km)) continue
+        const y = Math.max(top, Math.min(bottom, yForChainage(km)))
+        const marker = make("circle", {
+          cx: markerX,
+          cy: y,
+          r: kind === "CPD" ? 1.15 : 1.3,
+          class: `segment-${kind.toLowerCase()}-dot${focused(kind, point.id) ? " is-focused" : ""}`,
+          "data-route-marker": kind,
+          "data-route-id": point.id,
+          "data-track": dir,
+        })
+        marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
+        trackLayer.append(marker)
+      }
+    }
+    layer.append(trackLayer)
   }
   paintSegmentConnectors()
 }
@@ -2570,7 +2950,7 @@ function paintSegmentConnectors() {
       `${button.dataset.epDir}:${button.dataset.routeId}`,
       button,
     ]))
-    for (const control of document.querySelectorAll(".segment-ep-control[data-route-id]")) {
+    for (const control of document.querySelectorAll(`.segment-ep-control[data-track="${segment.activeDir}"][data-route-id]`)) {
       const itemId = control.dataset.routeId
       const button = rightButtons.get(itemId)
       const dot = control.querySelector(".segment-ep-dot")
@@ -2585,7 +2965,7 @@ function paintSegmentConnectors() {
       button.dataset.routeId,
       button,
     ]))
-    for (const control of document.querySelectorAll(".segment-nr-control[data-route-id]")) {
+    for (const control of document.querySelectorAll(`.segment-nr-control[data-track="${segment.activeDir}"][data-route-id]`)) {
       const id = control.dataset.routeId
       const button = nicheRoomButtons.get(id)
       const dot = control.querySelector(".segment-nr-dot")
@@ -2598,7 +2978,7 @@ function paintSegmentConnectors() {
       button.dataset.routeId,
       button,
     ]))
-    for (const dot of document.querySelectorAll(".segment-eap-dot[data-route-id]")) {
+    for (const dot of document.querySelectorAll(`.segment-eap-dot[data-track="${segment.activeDir}"][data-route-id]`)) {
       const id = dot.dataset.routeId
       const button = eapButtons.get(id)
       if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
@@ -2609,59 +2989,62 @@ function paintSegmentConnectors() {
 let segmentTrainNodes = new Map()
 function syncSegmentTrains() {
   const segment = state.segment
-  if (!segment?.geometry || state.sheetKind !== "segment") return
-  const { svg, x, top, bottom, topKm, bottomKm } = segment.geometry
+  if (!segment?.geometry?.tracks || state.sheetKind !== "segment") return
+  const { svg, top, bottom, tracks } = segment.geometry
   const layer = svg.querySelector("#segment-train-layer")
   if (!layer) return
-  const low = Math.min(topKm, bottomKm)
-  const high = Math.max(topKm, bottomKm)
   const seen = new Set()
-  const items = state.runs
-    .filter((run) => run.dir === segment.dir && Number.isFinite(run.km) && run.km >= low - 0.001 && run.km <= high + 0.001)
-    .map((run) => ({ run, y: top + ((run.km - topKm) / (bottomKm - topKm)) * (bottom - top) }))
-    .sort((a, b) => a.y - b.y)
-  for (let i = 1; i < items.length; i++) {
-    if (items[i].y - items[i - 1].y < 24) items[i].y = items[i - 1].y + 24
-  }
-  for (const { run, y } of items) {
-    seen.add(run.id)
-    let node = segmentTrainNodes.get(run.id)
-    if (!node) {
-      node = make("g", { class: "dg-train segment-train", role: "button", tabindex: 0, "data-dir": segment.dir })
-      node.append(
-        make("circle", { r: TRAIN_R + 7, class: "dg-train-glow", filter: "url(#segment-glow)" }),
-        make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
-        make("circle", { r: TRAIN_R, class: "dg-train-body", fill: segment.dir === "UP" ? COLORS.UP : COLORS.DOWN }),
-        make("path", { d: segment.dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
-        make("text", { class: "dg-train-run" }),
-        make("circle", { r: 15, fill: "transparent" }),
-        make("g", { class: "dg-late" }),
-      )
-      node.addEventListener("click", () => openTrain(run.id))
-      node.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          openTrain(run.id)
-        }
-      })
-      layer.append(node)
-      segmentTrainNodes.set(run.id, node)
+  for (const [dir, track] of Object.entries(tracks)) {
+    const low = Math.min(track.topKm, track.bottomKm)
+    const high = Math.max(track.topKm, track.bottomKm)
+    const items = state.runs
+      .filter((run) => run.dir === dir && Number.isFinite(run.km) && run.km >= low - 0.001 && run.km <= high + 0.001)
+      .map((run) => ({ run, y: top + ((run.km - track.topKm) / (track.bottomKm - track.topKm)) * (bottom - top) }))
+      .sort((a, b) => a.y - b.y)
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].y - items[i - 1].y < 24) items[i].y = items[i - 1].y + 24
     }
-    node.setAttribute("transform", `translate(${x} ${Math.max(top, Math.min(bottom, y)).toFixed(1)})`)
-    node.dataset.delay = run.delay ? "1" : "0"
-    node.dataset.short = isShortTrip(run) ? "1" : "0"
-    node.dataset.phase = run.pos.phase
-    node.dataset.level = String(lateLevel(run))
-    node.dataset.last = isLastTrip(run) ? "1" : "0"
-    const reveal = runsOn()
-    node.dataset.reveal = reveal ? "1" : "0"
-    if (reveal) {
-      const label = run.kind === "sched" ? String(run.trip.run) : "–"
-      const text = node.querySelector(".dg-train-run")
-      if (text.textContent !== label) text.textContent = label
+    for (const { run, y } of items) {
+      seen.add(run.id)
+      let node = segmentTrainNodes.get(run.id)
+      if (!node) {
+        node = make("g", { class: "dg-train segment-train", role: "button", tabindex: 0, "data-dir": dir })
+        node.append(
+          make("circle", { r: TRAIN_R + 7, class: "dg-train-glow", filter: "url(#segment-glow)" }),
+          make("circle", { r: TRAIN_R + 6, class: "dg-train-halo" }),
+          make("circle", { r: TRAIN_R, class: "dg-train-body", fill: COLORS[dir] }),
+          make("path", { d: dir === "UP" ? "M-4 2.5 L0 -3.5 L4 2.5 Z" : "M-4 -2.5 L0 3.5 L4 -2.5 Z", class: "dg-train-arrow" }),
+          make("text", { class: "dg-train-run" }),
+          make("circle", { r: 15, fill: "transparent" }),
+          make("g", { class: "dg-late" }),
+        )
+        node.addEventListener("click", () => openTrain(run.id))
+        node.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            openTrain(run.id)
+          }
+        })
+        layer.append(node)
+        segmentTrainNodes.set(run.id, node)
+      }
+      node.dataset.dir = dir
+      node.setAttribute("transform", `translate(${track.x} ${Math.max(top, Math.min(bottom, y)).toFixed(1)})`)
+      node.dataset.delay = run.delay ? "1" : "0"
+      node.dataset.short = isShortTrip(run) ? "1" : "0"
+      node.dataset.phase = run.pos.phase
+      node.dataset.level = String(lateLevel(run))
+      node.dataset.last = isLastTrip(run) ? "1" : "0"
+      const reveal = runsOn()
+      node.dataset.reveal = reveal ? "1" : "0"
+      if (reveal) {
+        const label = run.kind === "sched" ? String(run.trip.run) : "–"
+        const text = node.querySelector(".dg-train-run")
+        if (text.textContent !== label) text.textContent = label
+      }
+      paintLateTag(node, run)
+      node.setAttribute("aria-label", `${network.name(run.dest, LANG)} · ${positionText(run)}`)
     }
-    paintLateTag(node, run)
-    node.setAttribute("aria-label", `${network.name(run.dest, LANG)} · ${positionText(run)}`)
   }
   for (const [id, node] of segmentTrainNodes) {
     if (!seen.has(id)) {
@@ -3224,7 +3607,7 @@ function wireControls() {
     if (button) showView(button.dataset.view)
   })
   els.bellBtn.addEventListener("click", () => openNoticePanel(activeNotices()))
-  els.helpBtn.addEventListener("click", openHelp)
+  els.helpBtn.addEventListener("click", openSearch)
   els.pauseBtn.addEventListener("click", () => {
     state.paused = !state.paused
     writePref(PAUSE_KEY, state.paused ? "1" : "0")
@@ -3245,18 +3628,46 @@ function wireControls() {
   })
   els.periodTag.addEventListener("click", openDutySheet)
   els.sheet.addEventListener("input", (event) => {
-    if (state.sheetKind !== "duty" || !event.target.matches(".duty-search")) return
-    state.duty.query = event.target.value
-    paintDutyBody()
+    if (state.sheetKind === "duty" && event.target.matches(".duty-search")) {
+      state.duty.query = event.target.value
+      paintDutyBody()
+      return
+    }
+    if (state.sheetKind !== "search" || !event.target.matches("#search-input") || !state.search) return
+    state.search.query = event.target.value
+    if (state.search.query.trim()) state.search.vccArea = null
+    renderSearchResults()
   })
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
-    else if (state.sheetKind === "station" && event.target.closest("[data-segment-dir]")) {
+    else if (state.sheetKind === "search" && event.target.closest("[data-open-help]")) openHelp()
+    else if (state.sheetKind === "search" && event.target.closest("[data-search-retry]")) openSearch()
+    else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
+      const button = event.target.closest("[data-search-category]")
+      state.search.category = button.dataset.searchCategory
+      state.search.vccArea = null
+      renderSearchResults()
+      document.querySelector(`[data-search-category="${button.dataset.searchCategory}"]`)?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-search-vcc]")) {
+      const value = event.target.closest("[data-search-vcc]").dataset.searchVcc
+      state.search.vccArea = value === "all" ? null : Number(value)
+      renderSearchResults()
+    } else if (state.sheetKind === "search" && event.target.closest("[data-search-result]")) {
+      const button = event.target.closest("[data-search-result]")
+      openSearchResult(button.dataset.searchResult, button.dataset.defaultDir)
+    } else if (state.sheetKind === "station" && event.target.closest("[data-segment-dir]")) {
       openSegment(state.station, event.target.closest("[data-segment-dir]").dataset.segmentDir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-direction]")) {
+      setSegmentDirection(event.target.closest("[data-segment-direction]").dataset.segmentDirection)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
-      const { from, dir } = state.segment
-      openSegment(from, dir)
+      const segment = state.segment
+      openSegment(segment.from, segment.activeDir, {
+        dual: segment.mode === "dual",
+        segment: { id: segment.segmentId, from: segment.canonicalFrom, to: segment.canonicalTo },
+        segmentId: segment.segmentId,
+        focus: segment.focus,
+      })
     } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-connectors]")) {
       state.segment.epConnectors = state.segment.epConnectors === false
       paintSegmentInfo()
@@ -3286,6 +3697,25 @@ function wireControls() {
   })
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeSheet()
+    if (event.key === "Tab" && els.sheet.dataset.open === "1") {
+      const focusable = [...els.sheet.querySelectorAll("button:not([disabled]), input:not([disabled]), summary, [href], [tabindex]:not([tabindex='-1'])")]
+        .filter((element) => element.getClientRects().length > 0)
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && (document.activeElement === first || !els.sheet.contains(document.activeElement))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || !els.sheet.contains(document.activeElement))) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    const typing = event.target.matches("input, textarea, [contenteditable='true']")
+    if (!typing && (event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k"))) {
+      event.preventDefault()
+      openSearch()
+    }
   })
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return

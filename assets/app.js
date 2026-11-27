@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.10.0", commit: "65378a0" }
+const BUILD = { version: "0.11.0", commit: "65378a0" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -2151,8 +2151,17 @@ async function showView(view) {
 /* ----------------------------------------------------------------- sheet */
 
 let sheetDrag = null
+let drawerDrag = null
+let suppressDrawerClickUntil = 0
 
 function resetSheetDrag() {
+  const drawerPointerId = drawerDrag?.pointerId
+  const drawerHandle = document.querySelector(".segment-drawer-handle")
+  drawerDrag = null
+  document.querySelector(".segment-drawer")?.style.removeProperty("transform")
+  if (drawerPointerId != null && drawerHandle?.hasPointerCapture(drawerPointerId)) {
+    drawerHandle.releasePointerCapture(drawerPointerId)
+  }
   const pointerId = sheetDrag?.pointerId
   sheetDrag = null
   els.sheet.dataset.dragging = "0"
@@ -2186,6 +2195,8 @@ function closeSheet() {
   els.sheetBackdrop.dataset.open = "0"
   delete els.sheet.dataset.kind
   delete els.sheet.dataset.mode
+  delete els.sheet.dataset.drawer
+  delete els.sheet.dataset.segmentLayout
   els.sheet.setAttribute("aria-modal", "false")
   els.sheet.setAttribute("aria-hidden", "true")
   els.sheet.setAttribute("inert", "")
@@ -2239,6 +2250,53 @@ function finishSheetDrag(event, cancelled = false) {
   const threshold = Math.min(160, Math.max(72, height * 0.18))
   if (!cancelled && offset >= threshold) closeSheet()
   else resetSheetDrag()
+}
+
+function beginDrawerDrag(event) {
+  if (
+    drawerDrag ||
+    sheetDrag ||
+    isWideSegmentLayout() ||
+    state.sheetKind !== "segment" ||
+    !event.isPrimary ||
+    event.button !== 0 ||
+    !event.target.closest(".segment-drawer-handle")
+  ) return
+  event.preventDefault()
+  const handle = event.target.closest(".segment-drawer-handle")
+  drawerDrag = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    offset: 0,
+    startMode: state.segment.drawer,
+  }
+  handle.setPointerCapture(event.pointerId)
+}
+
+function moveDrawerDrag(event) {
+  if (!drawerDrag || event.pointerId !== drawerDrag.pointerId) return
+  event.preventDefault()
+  const offset = Math.max(-180, Math.min(180, event.clientY - drawerDrag.startY))
+  drawerDrag.offset = offset
+  const drawer = document.querySelector(".segment-drawer")
+  if (drawer) drawer.style.transform = `translateY(${offset}px)`
+}
+
+function finishDrawerDrag(event, cancelled = false) {
+  if (!drawerDrag || event.pointerId !== drawerDrag.pointerId) return
+  const { offset, startMode, pointerId } = drawerDrag
+  drawerDrag = null
+  const handle = event.target.closest?.(".segment-drawer-handle")
+  if (handle?.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId)
+  document.querySelector(".segment-drawer")?.style.removeProperty("transform")
+  if (Math.abs(offset) > 8) suppressDrawerClickUntil = Date.now() + 350
+  if (cancelled) return
+  let next = startMode
+  if (startMode === "collapsed" && offset < -24) next = "peek"
+  else if (startMode === "peek" && offset < -48) next = "expanded"
+  else if (startMode === "peek" && offset > 48) next = "collapsed"
+  else if (startMode === "expanded" && offset > 80) next = "peek"
+  if (next !== startMode) setSegmentDrawer(next)
 }
 
 function minutesLabel(value) {
@@ -2345,6 +2403,18 @@ function segmentDirectionSwitchHtml() {
     `<button type="button" data-segment-direction="DOWN" aria-pressed="${segment.activeDir === "DOWN"}">▼ ${s.down}</button></div>`
 }
 
+function segmentDrawerShellHtml() {
+  const s = t()
+  return `<div class="segment-drawer" id="segment-drawer" data-drawer="collapsed">` +
+    `<button type="button" class="segment-drawer-handle" data-segment-drawer="toggle" aria-expanded="false" aria-controls="segment-drawer-body">` +
+    `<span class="segment-drawer-grip" aria-hidden="true"></span><span data-drawer-summary>${s.tdLoading}</span><b data-drawer-action>${s.searchExpand} ▲</b></button>` +
+    `<div class="segment-drawer-body" id="segment-drawer-body">` +
+    `<div class="segment-drawer-pane segment-drawer-collapsed" data-drawer-pane="collapsed" hidden></div>` +
+    `<div class="segment-drawer-pane segment-drawer-peek" data-drawer-pane="peek" hidden>${s.tdLoading}</div>` +
+    `<div class="segment-drawer-pane segment-drawer-expanded" data-drawer-pane="expanded" tabindex="-1">${s.tdLoading}</div>` +
+    `</div></div>`
+}
+
 function segmentShellHtml(from, to, dir) {
   const s = t()
   const segment = state.segment
@@ -2357,13 +2427,13 @@ function segmentShellHtml(from, to, dir) {
   const direction = dual ? s.segmentDual : dir === "UP" ? `▲ ${s.up} · ${s.toTum}` : `▼ ${s.down} · ${s.toWks}`
   return (
     `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
-    `<div class="segment-head"><h2>${title}</h2><div class="sub" id="segment-direction">${direction} · TML</div></div>` +
+    `<div class="segment-head"><div class="segment-head-main"><h2>${title}</h2><div class="sub" id="segment-direction">${direction} · TML</div></div>${segmentDirectionSwitchHtml()}</div>` +
     `<div class="segment-layout">` +
     `<section class="segment-route" aria-label="${s.segmentRoute}">` +
     `<div class="segment-range" id="segment-range">${s.tdLoading}</div>` +
     `<svg class="segment-diagram" id="segment-diagram" viewBox="0 0 280 360" role="group" aria-label="${title}"></svg>` +
     `</section>` +
-    `<aside class="segment-info" id="segment-info" aria-live="polite">${segmentDirectionSwitchHtml()}${s.tdLoading}</aside>` +
+    `<aside class="segment-info" id="segment-info" aria-live="polite">${segmentDrawerShellHtml()}</aside>` +
     `<svg class="segment-connectors" id="segment-connectors" aria-hidden="true"></svg>` +
     `</div>`
   )
@@ -2396,6 +2466,9 @@ function openSegment(code, dir, options = {}) {
     segmentId: options.segmentId ?? options.segment?.id ?? null,
     focus: options.focus ?? null,
     fallback: options.fallback ?? null,
+    drawer: options.focus ? "peek" : "collapsed",
+    focusSequence: null,
+    focusIndex: -1,
     recordsByDir: null,
     scrollByDir: { UP: 0, DOWN: 0 },
     epConnectors: true,
@@ -2415,13 +2488,16 @@ function openSegment(code, dir, options = {}) {
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
   els.sheet.dataset.mode = dual ? "dual" : "single"
+  els.sheet.dataset.drawer = state.segment.drawer
+  syncSegmentDrawer()
   buildSegmentDiagram()
   const svg = document.getElementById("segment-diagram")
   const info = document.getElementById("segment-info")
+  const infoPane = info?.querySelector('[data-drawer-pane="expanded"]')
   const layout = document.querySelector(".segment-layout")
-  info?.addEventListener("scroll", () => {
+  infoPane?.addEventListener("scroll", () => {
     if (!state.segment || state.sheetKind !== "segment") return
-    state.segment.scrollByDir[state.segment.activeDir] = info.scrollTop
+    state.segment.scrollByDir[state.segment.activeDir] = infoPane.scrollTop
     paintSegmentConnectors()
   }, { passive: true })
   if (svg && "ResizeObserver" in window) {
@@ -2551,13 +2627,250 @@ function segmentFallbackHtml(segment) {
     `${s.segmentOpposite(network.name(opposite.from, LANG), network.name(opposite.to, LANG))}</button></div>`
 }
 
+function isWideSegmentLayout() {
+  return window.matchMedia("(min-width: 640px)").matches
+}
+
+function segmentRecordCount(segment) {
+  if (!segment?.records) return 0
+  return (segment.focusSequence ?? segmentFocusSequence(segment)).length
+}
+
+function segmentFocusSequence(segment) {
+  const records = segment?.records
+  if (!records) return []
+  const items = []
+  const seen = new Set()
+  const add = (kind, id, data, extra = {}) => {
+    const key = `${kind}:${id}:${extra.direction ?? ""}`
+    if (seen.has(key)) return
+    seen.add(key)
+    const values = chainageValues(data?.chainageKm ?? data?.values ?? [data?.upChainageKm, data?.downChainageKm]).filter(Number.isFinite)
+    items.push({ kind, id, data, km: values[0] ?? Infinity, ...extra })
+  }
+  for (const boundary of records.vccBoundaries ?? []) {
+    add("VCC_BOUNDARY", boundary.between.join(":"), boundary)
+  }
+  const neutralZones = segment.mode === "dual"
+    ? [
+      ...(segment.recordsByDir?.UP?.records?.neutralZones ?? []),
+      ...(segment.recordsByDir?.DOWN?.records?.neutralZones ?? []),
+    ]
+    : records.neutralZones ?? []
+  const seenZones = new Set()
+  for (const zone of neutralZones) {
+    const base = String(zone.isolator).replace(/\s*(?:601|602)$/u, "")
+    if (seenZones.has(base)) continue
+    seenZones.add(base)
+    const pair = {
+      base,
+      up: neutralZones.find((row) => String(row.track).toUpperCase() === "UP" && String(row.isolator).replace(/\s*(?:601|602)$/u, "") === base) ?? null,
+      down: neutralZones.find((row) => String(row.track).toUpperCase() === "DOWN" && String(row.isolator).replace(/\s*(?:601|602)$/u, "") === base) ?? null,
+    }
+    add("NZ", base, { ...pair, chainageKm: pair.up?.chainageKm ?? pair.down?.chainageKm })
+  }
+  for (const ep of records.entryPoints ?? []) {
+    const yellowId = String(ep.yellowEPId ?? ep.yellowEP)
+    const greenId = String(ep.greenEPId ?? ep.greenEP)
+    if (yellowId && yellowId !== "undefined") add("EP", yellowId, ep, { direction: "TUM" })
+    if (greenId && greenId !== "undefined") add("EP", greenId, ep, { direction: "WKS" })
+  }
+  for (const room of records.nicheRooms ?? []) add("NR", room.uid, room)
+  for (const point of records.emergencyAccessPoints ?? []) add("EAP", point.id, point)
+  for (const cpd of records.cpds ?? []) add("CPD", cpd.id, cpd)
+  const kindOrder = ["VCC_BOUNDARY", "NZ", "EP", "NR", "EAP", "CPD"]
+  return items.sort((a, b) => b.km - a.km || kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind))
+}
+
+function sameSegmentFocus(a, b) {
+  if (!a || !b || a.kind !== b.kind || String(a.id) !== String(b.id)) return false
+  return a.kind !== "EP" || String(a.direction).toUpperCase() === String(b.direction).toUpperCase()
+}
+
+function segmentFocusKindLabel(kind) {
+  const s = t()
+  return {
+    VCC_BOUNDARY: s.tdVcc,
+    NZ: s.tdNeutralZones,
+    EP: s.tdEntryPoints,
+    NR: s.tdNicheRooms,
+    EAP: s.tdEap,
+    CPD: s.tdCpd,
+  }[kind] ?? kind
+}
+
+function segmentFocusLabel(item) {
+  if (item.kind === "VCC_BOUNDARY") return `VCC ${item.data.between[0]} ↔ ${item.data.between[1]}`
+  if (item.kind === "NZ") return item.data.base ?? item.id
+  if (item.kind === "EP") return `EP ${formatEp(item.id)}`
+  if (item.kind === "NR") return item.data.name ?? item.id
+  return item.id
+}
+
+function segmentFocusTrack(item, segment) {
+  const s = t()
+  if (item.kind === "EP") return item.direction === "TUM" ? s.tdTumDirection : s.tdWksDirection
+  if (item.kind === "VCC_BOUNDARY") return "UP / DOWN"
+  if (item.kind === "NZ") return item.data.up && item.data.down ? "UP / DOWN" : item.data.up ? "UP" : "DOWN"
+  const explicit = item.data.track ?? item.data.access
+  if (explicit && explicit !== "-") return explicit
+  const collection = { CPD: "cpds", NR: "nicheRooms", EAP: "emergencyAccessPoints" }[item.kind]
+  if (collection && segment?.recordsByDir) {
+    const directions = Object.entries(segment.recordsByDir)
+      .filter(([, value]) => (value.records?.[collection] ?? []).some((row) => String(row.id ?? row.uid) === String(item.id)))
+      .map(([direction]) => direction)
+    if (directions.length) return directions.join(" / ")
+  }
+  return segment?.activeDir ?? ""
+}
+
+function segmentFocusChainage(item) {
+  if (item.kind === "VCC_BOUNDARY") return `${chainageText(item.data.values)} km`
+  if (item.kind === "NZ") {
+    const up = item.data.up ? neutralZoneRangeText(item.data.up) : ""
+    const down = item.data.down ? neutralZoneRangeText(item.data.down) : ""
+    if (up && down && up !== down) return `UP ${up} · DOWN ${down}`
+    return up || down
+  }
+  return `${chainageText(item.data.chainageKm)} km`
+}
+
+function segmentFocusSource(item) {
+  const value = item.kind === "NZ"
+    ? [item.data.up?.sourcePages ?? item.data.up?.sourcePage, item.data.down?.sourcePages ?? item.data.down?.sourcePage].flat()
+    : item.data.sourcePages ?? item.data.sourcePage ?? item.data.source ?? ""
+  return [...new Set((Array.isArray(value) ? value : String(value).split(/,\s*/)).filter(Boolean))].join(", ")
+}
+
+function segmentFocusDetailHtml(segment) {
+  const s = t()
+  const sequence = segment.focusSequence ?? segmentFocusSequence(segment)
+  const item = sequence[segment.focusIndex] ?? sequence.find((row) => sameSegmentFocus(row, segment.focus))
+  if (!item) return `<div class="segment-focus-empty">${s.segmentSelectFacility}</div>`
+  const itemIndex = sequence.indexOf(item)
+  const source = segmentFocusSource(item)
+  const track = segmentFocusTrack(item, segment)
+  return `<section class="segment-focus-detail" tabindex="-1" aria-label="${escapeHtml(segmentFocusLabel(item))}">` +
+    `<div class="segment-focus-head"><span class="segment-focus-badge ${item.kind.toLowerCase()}">${segmentFocusKindLabel(item.kind)}</span>` +
+    `<button type="button" class="segment-focus-close" data-segment-drawer="collapse" aria-label="${s.close}">✕</button></div>` +
+    `<h3>${escapeHtml(segmentFocusLabel(item))}</h3>` +
+    `<dl class="segment-focus-meta">` +
+    (track ? `<div><dt>軌道</dt><dd>${escapeHtml(track)}</dd></div>` : "") +
+    `<div><dt>里程</dt><dd>${escapeHtml(segmentFocusChainage(item))}</dd></div>` +
+    (source ? `<div><dt>來源</dt><dd>${escapeHtml(source)}</dd></div>` : "") +
+    `</dl>${tdNote(item.data)}${item.kind === "EAP" ? segmentFallbackHtml(segment) : ""}` +
+    `<div class="segment-focus-nav">` +
+    `<button type="button" data-segment-focus-step="-1">← ${s.segmentPrevious}</button>` +
+    `<span>${itemIndex + 1} / ${sequence.length}</span>` +
+    `<button type="button" data-segment-focus-step="1">${s.segmentNext} →</button>` +
+    `<button type="button" class="segment-focus-all" data-segment-drawer="expand">${s.segmentAll(sequence.length)} ▲</button>` +
+    `</div></section>`
+}
+
+function syncSegmentDrawer() {
+  const segment = state.segment
+  if (!segment || state.sheetKind !== "segment") return
+  const wide = isWideSegmentLayout()
+  const drawer = segment.drawer
+  const visible = wide ? "expanded" : drawer
+  els.sheet.dataset.drawer = drawer
+  els.sheet.dataset.segmentLayout = wide ? "wide" : "narrow"
+  const handle = document.querySelector(".segment-drawer-handle")
+  const body = document.getElementById("segment-drawer-body")
+  if (body) {
+    body.hidden = !wide && drawer === "collapsed"
+    body.toggleAttribute("inert", body.hidden)
+  }
+  if (handle) {
+    handle.hidden = wide
+    handle.setAttribute("aria-expanded", String(drawer !== "collapsed"))
+    const action = handle.querySelector("[data-drawer-action]")
+    if (action) action.textContent = drawer === "expanded" ? `${t().searchCollapse} ▼` : `${t().searchExpand} ▲`
+    const summary = handle.querySelector("[data-drawer-summary]")
+    if (summary) summary.textContent = `${t().segmentTechnical} (${segmentRecordCount(segment)})`
+  }
+  document.querySelectorAll("[data-drawer-pane]").forEach((pane) => {
+    pane.hidden = pane.dataset.drawerPane !== visible
+    pane.toggleAttribute("inert", pane.hidden)
+  })
+}
+
+function setSegmentDrawer(mode) {
+  const segment = state.segment
+  if (!segment || !["collapsed", "peek", "expanded"].includes(mode)) return
+  segment.drawer = mode
+  syncSegmentDrawer()
+  paintSegmentConnectors()
+  setTimeout(() => {
+    if (state.segment !== segment || state.sheetKind !== "segment") return
+    if (isWideSegmentLayout()) return
+    if (mode === "peek") {
+      scrollSegmentMarkerIntoView(segment)
+      document.querySelector(".segment-focus-detail")?.focus({ preventScroll: true })
+    } else if (mode === "collapsed") {
+      document.querySelector(".segment-drawer-handle")?.focus({ preventScroll: true })
+    } else {
+      document.querySelector(".segment-drawer-expanded")?.focus({ preventScroll: true })
+    }
+  }, 0)
+}
+
+function selectSegmentFocus(item, mode = "peek") {
+  const segment = state.segment
+  if (!segment || !item) return
+  segment.focus = { kind: item.kind, id: item.id, dir: segment.activeDir, direction: item.direction, data: item.data }
+  applySegmentFocus(segment)
+  segment.drawer = mode
+  paintSegmentInfo()
+  paintSegmentInfrastructure()
+  syncSegmentTrains()
+  setSegmentDrawer(mode)
+}
+
+function moveSegmentFocus(delta) {
+  const segment = state.segment
+  const sequence = segment?.focusSequence ?? segmentFocusSequence(segment)
+  if (!sequence.length) return
+  const current = segment.focusIndex >= 0 ? segment.focusIndex : sequence.findIndex((item) => sameSegmentFocus(item, segment.focus))
+  const next = (current + delta + sequence.length) % sequence.length
+  selectSegmentFocus(sequence[next])
+}
+
+function scrollSegmentMarkerIntoView(segment) {
+  const focus = segment?.focus
+  const route = document.querySelector(".segment-route")
+  if (!focus || !route) return
+  const routeId = focus.kind === "EP" ? `${focus.direction}:${focus.id}` : focus.id
+  const marker = document.querySelector(`[data-route-marker="${focus.kind}"][data-route-id="${CSS.escape(routeId)}"]`)
+    ?? document.querySelector(`[data-focus-id="${CSS.escape(focus.id)}"]`)
+  if (!marker) return
+  const mr = marker.getBoundingClientRect()
+  const rr = route.getBoundingClientRect()
+  if (mr.top < rr.top + 8 || mr.bottom > rr.bottom - 8) {
+    route.scrollTop += (mr.top + mr.bottom - rr.top - rr.bottom) / 2
+  }
+}
+
+function segmentFocusFromRow(row, segment) {
+  const sequence = segment.focusSequence ?? segmentFocusSequence(segment)
+  if (row.dataset.focusKind) {
+    return sequence.find((item) => item.kind === row.dataset.focusKind && String(item.id) === row.dataset.focusId)
+  }
+  if (row.classList.contains("td-ep-group")) {
+    const direction = segment.activeDir === "UP" ? "TUM" : "WKS"
+    const id = direction === "TUM" ? row.dataset.epYellow : row.dataset.epGreen
+    return sequence.find((item) => item.kind === "EP" && item.id === id && item.direction === direction)
+  }
+  return null
+}
+
 function segmentInfoHtml(segment) {
   const s = t()
   if (segment.status === "error") {
-    return segmentDirectionSwitchHtml() + segmentFallbackHtml(segment) + `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
+    return segmentFallbackHtml(segment) + `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
   }
   const { records, range } = segment
-  if (!records || !range) return segmentDirectionSwitchHtml() + segmentFallbackHtml(segment) + s.tdLoading
+  if (!records || !range) return segmentFallbackHtml(segment) + s.tdLoading
   const focusKind = segment.focus?.kind
   const focusId = segment.focus?.id
   const pointFocused = (kind, id) => focusKind === kind && String(focusId) === String(id)
@@ -2582,7 +2895,7 @@ function segmentInfoHtml(segment) {
     const yellowId = String(ep.yellowEPId ?? ep.yellowEP)
     const greenId = String(ep.greenEPId ?? ep.greenEP)
     const showLabel = index === 0
-    return `<li class="td-row td-ep-group"><div class="ep-line">${epButton("WKS", green, greenId, s.tdWksDirection, showLabel)}</div>` +
+    return `<li class="td-row td-ep-group" data-ep-yellow="${escapeHtml(yellowId)}" data-ep-green="${escapeHtml(greenId)}"><div class="ep-line">${epButton("WKS", green, greenId, s.tdWksDirection, showLabel)}</div>` +
       `<div class="ep-line">${epButton("TUM", yellow, yellowId, s.tdTumDirection, showLabel)}</div>` +
       `<div class="td-meta">${chainageText(ep.chainageKm)} km</div></li>`
   })
@@ -2616,7 +2929,7 @@ function segmentInfoHtml(segment) {
     ? vccTop === vccBottom ? `VCC ${vccTop}` : s.tdVccAreas(vccTop, vccBottom)
     : s.tdNone
   return (
-    segmentDirectionSwitchHtml() + segmentDualSummaryHtml(segment) + segmentFallbackHtml(segment) +
+    segmentDualSummaryHtml(segment) + segmentFallbackHtml(segment) +
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
@@ -2632,10 +2945,15 @@ function paintSegmentInfo() {
   if (!segment || state.sheetKind !== "segment") return
   const info = document.getElementById("segment-info")
   const range = document.getElementById("segment-range")
-  const scrollTop = info?.scrollTop ?? 0
   if (info) {
-    info.innerHTML = segmentInfoHtml(segment)
-    info.scrollTop = scrollTop
+    const expanded = info.querySelector('[data-drawer-pane="expanded"]')
+    const peek = info.querySelector('[data-drawer-pane="peek"]')
+    const scrollTop = expanded?.scrollTop ?? 0
+    if (expanded) {
+      expanded.innerHTML = segmentInfoHtml(segment)
+      expanded.scrollTop = scrollTop
+    }
+    if (peek) peek.innerHTML = segment.focus ? segmentFocusDetailHtml(segment) : `<div class="segment-focus-empty">${t().segmentSelectFacility}</div>`
   }
   if (range && segment.range) {
     const topChainage = segment.activeDir === "UP" ? segment.range.chainageTo : segment.range.chainageFrom
@@ -2648,6 +2966,7 @@ function paintSegmentInfo() {
       ? `${t().segmentDual} · ${segment.activeDir === "UP" ? `▲ ${t().up}` : `▼ ${t().down}`} · TML`
       : `${segment.activeDir === "UP" ? `▲ ${t().up} · ${t().toTum}` : `▼ ${t().down} · ${t().toWks}`} · TML`
   }
+  syncSegmentDrawer()
   paintSegmentConnectors()
 }
 
@@ -2807,6 +3126,8 @@ function buildSegmentDiagram(force = false) {
 function applySegmentFocus(segment) {
   const focus = segment?.focus
   if (!focus || !segment.routes) return
+  segment.focusSequence = segmentFocusSequence(segment)
+  segment.focusIndex = segment.focusSequence.findIndex((item) => sameSegmentFocus(item, focus))
   if (focus.kind === "EP") {
     const direction = focus.direction === "TUM" ? "TUM" : "WKS"
     segment.routes.EP = { status: "single", direction, selectedId: `${direction}:${focus.id}` }
@@ -2820,6 +3141,10 @@ function applySegmentFocus(segment) {
 
 function focusSegmentItem(segment) {
   if (!segment?.focus) return
+  if (!isWideSegmentLayout()) {
+    setSegmentDrawer("peek")
+    return
+  }
   const token = segment.openToken
   setTimeout(() => {
     if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
@@ -2843,8 +3168,8 @@ function focusSegmentItem(segment) {
 function setSegmentDirection(dir) {
   const segment = state.segment
   if (!segment || segment.mode !== "dual" || !["UP", "DOWN"].includes(dir) || !segment.recordsByDir?.[dir]) return
-  const info = document.getElementById("segment-info")
-  if (info) segment.scrollByDir[segment.activeDir] = info.scrollTop
+  const pane = document.querySelector('[data-drawer-pane="expanded"]')
+  if (pane) segment.scrollByDir[segment.activeDir] = pane.scrollTop
   segment.activeDir = dir
   segment.dir = dir
   const endpoints = segmentDirectionEndpoints(segment, dir)
@@ -2852,11 +3177,24 @@ function setSegmentDirection(dir) {
   segment.to = endpoints.to
   segment.range = segment.recordsByDir[dir].range
   segment.records = segment.recordsByDir[dir].records
+  segment.focusSequence = segmentFocusSequence(segment)
+  if (segment.focus) {
+    segment.focusIndex = segment.focusSequence.findIndex((item) => sameSegmentFocus(item, segment.focus))
+    if (segment.focusIndex >= 0) applySegmentFocus(segment)
+    else {
+      segment.focus = null
+      segment.focusIndex = -1
+      if (segment.drawer === "peek") segment.drawer = "collapsed"
+    }
+  }
   buildSegmentDiagram(true)
   paintSegmentInfo()
   paintSegmentInfrastructure()
   syncSegmentTrains()
-  if (info) info.scrollTop = segment.scrollByDir[dir] ?? 0
+  if (pane) pane.scrollTop = segment.scrollByDir[dir] ?? 0
+  document.querySelectorAll("[data-segment-direction]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.segmentDirection === dir))
+  })
   document.querySelector(`[data-segment-direction="${dir}"]`)?.focus({ preventScroll: true })
 }
 
@@ -2955,6 +3293,7 @@ function paintSegmentInfrastructure() {
       const group = make("g", {
         class: `segment-neutral-zone-group${focused("NZ", base) ? " is-focused" : ""}`,
         "data-neutral-zone": zone.isolator,
+        "data-focus-id": base,
         "data-track": dir,
       })
       const rangeText = neutralZoneRangeText(zone)
@@ -2983,6 +3322,7 @@ function paintSegmentInfrastructure() {
         x1: left, y1: y, x2: right, y2: y,
         class: `segment-vcc-line${focused("VCC_BOUNDARY", id) ? " is-focused" : ""}`,
         "data-vcc-boundary": id,
+        "data-focus-id": id,
         "data-track": dir,
       })
       trackLayer.append(
@@ -3081,6 +3421,11 @@ function paintSegmentConnectors() {
   const svg = document.getElementById("segment-connectors")
   if (!svg || state.sheetKind !== "segment" || !segment) return
   svg.replaceChildren()
+  if (!isWideSegmentLayout()) {
+    svg.hidden = true
+    return
+  }
+  svg.hidden = false
   const layout = document.querySelector(".segment-layout")
   const info = document.getElementById("segment-info")
   if (!layout || !info) return
@@ -3769,6 +4114,25 @@ function handleDutyClick(event) {
 /* -------------------------------------------------------------- controls */
 
 function wireControls() {
+  let segmentResizeTimer = 0
+  window.addEventListener("resize", () => {
+    if (state.sheetKind !== "segment") return
+    const active = document.activeElement
+    const focusWasExpanded = Boolean(active?.closest?.('[data-drawer-pane="expanded"]'))
+    const focusWasPeek = Boolean(active?.closest?.('[data-drawer-pane="peek"]'))
+    window.clearTimeout(segmentResizeTimer)
+    segmentResizeTimer = window.setTimeout(() => {
+      if (state.sheetKind !== "segment") return
+      syncSegmentDrawer()
+      buildSegmentDiagram(true)
+      paintSegmentConnectors()
+      if (focusWasExpanded && !isWideSegmentLayout()) {
+        const target = state.segment.drawer === "peek" ? document.querySelector(".segment-focus-detail") : document.querySelector(".segment-drawer-handle")
+        target?.focus({ preventScroll: true })
+      }
+      if (focusWasPeek && isWideSegmentLayout()) document.querySelector("[data-segment-direction]")?.focus({ preventScroll: true })
+    }, 80)
+  })
   els.viewSeg.addEventListener("click", (event) => {
     const button = event.target.closest("button")
     if (button) showView(button.dataset.view)
@@ -3786,11 +4150,20 @@ function wireControls() {
     if (!state.paused) refresh(false)
   })
   els.sheetBackdrop.addEventListener("click", closeSheet)
+  els.sheet.addEventListener("pointerdown", beginDrawerDrag)
   els.sheet.addEventListener("pointerdown", beginSheetDrag)
+  els.sheet.addEventListener("pointermove", moveDrawerDrag)
   els.sheet.addEventListener("pointermove", moveSheetDrag)
-  els.sheet.addEventListener("pointerup", (event) => finishSheetDrag(event))
-  els.sheet.addEventListener("pointercancel", (event) => finishSheetDrag(event, true))
+  els.sheet.addEventListener("pointerup", (event) => {
+    finishDrawerDrag(event)
+    finishSheetDrag(event)
+  })
+  els.sheet.addEventListener("pointercancel", (event) => {
+    finishDrawerDrag(event, true)
+    finishSheetDrag(event, true)
+  })
   els.sheet.addEventListener("lostpointercapture", (event) => {
+    if (drawerDrag?.pointerId === event.pointerId) finishDrawerDrag(event, true)
     if (sheetDrag?.pointerId === event.pointerId) resetSheetDrag()
   })
   els.periodTag.addEventListener("click", openDutySheet)
@@ -3890,6 +4263,16 @@ function wireControls() {
       openSearchResult(button.dataset.searchResult, button.dataset.defaultDir)
     } else if (state.sheetKind === "station" && event.target.closest("[data-segment-dir]")) {
       openSegment(state.station, event.target.closest("[data-segment-dir]").dataset.segmentDir)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-focus-step]")) {
+      moveSegmentFocus(Number(event.target.closest("[data-segment-focus-step]").dataset.segmentFocusStep))
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-drawer]")) {
+      const control = event.target.closest("[data-segment-drawer]")
+      const requested = control.dataset.segmentDrawer
+      if (requested === "toggle" && Date.now() < suppressDrawerClickUntil) return
+      const mode = requested === "toggle"
+        ? (state.segment.drawer === "expanded" ? "collapsed" : "expanded")
+        : requested === "expand" ? "expanded" : requested === "collapse" ? "collapsed" : requested
+      setSegmentDrawer(mode)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-direction]")) {
       setSegmentDirection(event.target.closest("[data-segment-direction]").dataset.segmentDirection)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-opposite]")) {
@@ -3935,6 +4318,12 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
       const button = event.target.closest("[data-route-kind]")
       setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)
+    } else if (state.sheetKind === "segment" && event.target.closest(".td-row")) {
+      const row = event.target.closest(".td-row")
+      const item = segmentFocusFromRow(row, state.segment)
+      if (item) selectSegmentFocus(item)
+    } else if (state.sheetKind === "segment" && event.target.matches('[data-drawer-pane="expanded"]')) {
+      setSegmentDrawer("collapsed")
     } else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")
       openDutyCard(open.dataset.sheet, open.dataset.duty)

@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.0 — 2026-11-27 (`pending`, test branch)
+- 雙軌技術圖改為響應式介面：640px 以下直屏使用全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），640px 以上維持左右獨立捲動。
+- 直屏關閉跨欄 SVG 連線，改以 marker focus、設施類型 badge 同單項詳情卡配對；詳情卡支援上一項／下一項、展開全部同收起。
+- 抽屜支援按鈕同拖曳切換，隱藏內容設為 `hidden`／`inert`；旋轉保留抽屜、方向、設施 focus 同鍵盤 focus。
+- 667×375 矮橫屏使用緊湊頂列同獨立左右捲動；UP／DOWN switch 同步 `aria-pressed`。
+- 雙軌 Neutral Zone 詳情同時保留 UP／DOWN chainage 同來源；Shell cache renamed `v102`。
+
 ## v0.10.0 — 2026-11-27 (`65378a0`, test branch)
 - 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明移到搜尋 sheet 頂部快捷列，並加入可點查詢範例。
 - 新增 598 筆前端技術搜尋 index；EP 先選主線 VCC 區域，再按實際 UP／DOWN 軌分組，並以黃／綠區分 EP 功能方向。

@@ -59,9 +59,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.9.0", commit: "dev" }
-const BUILD_REPO = "iceninye/TML-traffic"
-const BUILD_CACHE_MS = 5 * 60_000
+const BUILD = { version: "0.9.0", commit: "42bf1a1" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -257,7 +255,6 @@ async function boot() {
   feed = makeFeed()
 
   applyStrings()
-  refreshBuildCommit()
   buildDiagram()
   wireControls()
   render()
@@ -813,57 +810,8 @@ function setStatus(kind) {
 /* ---------------------------------------------------------------- strings */
 
 function buildCommitMarkup() {
-  if (!/^[0-9a-f]{40}$/i.test(BUILD.commit)) return "dev"
-  return `<a href="https://github.com/${BUILD_REPO}/commit/${BUILD.commit}">${BUILD.commit}</a>`
-}
-
-function paintBuildLine() {
-  const line = document.getElementById("build")
-  if (line) line.innerHTML = `v${BUILD.version} · commit ${buildCommitMarkup()}`
-}
-
-function deploymentBranch() {
-  if (location.protocol === "file:") return null
-  const host = location.hostname.toLowerCase()
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return null
-  return host.includes("test-v2") ? "test-v2" : "main"
-}
-
-// Workers Builds exposes WORKERS_CI_COMMIT_SHA only during the build, while
-// this app is shipped as static assets. Resolve the public branch head once per
-// session instead; local/offline use keeps the honest `dev` fallback.
-async function refreshBuildCommit() {
-  const branch = deploymentBranch()
-  if (!branch) return
-  const cacheKey = `tml-traffic-build-${branch}`
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(cacheKey) ?? "null")
-    if (/^[0-9a-f]{40}$/i.test(cached?.sha) && Date.now() - cached.at < BUILD_CACHE_MS) {
-      BUILD.commit = cached.sha
-      paintBuildLine()
-      return
-    }
-  } catch {
-    // Storage can be unavailable in private or embedded browsers.
-  }
-  try {
-    const response = await fetch(`https://api.github.com/repos/${BUILD_REPO}/commits/${branch}`, {
-      headers: { Accept: "application/vnd.github+json" },
-      cache: "no-store",
-    })
-    if (!response.ok) return
-    const data = await response.json()
-    if (!/^[0-9a-f]{40}$/i.test(data?.sha)) return
-    BUILD.commit = data.sha
-    try {
-      sessionStorage.setItem(cacheKey, JSON.stringify({ sha: data.sha, at: Date.now() }))
-    } catch {
-      // The footer still works without a cache.
-    }
-    paintBuildLine()
-  } catch {
-    // Metadata is non-critical; never block the live diagram on GitHub.
-  }
+  if (!/^[0-9a-f]{7,40}$/i.test(BUILD.commit)) return "dev"
+  return `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}" title="${BUILD.commit}">${BUILD.commit.slice(0, 7)}</a>`
 }
 
 function applyStrings() {
@@ -2254,7 +2202,7 @@ function paintSegmentInfo() {
     const topChainage = segment.dir === "UP" ? segment.range.chainageTo : segment.range.chainageFrom
     const bottomChainage = segment.dir === "UP" ? segment.range.chainageFrom : segment.range.chainageTo
     range.textContent = t().tdRange(chainageText(topChainage), chainageText(bottomChainage))
-  } else range.textContent = segment.status === "error" ? t().tdFailed : t().tdLoading
+  } else if (range) range.textContent = segment.status === "error" ? t().tdFailed : t().tdLoading
   paintSegmentConnectors()
 }
 
@@ -2298,6 +2246,7 @@ function buildSegmentDiagram() {
     base.append(make("path", { d: segment.dir === "UP" ? `M${x - 4} ${y + 2.5} L${x} ${y - 3.5} L${x + 4} ${y + 2.5} Z` : `M${x - 4} ${y - 2.5} L${x} ${y + 3.5} L${x + 4} ${y - 2.5} Z`, class: "dg-chev" }))
   }
   const stationHits = []
+  const jumpIcons = []
   for (const [position, code, y] of [["top", topCode, top], ["bottom", bottomCode, bottom]]) {
     const name = network.name(code, LANG)
     let jumpFrom = null
@@ -2331,7 +2280,7 @@ function buildSegmentDiagram() {
         make("circle", { r: 7 }),
         make("path", { d: jumpKind === "previous" ? "M-3 1 L0 -2 L3 1" : "M-3 -1 L0 2 L3 -1" }),
       )
-      base.append(jumpIcon)
+      jumpIcons.push(jumpIcon)
       const hit = make("rect", {
         x: x - 22,
         y: y - 18,
@@ -2365,9 +2314,12 @@ function buildSegmentDiagram() {
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
   const stationLayer = make("g", { id: "segment-station-layer" })
   stationLayer.append(...stationHits)
+  const jumpIconLayer = make("g", { id: "segment-jump-icon-layer" })
+  jumpIconLayer.append(...jumpIcons)
   // Trains own the endpoint overlap: a dwell train must open its card instead
-  // of triggering the adjacent-segment hit underneath it.
-  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }))
+  // of triggering the adjacent-segment hit underneath it. Icons stay above
+  // trains for discoverability but never receive pointer events.
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), jumpIconLayer)
   const labelRoom = width - x - 32
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()

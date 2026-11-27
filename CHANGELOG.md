@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.9.0 — 2026-11-26 (`dev`, test branch)
+## v0.9.0 — 2026-11-26 (`42bf1a1`, test branch)
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。
 - 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。
 - 移除左上角橙色掣；有適用 Duty Sheet 時，Run 編號同「全日更份」直接可用。
@@ -16,7 +16,7 @@ release commits stamped in the page footer.
 - EP 圓點收細；右側顏色掣再撳一次可收起路軌顯示。Neutral Zone 以 5 倍闊度顯示並保留實際界線；CPD／EAP 改為行車方向一側路軌 border 上嘅細點，三類路軌標記互斥。
 - Neutral Zone 改為統一 `19.4 × 12` 左至右彩虹圖，路軌文字統一為 `Neutral Zone`；實際 1× 界線改為閃動白色線。EP／CPD／EAP 路軌標記加入柔和閃動，並改為各自獨立嘅全部／單項／收起三態，可同時存在。
 - Neutral Zone 移除中間白點，加 1px 白邊；文字改成兩行放喺路線左邊，冇白底。EP／CPD／EAP 閃動改為較細但更清楚，CPD／EAP 改用白邊；路軌本體透明度改為 80%。
-- Neutral Zone 文字改用主題文字顏色，深夜模式可以清楚顯示；彩虹圖縮小 20% 至 `15.52 × 9.6`。EP／CPD／EAP 改為九段式 glow／sharp／透明度閃爍，即使開啟減少動態效果仍然保留閃爍。
+- Neutral Zone 文字改用主題文字顏色，深夜模式可以清楚顯示；彩虹圖縮小 20% 至 `15.52 × 9.6`。EP／CPD／EAP 改為九段式 glow／sharp／透明度閃爍。
 - 路軌 EP 保留 6px 核心尺寸，但改用右側掣嘅明亮綠／黃色、2px 白邊同 12px glow，令夜間模式都清楚可見。
 - 站卡按鈕文字由「放大上行／放大下行」簡化為「上行／下行」。Entry Point 標題旁加入 EP 連線開關；路軌 EP 同右側對應掣之間加入有間距、跟隨右欄滾動嘅綠／黃連線。
 - 移除 EP 連線開關旁邊嘅可見文字，只保留 switch。
@@ -30,9 +30,11 @@ release commits stamped in the page footer.
 - 放大圖上／下車站圖示可跳轉到所選方向嘅前／後相鄰站段，支援鍵盤操作；終站冇相鄰段時唔顯示跳轉。
 - 修正放大圖整體定向：上行屯門方向喺上、列車向上；下行烏溪沙方向喺下、列車向下。chainage range、VCC／Neutral Zone／EP／CPD／EAP 列表同 marker／連線全部跟隨上下次序。
 - 列車層移到站段跳轉層之上，端站停靠列車唔會被跳轉 hit area 攔截；跳轉掣加 idle 圖示。
-- 關閉 sheet 時清除 `data-kind`；footer 改用所部署 branch 嘅公開 commit SHA，離線或本機保留 `dev`。
-- Shell cache renamed `v94`。
-- 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v92`。
+- 關閉 sheet 時清除 `data-kind`；footer 改返 release-time commit stamp，移除 runtime GitHub API 依賴。
+- 跳轉 icon 移到列車層之上但保持 `pointer-events: none`，永遠可見且不攔截列車點擊。
+- `paintSegmentInfo()` 補返 range null guard；減少動態效果下停止 EP／CPD／EAP 閃動。
+- Shell cache renamed `v95`。
+- 新增 `tools/validate_td.mjs` 並加入 CI。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

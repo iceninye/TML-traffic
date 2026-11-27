@@ -1210,12 +1210,6 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .sheet[data-kind="segment"][data-mode="dual"] .segment-layout {
   grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
 }
-@media (max-width: 699px) {
-  .sheet[data-kind="segment"][data-mode="dual"] .segment-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 46vh) minmax(0, 1fr);
-  }
-}
 .segment-dir-switch {
   position: sticky;
   top: 0;
@@ -1255,9 +1249,9 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .segment-nr-control.is-focused .segment-nr-dot { filter: drop-shadow(0 0 7px currentColor); }
 .segment-cpd-dot.is-focused, .segment-eap-dot.is-focused { stroke: #fff; stroke-width: 1.5; filter: drop-shadow(0 0 4px currentColor); }
 
-/* Responsive technical panel: independent panes on wide screens, a three-detent
-   drawer on portrait screens. Keep this after the dual-mode rules so the
-   portrait layout wins without !important. */
+/* Responsive technical panel: every viewport keeps the diagram on the left and
+   technical details on the right. Portrait screens use a compact right-hand
+   three-detent panel; wide screens keep independent scrolling and connectors. */
 .segment-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .segment-head-main { min-width: 0; }
 .segment-head-main h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1305,66 +1299,62 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
   .segment-layout,
   .sheet[data-kind="segment"][data-mode="dual"] .segment-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 0;
-    gap: 0;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 6px;
     height: calc(100dvh - 72px);
     min-height: 0;
   }
-  .sheet[data-kind="segment"][data-drawer="peek"] .segment-layout,
-  .sheet[data-kind="segment"][data-mode="dual"][data-drawer="peek"] .segment-layout { grid-template-rows: minmax(0, 1fr) minmax(0, 46dvh); }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-layout,
-  .sheet[data-kind="segment"][data-mode="dual"][data-drawer="expanded"] .segment-layout { display: block; }
-  .segment-route { padding: 5px 9px 0; border: 0; border-radius: 0; background: transparent; overflow: hidden; }
-  .segment-range { min-height: 14px; font-size: 9.5px; }
+  .segment-route { padding: 5px 6px 0; overflow: hidden; }
+  .segment-range { min-height: 14px; font-size: 9px; }
   .segment-diagram { min-height: 0; }
-  .segment-info { overflow: visible; }
-  .segment-drawer-body { flex: none; }
-  .segment-drawer {
-    position: absolute;
-    z-index: 6;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: auto;
-    min-height: 0;
-    border: 1px solid var(--edge);
-    border-bottom: 0;
-    border-radius: 14px 14px 0 0;
-    background: var(--panel);
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.24);
-  }
+  .segment-info { overflow: hidden; }
+  .segment-drawer { height: 100%; min-height: 0; border-left: 1px solid var(--edge); background: var(--panel); }
+  .segment-drawer-body { flex: 1 1 0; min-height: 0; }
   .segment-drawer-handle {
     display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
     width: 100%;
     min-height: 44px;
-    padding: 5px 12px calc(5px + env(safe-area-inset-bottom));
-    border-radius: 14px 14px 0 0;
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--edge);
+    border-radius: 0;
     color: var(--text);
     text-align: left;
     cursor: pointer;
     touch-action: none;
   }
   .segment-drawer-handle:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: -3px; }
-  .segment-drawer-grip { width: 28px; height: 4px; border-radius: 999px; background: var(--muted); opacity: 0.65; }
-  [data-drawer-summary] { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-  [data-drawer-action] { color: var(--tml-lite); font-size: 11px; white-space: nowrap; }
+  .segment-drawer-grip { width: 18px; height: 4px; border-radius: 999px; background: var(--muted); opacity: 0.65; }
+  [data-drawer-summary] { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  [data-drawer-action] { color: var(--tml-lite); font-size: 10px; white-space: nowrap; }
   .sheet[data-kind="segment"][data-drawer="collapsed"] .segment-drawer-body { display: none; }
-  .sheet[data-kind="segment"][data-drawer="peek"] .segment-drawer-body { height: min(46dvh, 330px); overflow-y: auto; overscroll-behavior: contain; }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-drawer { top: 0; height: 100%; border-radius: 0; }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-drawer-handle { position: absolute; z-index: 2; top: 0; left: 0; width: 100%; border-bottom: 1px solid var(--edge); border-radius: 0; background: var(--panel); }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-drawer-body { height: 100%; padding-top: 44px; }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-drawer-expanded { height: 100%; padding: 10px 10px max(18px, env(safe-area-inset-bottom)); }
-  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-route { visibility: hidden; }
+  .sheet[data-kind="segment"][data-drawer="peek"] .segment-drawer-body { overflow-y: auto; overscroll-behavior: contain; }
+  .sheet[data-kind="segment"][data-drawer="peek"] .segment-drawer-peek { padding: 6px; }
+  .sheet[data-kind="segment"][data-drawer="expanded"] .segment-drawer-expanded { padding: 6px; }
   .segment-connectors { display: none; }
-  .segment-focus-detail { border: 0; border-radius: 0; background: transparent; }
-  .segment-focus-nav button { min-height: 44px; }
+  .segment-focus-detail { padding: 6px; border: 0; border-radius: 0; background: transparent; }
+  .segment-focus-detail h3 { font-size: 15px; }
+  .segment-focus-meta > div { grid-template-columns: 40px minmax(0, 1fr); gap: 5px; font-size: 10.5px; }
+  .segment-focus-nav { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 5px; }
+  .segment-focus-nav span { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+  .segment-focus-nav button { min-height: 44px; padding: 5px; font-size: 10.5px; }
+  .segment-focus-nav .segment-focus-all { grid-column: 1 / -1; }
   .segment-fallback { align-items: flex-start; flex-direction: column; }
   .segment-opposite { width: 100%; }
   .segment-diagram.is-dual .segment-neutral-label { display: none; }
+  .td-summary, .td-dual-summary { padding: 6px; }
+  .td-section { padding-top: 8px; }
+  .td-section h3 { font-size: 11.5px; }
+  .td-list { gap: 5px; }
+  .td-row { padding: 6px; }
+  .td-ep-group, .td-point-group { padding: 5px 0; }
+  .td-main { font-size: 10.5px; }
+  .td-meta, .td-note { font-size: 9.5px; }
+  .ep-code { font-size: 10px; }
+  .ep-direction { font-size: 7.5px; }
 }
 
 @media (min-width: 640px) and (max-height: 430px) {

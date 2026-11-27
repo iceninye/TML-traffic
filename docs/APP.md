@@ -98,7 +98,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 - 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。
 - 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
-- 雙軌圖頂部有上行／下行 switch，詳細資料跟 switch 切換。640px 以上維持左右獨立捲動同 SVG 連線；640px 以下直屏改為全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），直屏唔畫跨欄連線，改以 marker focus、類型 badge 同詳情卡配對。抽屜可撳或拖曳，旋轉保留狀態；667×375 矮橫屏使用緊湊頂列。
+- 所有螢幕尺寸都維持左右排版：左邊係軌圖，右邊係技術資料；640px 以上使用較闊雙欄、獨立捲動同 SVG 連線，640px 以下用緊湊右欄三段式面板（收起／單項詳情／完整清單）。右欄可撳或拖曳，旋轉保留狀態；667×375 矮橫屏使用緊湊頂列。
 - TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
 - EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
 - `tools/validate_search.mjs` 驗證 598 筆 index、594 筆主線可見結果、被排除 VCC 集合、站段解析、VCC 範圍、EP 分組、Neutral Zone 配對、格式迴歸同跨段 EAP metadata。

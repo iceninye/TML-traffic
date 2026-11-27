@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.10.0 — 2026-11-27 (`3699422`, test branch)
+## v0.10.0 — 2026-11-27 (`65378a0`, test branch)
 - 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明移到搜尋 sheet 頂部快捷列，並加入可點查詢範例。
 - 新增 598 筆前端技術搜尋 index；EP 先選主線 VCC 區域，再按實際 UP／DOWN 軌分組，並以黃／綠區分 EP 功能方向。
 - 搜尋結果跳到相關站段後自動啟動 marker／連線、捲到並 focus 該行；EP 行為與手動撳掣一致。

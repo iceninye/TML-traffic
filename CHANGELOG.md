@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.0 — 2026-11-27 (`pending`, test branch)
+## v0.11.0 — 2026-11-27 (`a09a00c`, test branch)
 - 雙軌技術圖改為響應式介面：640px 以下直屏使用全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），640px 以上維持左右獨立捲動。
 - 直屏關閉跨欄 SVG 連線，改以 marker focus、設施類型 badge 同單項詳情卡配對；詳情卡支援上一項／下一項、展開全部同收起。
 - 抽屜支援按鈕同拖曳切換，隱藏內容設為 `hidden`／`inert`；旋轉保留抽屜、方向、設施 focus 同鍵盤 focus。

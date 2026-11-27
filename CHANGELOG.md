@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.1 — 2026-11-28 (`pending`, test branch)
+## v0.11.1 — 2026-11-28 (`c45ab9d`, test branch)
 - 所有站段放大圖統一左右排版：左邊軌圖、右邊技術資料，唔再喺直屏使用上下排版。
 - 640px 以下改用緊湊右欄三段式面板（收起／單項詳情／完整清單），保留按鈕／拖曳、marker focus 同旋轉狀態；寬屏維持独立捲動同 SVG 連線。
 - Shell cache renamed `v103`。

@@ -799,6 +799,9 @@ svg.diagram {
 .cpd-dot { background: #67c7ff; box-shadow: 0 0 6px rgba(103, 199, 255, 0.45); }
 .point-dot:focus-visible, .ep-dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .segment-route-base { opacity: 0.8; }
+.segment-station-jump { pointer-events: none; }
+.segment-station-jump circle { fill: var(--panel-2); stroke: var(--edge); stroke-width: 1; }
+.segment-station-jump path { fill: none; stroke: var(--tml-lite); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .segment-station-hit { fill: transparent; cursor: pointer; outline: none; }
 .segment-station-hit:focus-visible { stroke: var(--tml-lite); stroke-width: 2; }
 .segment-neutral-zone { opacity: 1; stroke: #fff; stroke-width: 1; }

@@ -60,6 +60,8 @@ const MAX_TTNT = 3
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
 const BUILD = { version: "0.9.0", commit: "dev" }
+const BUILD_REPO = "iceninye/TML-traffic"
+const BUILD_CACHE_MS = 5 * 60_000
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -255,6 +257,7 @@ async function boot() {
   feed = makeFeed()
 
   applyStrings()
+  refreshBuildCommit()
   buildDiagram()
   wireControls()
   render()
@@ -809,6 +812,60 @@ function setStatus(kind) {
 
 /* ---------------------------------------------------------------- strings */
 
+function buildCommitMarkup() {
+  if (!/^[0-9a-f]{40}$/i.test(BUILD.commit)) return "dev"
+  return `<a href="https://github.com/${BUILD_REPO}/commit/${BUILD.commit}">${BUILD.commit}</a>`
+}
+
+function paintBuildLine() {
+  const line = document.getElementById("build")
+  if (line) line.innerHTML = `v${BUILD.version} · commit ${buildCommitMarkup()}`
+}
+
+function deploymentBranch() {
+  if (location.protocol === "file:") return null
+  const host = location.hostname.toLowerCase()
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return null
+  return host.includes("test-v2") ? "test-v2" : "main"
+}
+
+// Workers Builds exposes WORKERS_CI_COMMIT_SHA only during the build, while
+// this app is shipped as static assets. Resolve the public branch head once per
+// session instead; local/offline use keeps the honest `dev` fallback.
+async function refreshBuildCommit() {
+  const branch = deploymentBranch()
+  if (!branch) return
+  const cacheKey = `tml-traffic-build-${branch}`
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(cacheKey) ?? "null")
+    if (/^[0-9a-f]{40}$/i.test(cached?.sha) && Date.now() - cached.at < BUILD_CACHE_MS) {
+      BUILD.commit = cached.sha
+      paintBuildLine()
+      return
+    }
+  } catch {
+    // Storage can be unavailable in private or embedded browsers.
+  }
+  try {
+    const response = await fetch(`https://api.github.com/repos/${BUILD_REPO}/commits/${branch}`, {
+      headers: { Accept: "application/vnd.github+json" },
+      cache: "no-store",
+    })
+    if (!response.ok) return
+    const data = await response.json()
+    if (!/^[0-9a-f]{40}$/i.test(data?.sha)) return
+    BUILD.commit = data.sha
+    try {
+      sessionStorage.setItem(cacheKey, JSON.stringify({ sha: data.sha, at: Date.now() }))
+    } catch {
+      // The footer still works without a cache.
+    }
+    paintBuildLine()
+  } catch {
+    // Metadata is non-critical; never block the live diagram on GitHub.
+  }
+}
+
 function applyStrings() {
   const s = t()
   els.title.textContent = s.title
@@ -827,12 +884,9 @@ function applyStrings() {
     `<span class="lg-col up" title="${s.toTum}">${s.colUp}</span><span class="lg-col down" title="${s.toWks}">${s.colDown}</span>`
   els.mapLegend.innerHTML =
     `<span><i class="sw up"></i>${s.up} · ${s.toTum}</span><span><i class="sw down"></i>${s.down} · ${s.toWks}</span>`
-  const commitLink = BUILD.commit === "dev"
-    ? "dev"
-    : `<a href="https://github.com/iceninye/TML-traffic/commit/${BUILD.commit}">${BUILD.commit}</a>`
   els.foot.innerHTML =
     `<p>${s.source}</p><p>${s.disclaimer}</p>` + (dataInfo ? `<p class="foot-data">${s.helpData(escapeHtml(dataInfo))}</p>` : "") +
-    `<p id="build">v${BUILD.version} · commit ${commitLink}</p>`
+    `<p id="build">v${BUILD.version} · commit ${buildCommitMarkup()}</p>`
   paintClock()
 }
 
@@ -1848,6 +1902,7 @@ function closeSheet() {
   resetSheetDrag()
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
+  delete els.sheet.dataset.kind
   state.sheetKind = null
   state.selected = null
   state.station = null
@@ -2267,6 +2322,16 @@ function buildSegmentDiagram() {
     )
     if (jumpFrom && jumpTo) {
       const jumpKind = position === "top" ? "previous" : "next"
+      const jumpIcon = make("g", {
+        class: "segment-station-jump",
+        transform: `translate(${x + 12} ${y - 12})`,
+        "aria-hidden": "true",
+      })
+      jumpIcon.append(
+        make("circle", { r: 7 }),
+        make("path", { d: jumpKind === "previous" ? "M-3 1 L0 -2 L3 1" : "M-3 -1 L0 2 L3 -1" }),
+      )
+      base.append(jumpIcon)
       const hit = make("rect", {
         x: x - 22,
         y: y - 18,
@@ -2300,7 +2365,9 @@ function buildSegmentDiagram() {
   base.append(make("circle", { cx: x, cy: top, r: 3, fill: color }))
   const stationLayer = make("g", { id: "segment-station-layer" })
   stationLayer.append(...stationHits)
-  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), make("g", { id: "segment-train-layer" }), stationLayer)
+  // Trains own the endpoint overlap: a dwell train must open its card instead
+  // of triggering the adjacent-segment hit underneath it.
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }))
   const labelRoom = width - x - 32
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()

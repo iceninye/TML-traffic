@@ -36,7 +36,8 @@ release commits stamped in the page footer.
 - Shell cache renamed `v95`。
 - 新增 `tools/validate_td.mjs` 並加入 CI。
 - TD 技術資料升級至 schema `2.3.5`，加入 17 個 Niche Room；放大圖右欄次序為 EP → Niche Room → EAP → CPD，支援 EP 式三態 marker、獨立連線 switch 同 magenta `#d65db1` 連線。
-- Shell cache renamed `v96`。
+- Niche Room 更新為 `verified-full-line`，加入 UP 10／DN 7 track assignment、修正 Kwai Tsing Tunnel section 同 PDF page；查詢按所選方向過濾，唔會跨軌。
+- Shell cache renamed `v97`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

@@ -6705,7 +6705,12 @@
       "crossoverCount": 19,
       "physicalInterfaceCount": 4,
       "turnoutCount": 89,
-      "nicheRoomCount": 17
+      "nicheRoomCount": 17,
+      "nicheRoomPhysicalCount": 17,
+      "nicheRoomTrackSummary": {
+        "UP": 10,
+        "DN": 7
+      }
     },
     "decision": {
       "vccAreas": "approved",
@@ -6718,12 +6723,14 @@
       "crossovers": "approved-full-line-1A2-1-to-1A2-17",
       "turnouts": "approved-full-line-1A2-1-to-1A2-17",
       "physicalInterfaces": "verified-named-portals-and-viaducts",
-      "nicheRooms": "verified-after-structural-correction"
+      "nicheRooms": "verified-full-line"
     },
     "correctionsApplied": [
       "Retained all v2.3.3 verified datasets.",
       "Added 7 eastern-section main-line crossover/junction groups and 28 main-line turnouts across 1A2-11..1A2-17, excluding HHS siding-internal and TAD depot-internal turnouts.",
-      "Added 17 Niche Room records from TD-TML Issue/Rev 3.3 with stable UIDs and chainage-only range filtering."
+      "Added 17 Niche Room records from TD-TML Issue/Rev 3.3 with stable UIDs and track-aware range filtering.",
+      "Assigned UP/DN tracks to all 17 Niche Rooms, corrected Kwai Tsing Tunnel section labels, and aligned PDF pages to TD-TML Issue/Rev 3.3.",
+      "Niche Room sourcePdfPage uses corrected TD-TML Issue/Rev 3.3 pagination (1A2-9=40 through 1A2-5=36); legacy EP/EAP/CPD page references were retained unchanged."
     ]
   },
   "review": {
@@ -8114,10 +8121,11 @@
       "id": "02",
       "name": "Niche Room 02",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 107.795,
       "section": "Austin - Nam Cheong",
       "sourcePage": "1A2-9",
-      "sourcePdfPage": 38,
+      "sourcePdfPage": 40,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8125,10 +8133,11 @@
       "id": "05",
       "name": "Niche Room 05",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 108.331,
       "section": "Nam Cheong - Mei Foo",
       "sourcePage": "1A2-9",
-      "sourcePdfPage": 38,
+      "sourcePdfPage": 40,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8136,10 +8145,11 @@
       "id": "03",
       "name": "Niche Room 03",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 108.86,
       "section": "Nam Cheong - Mei Foo",
       "sourcePage": "1A2-8",
-      "sourcePdfPage": 37,
+      "sourcePdfPage": 39,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8147,10 +8157,11 @@
       "id": "04",
       "name": "Niche Room 04",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 109.549,
       "section": "Nam Cheong - Mei Foo",
       "sourcePage": "1A2-8",
-      "sourcePdfPage": 37,
+      "sourcePdfPage": 39,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8158,10 +8169,11 @@
       "id": "01",
       "name": "Niche Room 01",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 111.138,
-      "section": "Mei Foo - Tsuen Wan West",
+      "section": "Kwai Tsing Tunnel",
       "sourcePage": "1A2-8",
-      "sourcePdfPage": 37,
+      "sourcePdfPage": 39,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8169,10 +8181,11 @@
       "id": "06",
       "name": "Niche Room 06",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 111.175,
       "section": "Mei Foo - Tsuen Wan West",
       "sourcePage": "1A2-8",
-      "sourcePdfPage": 37,
+      "sourcePdfPage": 39,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8180,10 +8193,11 @@
       "id": "02",
       "name": "Niche Room 02",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 111.704,
-      "section": "Mei Foo - Tsuen Wan West",
+      "section": "Kwai Tsing Tunnel",
       "sourcePage": "1A2-8",
-      "sourcePdfPage": 37,
+      "sourcePdfPage": 39,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8191,10 +8205,11 @@
       "id": "07",
       "name": "Niche Room 07",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 112.325,
       "section": "Mei Foo - Tsuen Wan West",
       "sourcePage": "1A2-7",
-      "sourcePdfPage": 36,
+      "sourcePdfPage": 38,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8202,10 +8217,11 @@
       "id": "08",
       "name": "Niche Room 08",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 113.425,
       "section": "Mei Foo - Tsuen Wan West",
       "sourcePage": "1A2-7",
-      "sourcePdfPage": 36,
+      "sourcePdfPage": 38,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8213,10 +8229,11 @@
       "id": "03",
       "name": "Niche Room 03",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 114.203,
       "section": "Kwai Tsing Tunnel",
       "sourcePage": "1A2-7",
-      "sourcePdfPage": 36,
+      "sourcePdfPage": 38,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8224,10 +8241,11 @@
       "id": "01",
       "name": "Niche Room 01",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 116.207,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-6",
-      "sourcePdfPage": 35,
+      "sourcePdfPage": 37,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8235,10 +8253,11 @@
       "id": "02",
       "name": "Niche Room 02",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 116.607,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-6",
-      "sourcePdfPage": 35,
+      "sourcePdfPage": 37,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8246,10 +8265,11 @@
       "id": "03",
       "name": "Niche Room 03",
       "type": "nicheRoom",
+      "track": "DN",
       "chainageKm": 117.644,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-6",
-      "sourcePdfPage": 35,
+      "sourcePdfPage": 37,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8257,10 +8277,11 @@
       "id": "04",
       "name": "Niche Room 04",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 118.311,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-6",
-      "sourcePdfPage": 35,
+      "sourcePdfPage": 37,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8268,10 +8289,11 @@
       "id": "05",
       "name": "Niche Room 05",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 119.166,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-6",
-      "sourcePdfPage": 35,
+      "sourcePdfPage": 37,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8279,10 +8301,11 @@
       "id": "06",
       "name": "Niche Room 06",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 119.866,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-5",
-      "sourcePdfPage": 34,
+      "sourcePdfPage": 36,
       "reviewStatus": "verified-against-td-tml-3.3"
     },
     {
@@ -8290,11 +8313,18 @@
       "id": "07",
       "name": "Niche Room 07",
       "type": "nicheRoom",
+      "track": "UP",
       "chainageKm": 120.515,
       "section": "Tai Lam Tunnel",
       "sourcePage": "1A2-5",
-      "sourcePdfPage": 34,
+      "sourcePdfPage": 36,
       "reviewStatus": "verified-against-td-tml-3.3"
     }
-  ]
+  ],
+  "nicheRoomCount": 17,
+  "physicalRoomCount": 17,
+  "nicheRoomTrackSummary": {
+    "UP": 10,
+    "DN": 7
+  }
 }

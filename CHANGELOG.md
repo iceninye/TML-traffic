@@ -27,9 +27,11 @@ release commits stamped in the page footer.
 - EP 編號改用主題文字顏色，深色模式保持清晰；CPD 列表亦按行車方向排列。
 - CPD 查詢支援官方 `U`／`D`／`U/D` 軌道編碼，36 個方向性 CPD 不再遺漏；validator 加入真實編碼迴歸。
 - EAP 標題旁加入獨立連線開關，只控制 EAP 連線，同 EP 開關互不影響。
-- 放大圖上／下車站圖示可跳轉到所選方向嘅前／後相鄰站段，支援鍵盤操作；點擊層置於列車上方，終站冇相鄰段時唔顯示跳轉。
+- 放大圖上／下車站圖示可跳轉到所選方向嘅前／後相鄰站段，支援鍵盤操作；終站冇相鄰段時唔顯示跳轉。
 - 修正放大圖整體定向：上行屯門方向喺上、列車向上；下行烏溪沙方向喺下、列車向下。chainage range、VCC／Neutral Zone／EP／CPD／EAP 列表同 marker／連線全部跟隨上下次序。
-- Shell cache renamed `v93`。
+- 列車層移到站段跳轉層之上，端站停靠列車唔會被跳轉 hit area 攔截；跳轉掣加 idle 圖示。
+- 關閉 sheet 時清除 `data-kind`；footer 改用所部署 branch 嘅公開 commit SHA，離線或本機保留 `dev`。
+- Shell cache renamed `v94`。
 - 新增 `tools/validate_td.mjs` 並加入 CI；Shell cache renamed `v92`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)

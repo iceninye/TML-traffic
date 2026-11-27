@@ -160,6 +160,7 @@ node tools/validate_matching.mjs   # 延誤情境下嘅班次對應（合成讀�
 node tools/validate_data.mjs       # 全部 JSON 讀得通、index 同卡片 sha256／數量一致（CI 都行）
 node tools/validate_td.mjs         # TD_TML 27 段 chainage、EP／CPD／NZ／VCC 對應
 node tools/validate_search.mjs    # 技術搜尋 index、站段／VCC 解析、Neutral Zone 配對
+node tools/validate_sw.mjs        # 搜尋 critical-path 離線 shell 完整性
 node tools/validate_tool_paths.mjs # 路徑有空格時工具仍正常
 node tools/validate_duties.mjs     # 更份卡片資料同當值判斷（真資料）
 node tools/validate-hours.mjs      # 官表（duty-basic.json）同更份卡片工時一致

@@ -862,6 +862,8 @@ svg.diagram {
   }
   .segment-diagram.is-dual .segment-neutral-label { display: none; }
   .segment-diagram.is-dual .segment-station-label { font-size: 9px; }
+  .segment-fallback { align-items: flex-start; flex-direction: column; }
+  .segment-opposite { width: 100%; }
   .segment-route { padding: 8px; }
   .segment-range { font-size: 10.5px; }
   .td-summary { padding: 8px; }
@@ -1130,6 +1132,11 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
   font-size: 12px;
 }
 .search-chip[aria-pressed="true"] { border-color: var(--tml); background: var(--tml); color: #fff; font-weight: 650; }
+.search-quick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin: -2px 0 12px; color: var(--muted); font-size: 11px; }
+.search-examples { display: flex; flex-wrap: wrap; gap: 5px; }
+.search-example { min-height: 30px; padding: 4px 8px; border: 1px dashed var(--edge); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; }
+.search-example:hover { border-color: var(--tml-lite); color: var(--text); }
+.search-quick .search-help { margin: 0 0 0 auto; padding: 4px 0; }
 .search-results { display: grid; gap: 7px; }
 .search-count { padding: 4px 2px; color: var(--muted); font-size: 11px; }
 .search-result {
@@ -1146,6 +1153,7 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
   background: var(--panel-2);
 }
 .search-result:hover { border-color: var(--tml-lite); }
+.search-result[aria-selected="true"] { border-color: var(--tml-lite); background: color-mix(in srgb, var(--tml-lite) 12%, var(--panel-2)); box-shadow: 0 0 0 1px var(--tml-lite); }
 .search-result:focus-visible { outline: 2px solid var(--tml-lite); outline-offset: 2px; }
 .search-result-badge {
   min-width: 42px;
@@ -1213,11 +1221,21 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 }
 .segment-dir-switch button { min-height: 32px; padding: 4px 10px; border-radius: 6px; color: var(--muted); font-size: 11.5px; }
 .segment-dir-switch button[aria-pressed="true"] { background: var(--tml); color: #fff; font-weight: 700; }
+/* Keep compact visuals while providing a 44px touch target. The extension is
+   vertical only, so adjacent controls in the same row do not overlap. */
+.segment-dir-switch button, .search-ep-code, .segment-opposite { position: relative; }
+.segment-dir-switch button::after, .search-ep-code::after, .segment-opposite::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
 .td-dual-summary { margin-bottom: 10px; padding: 10px 11px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel-2); }
 .td-dual-summary h3 { margin: 0 0 6px; font-size: 12px; }
 .td-dual-summary > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 11px; }
 .td-dual-summary b { flex: none; }
 .td-dual-summary span { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.segment-fallback { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--edge)); border-radius: 9px; background: color-mix(in srgb, var(--warn) 10%, var(--panel-2)); color: var(--text); font-size: 11px; line-height: 1.4; }
+.segment-opposite { flex: none; min-height: 32px; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--edge)); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 11px; font-weight: 650; }
 .segment-track-infra[data-active="false"] { opacity: 0.38; }
 .td-row.is-focused { border-color: var(--tml-lite); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tml-lite) 22%, transparent); }
 .segment-vcc-line.is-focused { stroke-width: 3; filter: drop-shadow(0 0 4px var(--bad)); }

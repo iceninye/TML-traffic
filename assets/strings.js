@@ -193,6 +193,9 @@ export const STRINGS = {
     searchBack: "返回 VCC 區域",
     searchResultCount: (count) => `${count} 項結果`,
     searchOpenHelp: "圖例同說明",
+    searchExamples: "試下",
+    segmentCrossEap: "此 EAP 上下行分屬相鄰站段，現以單軌顯示。",
+    segmentOpposite: (from, to) => `前往對向（${from}–${to}）`,
     helpTitle: "圖例同說明",
     helpIntro: "列車位置係由港鐵各站「下一班幾分鐘」反推出嚟嘅推算，唔係官方定位。",
     helpGroups: [

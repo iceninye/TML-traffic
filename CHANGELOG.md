@@ -4,11 +4,13 @@ All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
 ## v0.10.0 — 2026-11-27 (`962b09e`, test branch)
-- 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明保留喺搜尋 sheet 底部。
+- 右上角「？説明」改為「尋找」：可搜尋 VCC、EP、CPD、EAP、Neutral Zone、Niche Room 或車站；圖例同說明移到搜尋 sheet 頂部快捷列，並加入可點查詢範例。
 - 新增 598 筆前端技術搜尋 index；EP 先選主線 VCC 區域，再按實際 UP／DOWN 軌分組，並以黃／綠區分 EP 功能方向。
 - 搜尋結果跳到相關站段後自動啟動 marker／連線、捲到並 focus 該行；EP 行為與手動撳掣一致。
+- 搜尋支援全形字、大小寫、空格及分隔符正規化；EP 不接受無分隔符數字拆解，避免 `1-12`／`11-2` 日後撞位。扁平結果支援 ↑／↓、Enter、兩段式 Esc 同 IME 組字保護。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 改為雙軌站段圖；UP／DOWN 同時顯示即時列車，右欄右上角可切換方向，頂部保留雙向摘要。
-- 新增 `tools/validate_search.mjs`（34 項）並加入 CI；Shell cache renamed `v98`。
+- TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，顯示原因並可一鍵往返對向區段，保留同一 EAP focus。
+- 新增 `tools/validate_search.mjs`（52 項）同 `tools/validate_sw.mjs` 並加入 CI；Shell cache renamed `v99`。
 
 ## v0.9.0 — 2026-11-26 (`74f888b`, test branch)
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。

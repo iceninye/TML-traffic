@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, mainlineVccAreas, searchResultMode, searchTechnicalIndex } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, mainlineVccAreas, searchResultPresentation, searchTechnicalIndex } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -732,6 +732,14 @@ const SEARCH_CATEGORIES = [
   ["NR", "searchNr"],
 ]
 
+function searchQuickHtml() {
+  const s = t()
+  const examples = ["EP 1/2", "HP 601", "NAC43", "VCC 6↔7"]
+  return `<div class="search-quick"><span>${s.searchExamples}</span><div class="search-examples">` +
+    examples.map((example) => `<button type="button" class="search-example" data-search-example="${example}">${example}</button>`).join("") +
+    `</div><button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button></div>`
+}
+
 function searchShellHtml() {
   const s = t()
   const search = state.search
@@ -739,17 +747,17 @@ function searchShellHtml() {
     `<button type="button" class="search-chip" data-search-category="${value}" aria-pressed="${search.category === value}">${s[label]}</button>`).join("")
   return `<button class="sheet-close" aria-label="${s.close}">✕</button>` +
     `<div class="search-head"><h2>${s.searchTitle}</h2><div class="sub">${s.searchIntro}</div></div>` +
-    `<label class="search-input-wrap"><input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
+    `<label class="search-input-wrap"><input id="search-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
     `<div class="search-chips" role="group" aria-label="${s.searchTitle}">${chips}</div>` +
-    `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>` +
-    `<button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button>`
+    searchQuickHtml() +
+    `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>`
 }
 
 function openSearch() {
   state.selected = null
   state.station = null
   state.segment = null
-  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "" }
+  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0 }
   setFollow(false)
   openSheet(searchShellHtml(), "search")
   loadSearchIndex().then((index) => {
@@ -780,17 +788,57 @@ function searchKindLabel(kind) {
   }[kind] ?? kind
 }
 
-function searchResultButton(item, defaultDir = item.defaultDir) {
+function searchResultButton(item, defaultDir = item.defaultDir, index = 0) {
   const s = t()
   const km = chainageValues(item.chainageKm).filter(Number.isFinite)
   const kmText = km.length ? `${km[0].toFixed(3)}${km.length > 1 ? `–${km.at(-1).toFixed(3)}` : ""} km` : ""
   const segment = item.segment
   const where = segment ? `${network.name(segment.from, LANG)} → ${network.name(segment.to, LANG)}` : item.sublabel
   const track = item.track === "BOTH" ? "UP / DOWN" : item.track
-  return `<button type="button" class="search-result" data-search-result="${escapeHtml(item.id)}"${defaultDir ? ` data-default-dir="${defaultDir}"` : ""}>` +
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" tabindex="-1" class="search-result" data-search-result="${escapeHtml(item.id)}"${defaultDir ? ` data-default-dir="${defaultDir}"` : ""}>` +
     `<span class="search-result-badge ${item.kind.toLowerCase()}">${searchKindLabel(item.kind)}</span>` +
     `<span class="search-result-main"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(where)}</span></span>` +
     `<span class="search-result-meta">${track ? `<b>${track}</b>` : ""}${kmText ? `<span>${kmText}</span>` : ""}</span></button>`
+}
+
+function clearSearchActive() {
+  const input = document.getElementById("search-input")
+  const body = document.getElementById("search-results")
+  if (state.search) state.search.activeIndex = -1
+  input?.setAttribute("aria-expanded", "false")
+  input?.removeAttribute("aria-activedescendant")
+  body?.removeAttribute("role")
+  body?.querySelectorAll("[role='option']").forEach((option) => option.setAttribute("aria-selected", "false"))
+}
+
+function setSearchActive(index, scroll = false) {
+  const search = state.search
+  const input = document.getElementById("search-input")
+  const body = document.getElementById("search-results")
+  if (!search || !input || !body) return
+  const options = [...body.querySelectorAll("[role='option']")]
+  if (!options.length) return clearSearchActive()
+  search.activeIndex = Math.max(0, Math.min(Number.isFinite(index) ? index : 0, options.length - 1))
+  options.forEach((option, optionIndex) => {
+    option.setAttribute("aria-selected", String(optionIndex === search.activeIndex))
+  })
+  const active = options[search.activeIndex]
+  input.setAttribute("aria-expanded", "true")
+  input.setAttribute("aria-activedescendant", active.id)
+  if (scroll) active.scrollIntoView({ block: "nearest" })
+}
+
+function moveSearchActive(delta) {
+  const count = document.querySelectorAll("#search-results [role='option']").length
+  if (!count || !state.search) return
+  const current = state.search.activeIndex >= 0 ? state.search.activeIndex : 0
+  setSearchActive((current + delta + count) % count, true)
+}
+
+function activateSearchActive() {
+  const index = state.search?.activeIndex ?? -1
+  if (index < 0) return
+  document.querySelectorAll("#search-results [role='option']")[index]?.click()
 }
 
 function renderEpSearchHierarchy() {
@@ -828,26 +876,32 @@ function renderSearchResults() {
   const body = document.getElementById("search-results")
   if (!search || !body) return
   if (search.status === "loading") {
+    clearSearchActive()
     body.innerHTML = `<p class="empty">${t().searchLoading}</p>`
     return
   }
   if (search.status === "error") {
+    clearSearchActive()
     body.innerHTML = `<div class="segment-error"><p>${t().searchFailed}</p><button type="button" class="btn" data-search-retry>${t().searchRetry}</button></div>`
     return
   }
   if (!tdSearchIndex) return
   if (search.category === "EP" && !search.query.trim()) {
+    clearSearchActive()
     body.innerHTML = renderEpSearchHierarchy()
     return
   }
   const rows = searchTechnicalIndex(tdSearchIndex, search.query, search.category)
     .filter((item) => item.kind !== "VCC_AREA" || item.mainline)
   if (!rows.length) {
+    clearSearchActive()
     body.innerHTML = `<p class="empty">${t().searchNoResults}</p>`
     return
   }
-  body.innerHTML = `<div class="search-count">${t().searchResultCount(rows.length)}</div>` +
-    rows.map((item) => searchResultButton(item)).join("")
+  body.setAttribute("role", "listbox")
+  body.innerHTML = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>` +
+    rows.map((item, index) => searchResultButton(item, item.defaultDir, index)).join("")
+  setSearchActive(search.activeIndex)
 }
 
 function openSearchResult(id, defaultDir = null) {
@@ -870,10 +924,20 @@ function openSearchResult(id, defaultDir = null) {
     : item.kind === "NR" ? item.data.uid
       : item.kind === "VCC_BOUNDARY" ? item.data.between.join(":")
         : item.kind === "NZ" ? item.data.base : item.data.id
+  const presentation = searchResultPresentation(item)
+  const fallback = presentation.fallbackReason ? {
+    reason: presentation.fallbackReason,
+    track: dir,
+    segment: item.segment,
+    oppositeTrack: presentation.oppositeTrack,
+    oppositeSegment: presentation.oppositeSegment,
+    focusId: rawId,
+  } : null
   openSegment(code, dir, {
-    dual: searchResultMode(item) === "dual",
+    dual: presentation.mode === "dual",
     segment: item.segment,
     segmentId: item.segment.id,
+    fallback,
     focus: { kind: item.kind, id: rawId, dir, direction: item.direction, data: item.data },
   })
 }
@@ -2241,6 +2305,7 @@ function openSegment(code, dir, options = {}) {
     openToken,
     segmentId: options.segmentId ?? options.segment?.id ?? null,
     focus: options.focus ?? null,
+    fallback: options.fallback ?? null,
     recordsByDir: null,
     scrollByDir: { UP: 0, DOWN: 0 },
     epConnectors: true,
@@ -2386,13 +2451,23 @@ function segmentDualSummaryHtml(segment) {
     `<div><b>▼ DOWN</b><span>${down ? `${chainageText(down.chainageFrom)} → ${chainageText(down.chainageTo)} km` : "n/a"}</span></div></section>`
 }
 
+function segmentFallbackHtml(segment) {
+  const fallback = segment?.fallback
+  const opposite = fallback?.oppositeSegment
+  if (fallback?.reason !== "cross-segment-eap" || !opposite) return ""
+  const s = t()
+  return `<div class="segment-fallback" role="note"><span>${s.segmentCrossEap}</span>` +
+    `<button type="button" class="segment-opposite" data-segment-opposite data-track="${fallback.oppositeTrack}">` +
+    `${s.segmentOpposite(network.name(opposite.from, LANG), network.name(opposite.to, LANG))}</button></div>`
+}
+
 function segmentInfoHtml(segment) {
   const s = t()
   if (segment.status === "error") {
-    return segmentDirectionSwitchHtml() + `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
+    return segmentDirectionSwitchHtml() + segmentFallbackHtml(segment) + `<div class="segment-error"><p>${s.tdFailed}</p><button type="button" class="btn" data-td-retry>${s.tdRetry}</button></div>`
   }
   const { records, range } = segment
-  if (!records || !range) return segmentDirectionSwitchHtml() + s.tdLoading
+  if (!records || !range) return segmentDirectionSwitchHtml() + segmentFallbackHtml(segment) + s.tdLoading
   const focusKind = segment.focus?.kind
   const focusId = segment.focus?.id
   const pointFocused = (kind, id) => focusKind === kind && String(focusId) === String(id)
@@ -2451,7 +2526,7 @@ function segmentInfoHtml(segment) {
     ? vccTop === vccBottom ? `VCC ${vccTop}` : s.tdVccAreas(vccTop, vccBottom)
     : s.tdNone
   return (
-    segmentDirectionSwitchHtml() + segmentDualSummaryHtml(segment) +
+    segmentDirectionSwitchHtml() + segmentDualSummaryHtml(segment) + segmentFallbackHtml(segment) +
     tdVccSection(vccLabel, vccRows, s.tdNone) +
     tdSection(s.tdNeutralZones, neutralRows, s.tdNone) +
     tdSection(s.tdEntryPoints, epRows, s.tdNone, connectorSwitch("EP")) +
@@ -2655,10 +2730,12 @@ function applySegmentFocus(segment) {
 
 function focusSegmentItem(segment) {
   if (!segment?.focus) return
-  const focus = segment.focus
+  const token = segment.openToken
   setTimeout(() => {
+    if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
     const info = document.getElementById("segment-info")
-    if (!info || state.sheetKind !== "segment") return
+    if (!info) return
+    const focus = segment.focus
     let target = null
     if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
       target = [...info.querySelectorAll("[data-route-kind]")].find((button) =>
@@ -3635,18 +3712,60 @@ function wireControls() {
     }
     if (state.sheetKind !== "search" || !event.target.matches("#search-input") || !state.search) return
     state.search.query = event.target.value
+    state.search.activeIndex = 0
     if (state.search.query.trim()) state.search.vccArea = null
     renderSearchResults()
   })
+  els.sheet.addEventListener("keydown", (event) => {
+    if (state.sheetKind !== "search" || !event.target.matches("#search-input") || !state.search) return
+    if (event.isComposing || event.keyCode === 229) {
+      if (event.key === "Enter" || event.key === "Escape") event.stopPropagation()
+      return
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      moveSearchActive(event.key === "ArrowDown" ? 1 : -1)
+    } else if (event.key === "Enter") {
+      event.preventDefault()
+      activateSearchActive()
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.target.value) {
+        event.target.value = ""
+        state.search.query = ""
+        state.search.vccArea = null
+        state.search.activeIndex = 0
+        renderSearchResults()
+      } else {
+        closeSheet()
+      }
+    }
+  })
+  els.sheet.addEventListener("touchmove", () => {
+    if (state.sheetKind !== "search") return
+    const input = document.getElementById("search-input")
+    if (input && document.activeElement === input) input.blur()
+  }, { passive: true })
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
     else if (state.sheetKind === "search" && event.target.closest("[data-open-help]")) openHelp()
     else if (state.sheetKind === "search" && event.target.closest("[data-search-retry]")) openSearch()
-    else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
+    else if (state.sheetKind === "search" && event.target.closest("[data-search-example]")) {
+      const input = document.getElementById("search-input")
+      state.search.query = event.target.closest("[data-search-example]").dataset.searchExample
+      state.search.category = "ALL"
+      state.search.vccArea = null
+      state.search.activeIndex = 0
+      if (input) input.value = state.search.query
+      renderSearchResults()
+      input?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
       const button = event.target.closest("[data-search-category]")
       state.search.category = button.dataset.searchCategory
       state.search.vccArea = null
+      state.search.activeIndex = 0
       renderSearchResults()
       document.querySelector(`[data-search-category="${button.dataset.searchCategory}"]`)?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-vcc]")) {
@@ -3660,6 +3779,25 @@ function wireControls() {
       openSegment(state.station, event.target.closest("[data-segment-dir]").dataset.segmentDir)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-direction]")) {
       setSegmentDirection(event.target.closest("[data-segment-direction]").dataset.segmentDirection)
+    } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-opposite]")) {
+      const current = state.segment
+      const fallback = current?.fallback
+      const dir = event.target.closest("[data-segment-opposite]").dataset.track
+      const next = fallback?.oppositeSegment
+      if (!fallback || !next || !["UP", "DOWN"].includes(dir)) return
+      const code = dir === "UP" ? next.from : next.to
+      openSegment(code, dir, {
+        segment: next,
+        segmentId: next.id,
+        fallback: {
+          ...fallback,
+          track: dir,
+          segment: next,
+          oppositeTrack: fallback.track,
+          oppositeSegment: fallback.segment,
+        },
+        focus: { ...current.focus, dir },
+      })
     } else if (state.sheetKind === "segment" && event.target.closest("[data-td-retry]")) {
       const segment = state.segment
       openSegment(segment.from, segment.activeDir, {
@@ -3667,6 +3805,7 @@ function wireControls() {
         segment: { id: segment.segmentId, from: segment.canonicalFrom, to: segment.canonicalTo },
         segmentId: segment.segmentId,
         focus: segment.focus,
+        fallback: segment.fallback,
       })
     } else if (state.sheetKind === "segment" && event.target.closest("[data-ep-connectors]")) {
       state.segment.epConnectors = state.segment.epConnectors === false
@@ -3696,6 +3835,7 @@ function wireControls() {
     }
   })
   document.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return
     if (event.key === "Escape") closeSheet()
     if (event.key === "Tab" && els.sheet.dataset.open === "1") {
       const focusable = [...els.sheet.querySelectorAll("button:not([disabled]), input:not([disabled]), summary, [href], [tabindex]:not([tabindex='-1'])")]

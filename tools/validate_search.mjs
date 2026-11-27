@@ -8,6 +8,7 @@ import {
   mainlineVccAreas,
   pairNeutralZones,
   searchResultMode,
+  searchResultPresentation,
   searchTechnicalIndex,
 } from "../lib/td-search.js"
 
@@ -42,6 +43,14 @@ check(same(counts, {
 }), "搜尋 index 各類別數量正確")
 check(index.items.length === 598, "搜尋 index 共 598 筆")
 check(new Set(index.items.map((item) => item.id)).size === index.items.length, "搜尋結果 ID 唯一")
+const visibleItems = searchTechnicalIndex(index, "", "ALL")
+  .filter((item) => item.kind !== "VCC_AREA" || item.mainline)
+const hiddenVccAreas = index.items
+  .filter((item) => item.kind === "VCC_AREA" && !item.mainline)
+  .map((item) => item.vccArea)
+  .sort((a, b) => a - b)
+check(visibleItems.length === 594, "UI 可見搜尋結果共 594 筆")
+check(same(hiddenVccAreas, [3, 10, 11, 12]), "被排除嘅 VCC 集合剛好為 3、10、11、12")
 
 const facilityKinds = ["VCC_BOUNDARY", "EP", "NR", "EAP", "CPD", "NZ"]
 const missingSegments = index.items.filter((item) => facilityKinds.includes(item.kind) && !item.segment)
@@ -98,6 +107,17 @@ check(tkwEap?.segments?.UP?.id === "14" && tkwEap?.segments?.DOWN?.id === "15"
   && homEap?.segments?.UP?.id === "15" && homEap?.segments?.DOWN?.id === "16"
   && searchResultMode(tkwEap) === "single" && searchResultMode(homEap) === "single",
 "上下行落在相鄰站段嘅 EAP 安全回落單軌，唔會切換後漏掉目標")
+const tkwPresentation = searchResultPresentation(tkwEap)
+const homPresentation = searchResultPresentation(homEap)
+check(tkwPresentation.mode === "single" && tkwPresentation.fallbackReason === "cross-segment-eap"
+  && tkwPresentation.oppositeTrack === "DOWN" && tkwPresentation.oppositeSegment?.id === "15",
+"TKW EAP 回退 metadata 指向 DOWN 站段 15")
+check(homPresentation.mode === "single" && homPresentation.fallbackReason === "cross-segment-eap"
+  && homPresentation.oppositeTrack === "DOWN" && homPresentation.oppositeSegment?.id === "16",
+"HOM EAP 回退 metadata 指向 DOWN 站段 16")
+check(searchResultPresentation(eapWks).fallbackReason === null
+  && searchResultPresentation(cpdNac43).mode === "dual",
+"正常雙軌結果唔會帶跨段回退 metadata")
 const nrAustin = index.items.find((item) => item.id === "nr:NAC-NR-02-107.795")
 check(nrAustin?.segment?.id === "19" && nrAustin.track === "UP", "Niche Room 解析到 AUS—NAC UP 站段")
 
@@ -115,14 +135,33 @@ const epSearch = searchTechnicalIndex(index, "1-2", "EP")
 check(epSearch[0]?.id === "ep:1-2", "搜尋 EP 1-2 將完全匹配排在首位")
 check(!searchTechnicalIndex(index, "1-2", "EP").some((item) => item.id === "ep:1612"),
 "EP 搜尋不會把 1-2 誤配成 1612")
+for (const query of ["EP 1/2", "EP 1－2", "EP 1 2", "EP1/2"]) {
+  check(searchTechnicalIndex(index, query, "EP")[0]?.id === "ep:1-2",
+  `EP 分隔符正規化：${query} → EP 1-2`)
+}
+check(searchTechnicalIndex(index, "EP 1-12", "EP")[0]?.id === "ep:1-12",
+"EP 1-12 保持獨立編號")
+check(searchTechnicalIndex(index, "EP 112", "EP").length === 0
+  && searchTechnicalIndex(index, "EP 12", "EP").length === 0,
+"EP 無分隔符數字唔會被任意拆解")
+check(!searchTechnicalIndex(index, "EP 112", "ALL").some((item) => item.kind === "EP")
+  && !searchTechnicalIndex(index, "EP 12", "ALL").some((item) => item.kind === "EP"),
+"全部類別同樣阻止 EP 無分隔符數字拆解")
 check(searchTechnicalIndex(index, "美孚", "ALL").length > 0
   && searchTechnicalIndex(index, "美孚", "ALL").every((item) => item.searchText.includes("美孚")),
 "車站中文名可以搜尋技術設施")
 check(searchTechnicalIndex(index, "NAC43", "CPD")[0]?.id === "cpd:NAC43", "CPD 編號可以搜尋")
+check(searchTechnicalIndex(index, "NAC 43", "CPD")[0]?.id === "cpd:NAC43", "CPD 編號忽略空格")
 check(searchTechnicalIndex(index, "WKS EAP 13", "EAP")[0]?.id === "eap:WKS EAP 13", "EAP 名稱可以搜尋")
 check(searchTechnicalIndex(index, "HP 601", "NZ")[0]?.id === "nz:HP", "Neutral Zone 編號可以搜尋")
+check(searchTechnicalIndex(index, "HP601", "NZ")[0]?.id === "nz:HP", "Neutral Zone compact 編號可以搜尋")
+check(searchTechnicalIndex(index, "ＨＰ６０１", "NZ")[0]?.id === "nz:HP", "Neutral Zone 全形編號可以搜尋")
 check(searchTechnicalIndex(index, "6-7", "VCC").some((item) => item.id === "vcc-boundary:6:7"),
 "VCC 交界可以搜尋")
+for (const query of ["VCC 6/7", "VCC 6↔7", "VCC67"]) {
+  check(searchTechnicalIndex(index, query, "VCC").some((item) => item.id === "vcc-boundary:6:7"),
+  `VCC 分隔符正規化：${query} → VCC 6↔7`)
+}
 
 if (failed) {
   console.error(`✗ 技術搜尋驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

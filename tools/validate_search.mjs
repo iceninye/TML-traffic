@@ -5,8 +5,10 @@ import {
   buildTechnicalSearchIndex,
   entryPointsByVccArea,
   findSegmentForChainage,
+  groupCpdsBySegment,
   mainlineVccAreas,
   pairNeutralZones,
+  searchResultMatchTier,
   searchResultMode,
   searchResultPresentation,
   searchTechnicalIndex,
@@ -162,6 +164,35 @@ for (const query of ["VCC 6/7", "VCC 6↔7", "VCC67"]) {
   check(searchTechnicalIndex(index, query, "VCC").some((item) => item.id === "vcc-boundary:6:7"),
   `VCC 分隔符正規化：${query} → VCC 6↔7`)
 }
+
+const epUp = searchTechnicalIndex(index, "", "EP", "UP")
+const epDown = searchTechnicalIndex(index, "", "EP", "DOWN")
+check(epUp[0]?.track === "UP" && epDown[0]?.track === "DOWN",
+"EP 空查詢按所選方向先列同軌項目")
+const epAliasRows = searchTechnicalIndex(index, "EP 1/2", "EP", "UP")
+const epAliasGroups = epAliasRows
+  .map((item) => `${searchResultMatchTier(item, "EP 1/2")}:${item.track}`)
+  .filter((key, position, all) => position === 0 || key !== all[position - 1])
+check(epAliasGroups[0] === "0:DOWN" && new Set(epAliasGroups).size === epAliasGroups.length,
+"EP 完全匹配與部分匹配分成連續組，唔會重複軌道標題")
+const epDownSegments = epDown.filter((item) => item.track === "DOWN").map((item) => Number(item.segment?.id))
+check(epDownSegments.every((id, position) => position === 0 || id <= epDownSegments[position - 1]),
+"EP DOWN 列表沿 TUM→WKS 方向排列")
+
+const cpdUp = searchTechnicalIndex(index, "", "CPD", "UP")
+const cpdDown = searchTechnicalIndex(index, "", "CPD", "DOWN")
+const cpdUpSegments = [...new Set(cpdUp.map((item) => item.segment?.id))]
+const cpdDownSegments = [...new Set(cpdDown.map((item) => item.segment?.id))]
+check(same(cpdUpSegments, ["11", "12", "18", "19", "20", "21", "22"]),
+"CPD UP 列表按 WKS→TUM 路段排列")
+check(same(cpdDownSegments, ["22", "21", "20", "19", "18", "12", "11"]),
+"CPD DOWN 列表按 TUM→WKS 路段排列")
+const cpdGroups = groupCpdsBySegment(cpdUp)
+check(cpdGroups.length === 7 && cpdGroups.reduce((sum, group) => sum + group.items.length, 0) === 260
+  && cpdGroups.every((group) => group.items.every((item) => item.segment?.id === group.id)),
+"CPD 按路段分成 7 組，完整收錄 260 筆")
+check(Math.max(...cpdGroups.map((group) => group.items.length)) === 103,
+"最大 CPD 路段組為 103 筆")
 
 if (failed) {
   console.error(`✗ 技術搜尋驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, mainlineVccAreas, searchResultPresentation, searchTechnicalIndex } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, mainlineVccAreas, searchResultMatchTier, searchResultPresentation, searchTechnicalIndex } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -740,6 +740,28 @@ function searchQuickHtml() {
     `</div><button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button></div>`
 }
 
+function searchDirectionSwitchHtml() {
+  const s = t()
+  const direction = state.search?.direction === "DOWN" ? "DOWN" : "UP"
+  return `<div class="search-direction" role="group" aria-label="${s.searchDirection}"><span>${s.searchDirection}</span>` +
+    `<button type="button" data-search-direction="UP" aria-pressed="${direction === "UP"}">▲ ${s.up}</button>` +
+    `<button type="button" data-search-direction="DOWN" aria-pressed="${direction === "DOWN"}">▼ ${s.down}</button></div>`
+}
+
+function syncSearchChips() {
+  const category = state.search?.category
+  document.querySelectorAll("[data-search-category]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.searchCategory === category))
+  })
+}
+
+function syncSearchDirection() {
+  const direction = state.search?.direction === "DOWN" ? "DOWN" : "UP"
+  document.querySelectorAll("[data-search-direction]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.searchDirection === direction))
+  })
+}
+
 function searchShellHtml() {
   const s = t()
   const search = state.search
@@ -749,6 +771,7 @@ function searchShellHtml() {
     `<div class="search-head"><h2>${s.searchTitle}</h2><div class="sub">${s.searchIntro}</div></div>` +
     `<label class="search-input-wrap"><input id="search-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
     `<div class="search-chips" role="group" aria-label="${s.searchTitle}">${chips}</div>` +
+    searchDirectionSwitchHtml() +
     searchQuickHtml() +
     `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>`
 }
@@ -757,7 +780,7 @@ function openSearch() {
   state.selected = null
   state.station = null
   state.segment = null
-  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0 }
+  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0, direction: "UP", expandedCpdGroups: new Set(), collapsedCpdGroups: new Set() }
   setFollow(false)
   openSheet(searchShellHtml(), "search")
   loadSearchIndex().then((index) => {
@@ -854,7 +877,7 @@ function renderEpSearchHierarchy() {
   const group = groups.get(search.vccArea)
   if (!group) return `<p class="empty">${s.searchNoResults}</p>`
   const directionSection = (dir, label) => {
-    const rows = group[dir]
+    const rows = dir === "DOWN" ? [...group[dir]].reverse() : group[dir]
     const byChainage = new Map()
     for (const item of rows) {
       const key = chainageText(item.chainageKm)
@@ -867,14 +890,82 @@ function renderEpSearchHierarchy() {
         items.map((item) => `<button type="button" class="search-ep-code ${item.direction === "WKS" ? "green" : "yellow"}" data-search-result="${escapeHtml(item.id)}" data-default-dir="${dir}" title="${item.direction === "WKS" ? s.tdWksDirection : s.tdTumDirection}">${escapeHtml(item.label.replace(/^EP /u, ""))}</button>`).join("") +
         `</div><span>${km} km</span></div>`).join("") + `</section>`
   }
+  const up = directionSection("UP", `${s.up} · ${s.toTum}`)
+  const down = directionSection("DOWN", `${s.down} · ${s.toWks}`)
   return `<button type="button" class="search-back" data-search-vcc="all">← ${s.searchBack}</button>` +
-    directionSection("UP", `${s.up} · ${s.toTum}`) + directionSection("DOWN", `${s.down} · ${s.toWks}`)
+    (search.direction === "DOWN" ? down + up : up + down)
+}
+
+function searchTrackGroup(item) {
+  const direction = state.search?.direction === "DOWN" ? "DOWN" : "UP"
+  if (item.track === direction) return direction
+  if (item.track === "BOTH") return "BOTH"
+  if (item.track === "UP" || item.track === "DOWN") return item.track
+  return "OTHER"
+}
+
+function searchTrackGroupLabel(group) {
+  const s = t()
+  return {
+    UP: s.searchGroupUp,
+    DOWN: s.searchGroupDown,
+    BOTH: s.searchGroupBoth,
+    OTHER: s.searchGroupOther,
+  }[group] ?? s.searchGroupOther
+}
+
+function searchCpdGroupButton(group, index, expanded) {
+  const s = t()
+  const segment = group.segment
+  const from = segment ? network.name(segment.from, LANG) : s.searchGroupOther
+  const to = segment ? network.name(segment.to, LANG) : ""
+  const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
+  const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
+  const tracks = [...new Set(group.items.map((item) => item.track))].sort().join(" / ")
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-cpd-group" data-cpd-group="${escapeHtml(group.id)}">` +
+    `<span class="search-result-badge cpd">${s.searchCpd}</span>` +
+    `<span class="search-result-main"><strong>${s.searchCpdGroup(from, to, group.items.length)}</strong><span>${escapeHtml(tracks)}${range ? ` · ${range}` : ""}</span></span>` +
+    `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
+}
+
+function flatSearchResultsHtml(rows) {
+  const search = state.search
+  let html = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>`
+  let optionIndex = 0
+  if (search.category === "CPD") {
+    for (const group of groupCpdsBySegment(rows)) {
+      const expanded = search.query.trim()
+        ? !search.collapsedCpdGroups.has(group.id)
+        : search.expandedCpdGroups.has(group.id)
+      html += searchCpdGroupButton(group, optionIndex++, expanded)
+      if (expanded) {
+        html += `<div class="search-cpd-items" role="group" aria-label="${escapeHtml(group.id)}">` +
+          group.items.map((item) => searchResultButton(item, item.defaultDir, optionIndex++)).join("") + `</div>`
+      }
+    }
+    return html
+  }
+  let lastGroup = null
+  for (const item of rows) {
+    const tier = searchResultMatchTier(item, search.query)
+    const trackGroup = searchTrackGroup(item)
+    const group = `${tier}:${trackGroup}`
+    if (group !== lastGroup) {
+      const label = tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(trackGroup)
+      html += `<div class="search-result-group" role="presentation">${label}</div>`
+      lastGroup = group
+    }
+    html += searchResultButton(item, item.defaultDir, optionIndex++)
+  }
+  return html
 }
 
 function renderSearchResults() {
   const search = state.search
   const body = document.getElementById("search-results")
   if (!search || !body) return
+  syncSearchChips()
+  syncSearchDirection()
   if (search.status === "loading") {
     clearSearchActive()
     body.innerHTML = `<p class="empty">${t().searchLoading}</p>`
@@ -891,7 +982,7 @@ function renderSearchResults() {
     body.innerHTML = renderEpSearchHierarchy()
     return
   }
-  const rows = searchTechnicalIndex(tdSearchIndex, search.query, search.category)
+  const rows = searchTechnicalIndex(tdSearchIndex, search.query, search.category, search.direction)
     .filter((item) => item.kind !== "VCC_AREA" || item.mainline)
   if (!rows.length) {
     clearSearchActive()
@@ -899,8 +990,7 @@ function renderSearchResults() {
     return
   }
   body.setAttribute("role", "listbox")
-  body.innerHTML = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>` +
-    rows.map((item, index) => searchResultButton(item, item.defaultDir, index)).join("")
+  body.innerHTML = flatSearchResultsHtml(rows)
   setSearchActive(search.activeIndex)
 }
 
@@ -3713,6 +3803,7 @@ function wireControls() {
     if (state.sheetKind !== "search" || !event.target.matches("#search-input") || !state.search) return
     state.search.query = event.target.value
     state.search.activeIndex = 0
+    state.search.collapsedCpdGroups.clear()
     if (state.search.query.trim()) state.search.vccArea = null
     renderSearchResults()
   })
@@ -3758,14 +3849,36 @@ function wireControls() {
       state.search.category = "ALL"
       state.search.vccArea = null
       state.search.activeIndex = 0
+      state.search.collapsedCpdGroups.clear()
       if (input) input.value = state.search.query
       renderSearchResults()
       input?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-search-direction]")) {
+      const button = event.target.closest("[data-search-direction]")
+      state.search.direction = button.dataset.searchDirection === "DOWN" ? "DOWN" : "UP"
+      state.search.activeIndex = 0
+      renderSearchResults()
+      document.querySelector(`[data-search-direction="${state.search.direction}"]`)?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-cpd-group]")) {
+      const button = event.target.closest("[data-cpd-group]")
+      const id = button.dataset.cpdGroup
+      const expanded = button.getAttribute("aria-expanded") === "true"
+      if (expanded) {
+        state.search.expandedCpdGroups.delete(id)
+        state.search.collapsedCpdGroups.add(id)
+      } else {
+        state.search.expandedCpdGroups.add(id)
+        state.search.collapsedCpdGroups.delete(id)
+      }
+      state.search.activeIndex = Number(button.id.replace("search-option-", ""))
+      renderSearchResults()
+      document.getElementById("search-input")?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
       const button = event.target.closest("[data-search-category]")
       state.search.category = button.dataset.searchCategory
       state.search.vccArea = null
       state.search.activeIndex = 0
+      state.search.collapsedCpdGroups.clear()
       renderSearchResults()
       document.querySelector(`[data-search-category="${button.dataset.searchCategory}"]`)?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-vcc]")) {

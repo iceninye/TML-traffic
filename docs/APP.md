@@ -91,12 +91,14 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 ### 技術搜尋同雙軌放大圖（2026-11-27）
 
-右上角「尋找」取代原本嘅「？説明」入口，但圖例同說明保留喺搜尋 sheet 底部。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
+右上角「尋找」取代原本嘅「？説明」入口，圖例同說明保留喺搜尋 sheet 頂部快捷列。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
 
+- 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。
+- CPD 結果按站段摺疊，頂層顯示車站、軌道、數量同 chainage 範圍；空查詢預設收合，搜尋時自動展開。
 - 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。
 - 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
-- 雙軌圖右欄右上角有上行／下行 switch；頂部先顯示雙向摘要，詳細資料跟 switch 切換。
+- 雙軌圖右欄右上角有上行／下行 switch；頂部先顯示雙向摘要，詳細資料跟 switch 切換。手機版雙軌改為全闊上下排版，路線圖唔再被右欄壓窄。
 - TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
 - EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
 - `tools/validate_search.mjs` 驗證 598 筆 index、594 筆主線可見結果、被排除 VCC 集合、站段解析、VCC 範圍、EP 分組、Neutral Zone 配對、格式迴歸同跨段 EAP metadata。

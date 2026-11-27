@@ -3838,7 +3838,9 @@ function wireControls() {
     if (event.isComposing || event.keyCode === 229) return
     if (event.key === "Escape") closeSheet()
     if (event.key === "Tab" && els.sheet.dataset.open === "1") {
-      const focusable = [...els.sheet.querySelectorAll("button:not([disabled]), input:not([disabled]), summary, [href], [tabindex]:not([tabindex='-1'])")]
+      const focusable = [...els.sheet.querySelectorAll(
+        "button:not([disabled]):not([tabindex='-1']), input:not([disabled]):not([tabindex='-1']), summary:not([tabindex='-1']), [href]:not([tabindex='-1']), [tabindex]:not([tabindex='-1'])"
+      )]
         .filter((element) => element.getClientRects().length > 0)
       if (!focusable.length) return
       const first = focusable[0]

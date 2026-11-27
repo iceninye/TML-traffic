@@ -710,7 +710,7 @@ svg.diagram {
 .segment-name { font-size: 13px; }
 
 .segment-connectors { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.segment-ep-connector, .segment-eap-connector { fill: none; stroke-width: 1.25; stroke-linecap: round; }
+.segment-ep-connector, .segment-nr-connector, .segment-eap-connector { fill: none; stroke-width: 1.25; stroke-linecap: round; }
 .segment-info {
   min-width: 0;
   overflow-y: auto;
@@ -794,10 +794,12 @@ svg.diagram {
 .td-ep-group .td-meta, .td-point-group .td-meta { margin-top: 2px; }
 .point-dot { padding: 0; cursor: pointer; opacity: 0.55; transition: opacity 0.15s ease, box-shadow 0.15s ease; }
 .point-dot[aria-pressed="true"] { opacity: 1; }
-.eap-dot, .cpd-dot { display: inline-block; flex: 0 0 auto; width: 14px; height: 14px; border: 1px solid #fff; border-radius: 50%; }
+.eap-dot, .cpd-dot, .nr-dot { display: inline-block; flex: 0 0 auto; width: 14px; height: 14px; border: 1px solid #fff; border-radius: 50%; }
 .eap-dot { background: #ff7a59; box-shadow: 0 0 6px rgba(255, 122, 89, 0.45); }
 .cpd-dot { background: #67c7ff; box-shadow: 0 0 6px rgba(103, 199, 255, 0.45); }
-.point-dot:focus-visible, .ep-dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.nr-dot { background: #d65db1; box-shadow: 0 0 6px rgba(214, 93, 177, 0.45); }
+.nr-dot[aria-pressed="true"] { box-shadow: 0 0 0 3px rgba(214, 93, 177, 0.2), 0 0 12px #d65db1; }
+.point-dot:focus-visible, .ep-dot:focus-visible, .nr-dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .segment-route-base { opacity: 0.8; }
 .segment-station-jump { pointer-events: none; }
 .segment-station-jump circle { fill: var(--panel-2); stroke: var(--edge); stroke-width: 1; }
@@ -807,9 +809,11 @@ svg.diagram {
 .segment-neutral-zone { opacity: 1; stroke: #fff; stroke-width: 1; }
 .segment-neutral-label { fill: var(--text); font-size: 8px; font-weight: 700; }
 .segment-ep-control { opacity: 1; pointer-events: none; }
+.segment-nr-control { opacity: 1; pointer-events: none; }
 .segment-ep-dot { stroke: #fff; stroke-width: 2; animation: segment-ep-flash 3.6s steps(1, end) infinite; }
 .segment-ep-dot.green { fill: #58c77a; --ep-color: #58c77a; }
 .segment-ep-dot.yellow { fill: #f5c451; --ep-color: #f5c451; }
+.segment-nr-dot { fill: #d65db1; stroke: #fff; stroke-width: 2; --ep-color: #d65db1; animation: segment-ep-flash 3.6s steps(1, end) infinite; }
 .segment-cpd-dot { fill: #168aad; stroke: #fff; stroke-width: 0.75; --marker-color: #168aad; animation: segment-marker-flash 3.6s steps(1, end) infinite; }
 .segment-eap-dot { fill: #c64d32; stroke: #fff; stroke-width: 0.75; --marker-color: #c64d32; animation: segment-marker-flash 3.6s steps(1, end) infinite; }
 @keyframes segment-ep-flash {
@@ -835,10 +839,10 @@ svg.diagram {
   88% { opacity: 1; filter: drop-shadow(0 0 3px var(--marker-color)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .segment-ep-dot, .segment-cpd-dot, .segment-eap-dot { animation: none; }
+  .segment-ep-dot, .segment-nr-dot, .segment-cpd-dot, .segment-eap-dot { animation: none; }
 }
-.segment-ep-code { fill: var(--text); font-size: 9.5px; font-weight: 700; }
-.segment-ep-code.overlap { fill: #fff; paint-order: stroke; stroke: #041018; stroke-width: 3px; stroke-linejoin: round; }
+.segment-ep-code, .segment-nr-code { fill: var(--text); font-size: 9.5px; font-weight: 700; }
+.segment-ep-code.overlap, .segment-nr-code.overlap { fill: #fff; paint-order: stroke; stroke: #041018; stroke-width: 3px; stroke-linejoin: round; }
 .segment-vcc-line { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 5 5; }
 .segment-vcc-label { fill: var(--bad); font-size: 9.5px; font-weight: 700; }
 .segment-vcc-km { font-variant-numeric: tabular-nums; }

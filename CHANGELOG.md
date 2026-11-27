@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.9.0 — 2026-11-26 (`42bf1a1`, test branch)
+## v0.9.0 — 2026-11-26 (`74f888b`, test branch)
 - 兩站之間新增左右軌點擊：撳上行軌開嗰段上行、撳下行軌開嗰段下行；放大圖只顯示所選方向一條軌，右邊列 Entry Point、CPD、Neutral Zone 同 VCC 交界。點站名仍然只開站卡。
 - 引入 `TD_TML` 官方 chainage 同 27 段技術資料；EP 固定黃色往屯門、綠色往烏溪沙，顯示格式為 `16-3`／`16-5`，唔隨軌道對調。
 - 移除左上角橙色掣；有適用 Duty Sheet 時，Run 編號同「全日更份」直接可用。
@@ -32,9 +32,12 @@ release commits stamped in the page footer.
 - 列車層移到站段跳轉層之上，端站停靠列車唔會被跳轉 hit area 攔截；跳轉掣加 idle 圖示。
 - 關閉 sheet 時清除 `data-kind`；footer 改返 release-time commit stamp，移除 runtime GitHub API 依賴。
 - 跳轉 icon 移到列車層之上但保持 `pointer-events: none`，永遠可見且不攔截列車點擊。
-- `paintSegmentInfo()` 補返 range null guard；減少動態效果下停止 EP／CPD／EAP 閃動。
+- `paintSegmentInfo()` 補返 range null guard；減少動態效果下停止 EP／Niche Room／CPD／EAP 閃動。
 - Shell cache renamed `v95`。
 - 新增 `tools/validate_td.mjs` 並加入 CI。
+- TD 技術資料升級至 schema `2.3.5`，加入 17 個 Niche Room；放大圖右欄次序為 EP → Niche Room → EAP → CPD，支援 EP 式三態 marker、獨立連線 switch 同 magenta `#d65db1` 連線。
+- Niche Room 更新為 `verified-full-line`，加入 UP 10／DN 7 track assignment、修正 Kwai Tsing Tunnel section 同 PDF page；查詢按所選方向過濾，唔會跨軌。
+- Shell cache renamed `v97`。
 
 ## v0.8.39 — 2026-11-18 (`ad79417`)
 - Run 851 自 11 月 19 日起取消（用戶 2026-11-18 確認）。保留 11 月 9–13 日，補回原定本星期 11 月 16–18 日嘅加班車；19 日及之後唔加入 Run 851。行車時間、其他班次同 17 日指定 Duty Sheet 8027 不變。

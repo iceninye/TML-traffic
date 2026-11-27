@@ -69,14 +69,14 @@ lib/mtr-*.js          抽取返嚟嘅估算引擎（串連各站倒數 → 列�
 worker/               可選：港鐵班次邊緣快取 Worker（預設關閉，見 worker/README.md）
 lib/tml-model.js      時間表位置模型（行車 + 停站 + S 曲線 + 時段）
 lib/tml-timetable.js  時間表對應：讀數 → 班次 → 延誤 → 位置
-lib/td-infrastructure.js TD_TML EP／CPD／Neutral Zone／VCC 站段查詢
+lib/td-infrastructure.js TD_TML EP／Niche Room／EAP／CPD／Neutral Zone／VCC 站段查詢
 lib/tml-motion.js     追蹤 + 列車時鐘平滑
 lib/maplibre/*.mjs    vendored MapLibre GL 6.12.0（1.2 MB，lazy load）
 data/tml-network.json 27 站
 data/tml-timetable.json 站距 / 行車 / 停站 / 時段（tools/build_data.py 生成）
 data/tml-track.json   OSM 真實走綫（tools/build_data.py 生成，ODbL）
 data/td-segments.json TD_TML 27 段官方 chainage 對照
-data/td-tml-v2_3_4.json TD_TML 全線技術資料（EP／CPD／NZ／VCC）
+data/td-tml-v2_3_5.json TD_TML 全線技術資料（EP／Niche Room／EAP／CPD／NZ／VCC）
 data/timetables/       工作時間表（index.json 清單 + 每份一個 <代號>.json）
 data/duties/           更份卡片（index.json + DS<代號>.json）
 data/calendar.json    公眾假期同「某日用邊份」（人手維護）

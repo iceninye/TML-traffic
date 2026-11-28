@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.9 — 2026-11-28 (`pending`, test branch)
+## v0.11.9 — 2026-11-28 (`2d2d07e`, test branch)
 - 技術資料面板固定展開，移除收合／展開掣同三態抽屜；窄屏保留靜態標題同設施總數。
 - 路線 EP、CPD、Niche Room、EAP、Neutral Zone 同 VCC 交界 marker 改為可點擊，行為與搜尋結果一致：選取設施、自動捲到清單項目並顯示直線連線。
 - 點擊另一軌 marker 會自動切換 UP／DOWN；補上 CPD／EAP／NZ／VCC 嘅透明加大觸控範圍。

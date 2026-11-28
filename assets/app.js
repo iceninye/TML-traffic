@@ -3318,6 +3318,7 @@ function paintSegmentInfrastructure() {
 
     const vccFrom = dir === "UP" ? records.vccTo : records.vccFrom
     const vccTo = dir === "UP" ? records.vccFrom : records.vccTo
+    const showVccLabels = isWideSegmentLayout() || dir === segment.activeDir
     for (const boundary of records.vccBoundaries) {
       const values = chainageValues(boundary.values).filter(Number.isFinite)
       if (!values.length) continue
@@ -3335,9 +3336,11 @@ function paintSegmentInfrastructure() {
       })
       trackLayer.append(
         line,
-        make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
-        make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
-        make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+        ...(showVccLabels ? [
+          make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
+          make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
+          make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+        ] : []),
       )
     }
 

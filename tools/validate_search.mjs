@@ -9,6 +9,7 @@ import {
   mainlineVccAreas,
   pairNeutralZones,
   searchResultChainageText,
+  searchResultChainageValues,
   searchResultDirection,
   searchResultEndpoints,
   searchResultMatchTier,
@@ -257,6 +258,77 @@ check(cpdDownGroups.length === 7 && cpdDownGroups.every((group) => group.directi
   && cpdDownGroups[0]?.id === "22"
   && same(segmentEndpoints(cpdDownGroups[0]?.segment, "DOWN"), { from: "KSR", to: "TWW" }),
 "CPD DOWN 摺疊組標題沿 TUM→WKS 反轉")
+
+const visiblePartition = {
+  UP: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "UP").length,
+  DOWN: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "DOWN").length,
+  BOTH: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "BOTH").length,
+  VCC_AREA: visibleItems.filter((item) => item.kind === "VCC_AREA").length,
+}
+check(same(visiblePartition, { UP: 158, DOWN: 136, BOTH: 292, VCC_AREA: 8 })
+  && Object.values(visiblePartition).reduce((sum, count) => sum + count, 0) === visibleItems.length,
+"594 筆可見結果完整拆分為 158 UP、136 DOWN、292 共用設施同 8 個 VCC 區域")
+
+const indexSnapshot = JSON.stringify(index)
+const stationArraysSnapshot = visibleItems.map((item) => JSON.stringify(item.data?.stations ?? item.stations))
+for (const selected of ["UP", "DOWN", "UP"]) {
+  for (const item of visibleItems) {
+    searchResultDirection(item, selected)
+    searchResultSegment(item, selected)
+    searchResultEndpoints(item, selected)
+    searchResultChainageValues(item, selected)
+    searchResultChainageText(item, selected)
+    searchResultStations(item, selected)
+  }
+}
+check(JSON.stringify(index) === indexSnapshot
+  && visibleItems.every((item, position) => JSON.stringify(item.data?.stations ?? item.stations) === stationArraysSnapshot[position]),
+"反覆切換上下行唔會改動搜尋 index、站段物件或 VCC 車站陣列")
+
+const expectedCrossSegmentEap = {
+  "eap:TKW EAP": {
+    UP: { segment: "14", endpoints: { from: "SUW", to: "TKW" }, chainage: "100.591 km" },
+    DOWN: { segment: "15", endpoints: { from: "HOM", to: "TKW" }, chainage: "100.602 km" },
+  },
+  "eap:HOM EAP": {
+    UP: { segment: "15", endpoints: { from: "TKW", to: "HOM" }, chainage: "101.617 km" },
+    DOWN: { segment: "16", endpoints: { from: "HUH", to: "HOM" }, chainage: "101.641 km" },
+  },
+}
+for (const [id, directions] of Object.entries(expectedCrossSegmentEap)) {
+  const item = index.items.find((row) => row.id === id)
+  for (const [direction, expected] of Object.entries(directions)) {
+    check(searchResultSegment(item, direction)?.id === expected.segment
+      && same(searchResultEndpoints(item, direction), expected.endpoints)
+      && searchResultChainageText(item, direction) === expected.chainage,
+      `${id} ${direction} 明確使用站段 ${expected.segment}、${expected.endpoints.from}→${expected.endpoints.to} 同 ${expected.chainage}`)
+  }
+}
+
+for (const direction of ["UP", "DOWN"]) {
+  const cpdGroups = groupCpdsBySegment(searchTechnicalIndex(index, "", "CPD", direction), direction)
+  const orderingErrors = []
+  const missingChainages = []
+  for (const group of cpdGroups) {
+    let previous = null
+    for (const item of group.items) {
+      const values = searchResultChainageValues(item, direction)
+      if (!values.length) {
+        missingChainages.push(item.id)
+        continue
+      }
+      const km = Math.min(...values)
+      if (previous != null && (direction === "UP" ? km < previous : km > previous)) {
+        orderingErrors.push(`${group.id}:${item.id}:${km}`)
+      }
+      previous = km
+    }
+  }
+  check(orderingErrors.length === 0,
+  `CPD ${direction} 全部 7 組組內 chainage 單調排列${orderingErrors.length ? `：${orderingErrors.slice(0, 5).join("、")}` : ""}`)
+  check(missingChainages.length === 0,
+  `CPD ${direction} 全部 260 筆都有有效 chainage，唔使用捏造排序值`)
+}
 
 if (failed) {
   console.error(`✗ 技術搜尋驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

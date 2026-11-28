@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.3 — 2026-11-28 (pending stamp, test branch)
+- 窄屏雙軌 VCC 界線只喺目前所選軌道顯示 label，避免 360px 兩組文字重疊；寬屏仍保留雙軌 label。
+- CPD 摺疊組內改為先按行車方向 chainage 排列，軌道優先次序只作同里程 tie-break；修正 AUS—NAC（站段 19）組內跳序。
+- 修正窄屏詳情卡關閉掣負 margin 造成嘅輕微橫向溢出。
+- 搜尋 validator 增至 79 項，加入 594 筆結果完整分類、反覆切換不可變性、TKW／HOM EAP 四組方向組合，以及雙向 CPD 組內單調性檢查。
+- Shell cache renamed `v105`。
+
 ## v0.11.2 — 2026-11-28 (`2deabb7`, test branch)
 - 修正技術搜尋方向顯示：DOWN 設施統一反轉端點，雙向設施跟隨所選 UP／DOWN，唔再顯示 WKS→TUM canonical 方向充當下行。
 - 搜尋結果、CPD 摺疊組標題、VCC 車站清單及 chainage metadata 全部方向感知；TKW／HOM EAP 下行改用正確方向專屬站段。

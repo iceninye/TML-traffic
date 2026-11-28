@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.12", commit: "9a8e1a0" }
+const BUILD = { version: "0.11.13", commit: "9a8e1a0" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -131,6 +131,7 @@ const state = {
   station: null,
   segment: null,
   search: null,
+  searchReturn: null,
 }
 
 let network = null
@@ -1068,6 +1069,11 @@ function openSearchResult(id, defaultDir = null) {
     oppositeSegment: presentation.oppositeSegment,
     focusId: rawId,
   } : null
+  state.searchReturn = {
+    search: state.search,
+    scrollTop: els.sheet.scrollTop,
+    activeIndex: state.search.activeIndex,
+  }
   openSegment(code, dir, {
     dual: presentation.mode === "dual",
     segment,
@@ -2236,6 +2242,25 @@ function closeSheet() {
   const wasOpen = els.sheet.dataset.open === "1"
   const returnTo = sheetTrigger
   resetSheetDrag()
+  if (wasOpen && state.sheetKind === "segment" && state.searchReturn?.search) {
+    const snapshot = state.searchReturn
+    state.search = snapshot.search
+    state.searchReturn = null
+    state.selected = null
+    state.station = null
+    state.segment = null
+    delete els.sheet.dataset.mode
+    delete els.sheet.dataset.drawer
+    delete els.sheet.dataset.segmentLayout
+    openSheet(searchShellHtml(), "search")
+    renderSearchResults()
+    requestAnimationFrame(() => {
+      els.sheet.scrollTop = snapshot.scrollTop
+      if (snapshot.activeIndex >= 0) setSearchActive(snapshot.activeIndex)
+      document.getElementById("search-input")?.focus({ preventScroll: true })
+    })
+    return
+  }
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
   delete els.sheet.dataset.kind
@@ -2251,6 +2276,7 @@ function closeSheet() {
   state.station = null
   state.segment = null
   state.search = null
+  state.searchReturn = null
   sheetTrigger = null
   setFollow(false)
   if (wasOpen) setTimeout(() => returnTo?.isConnected && returnTo.focus({ preventScroll: true }), 0)
@@ -2530,6 +2556,7 @@ function openSegment(code, dir, options = {}) {
   }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
+  els.sheet.scrollTop = 0
   els.sheet.dataset.mode = dual ? "dual" : "single"
   els.sheet.dataset.drawer = state.segment.drawer
   syncSegmentDrawer()

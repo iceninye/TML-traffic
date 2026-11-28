@@ -95,7 +95,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 - 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。結果端點、雙向項目點擊方向、CPD 組標題、VCC 車站次序同 chainage metadata 都跟實際顯示方向。
 - CPD 結果按站段摺疊，頂層顯示車站、軌道、數量同 chainage 範圍；空查詢預設收合，搜尋時自動展開。
-- 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。
+- 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。由搜尋結果開站段圖後按 `X` 會返回原搜尋結果，保留查詢、類別／VCC 區域、方向、摺疊同 active 狀態及 sheet 捲動位置；再按搜尋 `X` 才回主頁。非搜尋入口開嘅站段圖仍直接關回主頁。
 - 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
 - 所有螢幕尺寸都維持左右排版：左邊係軌圖，右邊係技術資料；640px 以上使用較闊雙欄、獨立捲動同 SVG 連線，640px 以下技術資料固定展開，只保留靜態標題／總數，唔再提供收合或展開。667×375 矮橫屏使用緊湊頂列。

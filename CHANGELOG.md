@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.3 — 2026-11-28 (pending stamp, test branch)
+## v0.11.3 — 2026-11-28 (`9f552b2`, test branch)
 - 窄屏雙軌 VCC 界線只喺目前所選軌道顯示 label，避免 360px 兩組文字重疊；寬屏仍保留雙軌 label。
 - CPD 摺疊組內改為先按行車方向 chainage 排列，軌道優先次序只作同里程 tie-break；修正 AUS—NAC（站段 19）組內跳序。
 - 修正窄屏詳情卡關閉掣負 margin 造成嘅輕微橫向溢出。

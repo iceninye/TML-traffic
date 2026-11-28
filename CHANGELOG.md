@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.2 — 2026-11-28 (`pending`, test branch)
+## v0.11.2 — 2026-11-28 (`2deabb7`, test branch)
 - 修正技術搜尋方向顯示：DOWN 設施統一反轉端點，雙向設施跟隨所選 UP／DOWN，唔再顯示 WKS→TUM canonical 方向充當下行。
 - 搜尋結果、CPD 摺疊組標題、VCC 車站清單及 chainage metadata 全部方向感知；TKW／HOM EAP 下行改用正確方向專屬站段。
 - 搜尋 validator 增至 69 項，加入全線 594 筆結果嘅方向端點、雙向點擊方向、跨段 EAP、CPD 分組及 chainage 迴歸。

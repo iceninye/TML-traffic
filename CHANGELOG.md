@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.12 — 2026-11-28 (`pending`, test branch)
+## v0.11.12 — 2026-11-28 (`9a8e1a0`, test branch)
 - 恢復右邊 EP／CPD／Niche Room／EAP 掣切換至「全部」時嘅全部連線：窄屏依家跟隨已顯示 marker 逐項連到右邊按鈕，唔再要求 `focus`。
 - 單項模式仍只連所選項目；關掉連線 switch 或全部 marker 收起時隱藏連線。
 - 真實 393×852 WebKit touch 驗證：EP 全部模式 4 條、CPD 8 條、NR 1 條、EAP 3 條，截圖確認直線可見。

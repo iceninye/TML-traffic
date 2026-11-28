@@ -6,12 +6,21 @@ import {
   entryPointsByVccArea,
   findSegmentForChainage,
   groupCpdsBySegment,
+  groupEntryPointsByPrefix,
+  groupTechnicalSearchRows,
   mainlineVccAreas,
   pairNeutralZones,
+  searchResultChainageText,
+  searchResultChainageValues,
+  searchResultDirection,
+  searchResultEndpoints,
   searchResultMatchTier,
   searchResultMode,
   searchResultPresentation,
+  searchResultSegment,
+  searchResultStations,
   searchTechnicalIndex,
+  segmentEndpoints,
 } from "../lib/td-search.js"
 
 let failed = 0
@@ -93,6 +102,32 @@ check([...epGroups.values()].reduce((sum, group) => sum + group.UP.length + grou
 check(same(epGroups.get(1)?.UP.map((item) => item.data.id).slice(0, 3), ["1-43", "1-1", "1-3"])
   && same(epGroups.get(1)?.DOWN.map((item) => item.data.id).slice(0, 3), ["1-44", "1-2", "1-5"]),
 "VCC 1 UP／DOWN EP 按 chainage 排序")
+
+const epRows = index.items.filter((item) => item.kind === "EP")
+const epUnits = groupEntryPointsByPrefix(epRows)
+check(same(epUnits.map((group) => [group.id, group.items.length]), [
+  ["16", 30], ["14", 16], ["7", 32], ["6", 32],
+  ["5", 24], ["1", 40], ["2", 28], ["4", 38],
+]), "240 筆 EP 按正式編號開首整合成 8 個摺疊組")
+const groupedEpIds = epUnits.flatMap((group) => group.items.map((item) => item.id))
+check(groupedEpIds.length === 240 && new Set(groupedEpIds).size === 240
+  && same([...groupedEpIds].sort(), epRows.map((item) => item.id).sort()),
+"EP 摺疊分組完整收錄 240 筆，無遺漏或重複")
+for (const [direction, expected] of Object.entries({
+  UP: { "16": 15, "14": 8, "7": 16, "6": 16, "5": 12, "1": 20, "2": 16, "4": 19 },
+  DOWN: { "16": 15, "14": 8, "7": 16, "6": 16, "5": 12, "1": 20, "2": 12, "4": 19 },
+})) {
+  const rows = searchTechnicalIndex(index, "", "ALL", direction).filter((item) => item.kind === "EP" && item.track === direction)
+  const groups = groupEntryPointsByPrefix(rows)
+  check(same(Object.fromEntries(groups.map((group) => [group.id, group.items.length])), expected),
+  `EP ${direction} 各前綴組數量正確，唔跨軌合併`)
+}
+const epRowsSnapshot = JSON.stringify(epRows)
+groupEntryPointsByPrefix(epRows)
+check(JSON.stringify(epRows) === epRowsSnapshot, "EP 摺疊分組唔改動原搜尋結果或陣列順序")
+const exactEp = searchTechnicalIndex(index, "EP 16-28", "EP", "UP")
+check(exactEp.length === 1 && groupEntryPointsByPrefix(exactEp)[0]?.items.length === 1,
+"完全匹配 EP 只形成單項，UI 可直接顯示而唔隱藏")
 
 const ep12 = index.items.find((item) => item.id === "ep:1-2")
 check(ep12?.track === "DOWN" && ep12.direction === "WKS" && ep12.vccArea === 1 && ep12.segment?.id === "20",
@@ -192,7 +227,157 @@ check(cpdGroups.length === 7 && cpdGroups.reduce((sum, group) => sum + group.ite
   && cpdGroups.every((group) => group.items.every((item) => item.segment?.id === group.id)),
 "CPD 按路段分成 7 組，完整收錄 260 筆")
 check(Math.max(...cpdGroups.map((group) => group.items.length)) === 103,
-"最大 CPD 路段組為 103 筆")
+  "最大 CPD 路段組為 103 筆")
+
+const mixedUnits = groupTechnicalSearchRows(visibleItems, "UP")
+const mixedCpdGroups = mixedUnits.filter((unit) => unit.kind === "cpdGroup")
+const mixedEpGroups = mixedUnits.filter((unit) => unit.kind === "epGroup")
+check(same(Object.fromEntries(mixedCpdGroups.map((group) => [group.id, group.items.length])), {
+  "11": 12, "12": 4, "18": 4, "19": 43, "20": 43, "21": 51, "22": 103,
+}), "混合搜尋結果入面嘅 CPD 按 7 個站段整合")
+const mixedCpdIds = mixedCpdGroups.flatMap((group) => group.items.map((item) => item.id))
+check(mixedCpdIds.length === 260 && new Set(mixedCpdIds).size === 260
+  && same([...mixedCpdIds].sort(), visibleItems.filter((item) => item.kind === "CPD").map((item) => item.id).sort()),
+"混合結果 CPD 摺疊完整收錄 260 筆，無遺漏或重複")
+check(mixedEpGroups.length === 8
+  && mixedEpGroups.reduce((sum, group) => sum + group.items.length, 0) === 240
+  && mixedUnits.filter((unit) => unit.kind === "item").length === 94,
+"加入 CPD 整合後同時保留 8 組 EP 同 94 筆非摺疊項目")
+const mixedSnapshot = JSON.stringify(visibleItems)
+groupTechnicalSearchRows(visibleItems, "DOWN")
+check(JSON.stringify(visibleItems) === mixedSnapshot, "混合 CPD／EP 分組唔改動原始搜尋結果")
+const exactCpd = searchTechnicalIndex(index, "HIK001", "CPD", "UP")
+check(exactCpd.length === 1 && groupTechnicalSearchRows(exactCpd, "UP")[0]?.items.length === 1,
+"完全匹配 CPD 只形成單項，UI 可直接顯示")
+
+const ep436 = index.items.find((item) => item.id === "ep:4-36")
+const vcc89 = index.items.find((item) => item.id === "vcc-boundary:8:9")
+const cpdHik001 = index.items.find((item) => item.id === "cpd:HIK001")
+const ep724 = index.items.find((item) => item.id === "ep:7-24")
+const vccArea9 = index.items.find((item) => item.id === "vcc-area:9")
+check(searchResultDirection(ep436, "UP") === "DOWN"
+  && same(searchResultEndpoints(ep436, "DOWN"), { from: "TUM", to: "SIH" }),
+"EP 4-36 下行顯示屯門→兆康")
+check(searchResultDirection(cpdNac43, "DOWN") === "DOWN"
+  && same(searchResultEndpoints(cpdNac43, "DOWN"), { from: "MEF", to: "NAC" }),
+"共用 CPD 跟隨所選 DOWN 方向")
+check(same(searchResultEndpoints(vcc89, "DOWN"), { from: "CKT", to: "STW" })
+  && same(searchResultEndpoints(cioPair, "DOWN"), { from: "STW", to: "CIO" })
+  && same(searchResultEndpoints(cpdHik001, "DOWN"), { from: "DIH", to: "HIK" }),
+"VCC／Neutral Zone／CPD 下行端點全部反轉")
+check(searchResultSegment(tkwEap, "DOWN")?.id === "15"
+  && same(searchResultEndpoints(tkwEap, "DOWN"), { from: "HOM", to: "TKW" })
+  && searchResultSegment(homEap, "DOWN")?.id === "16"
+  && same(searchResultEndpoints(homEap, "DOWN"), { from: "HUH", to: "HOM" }),
+"TKW／HOM EAP 下行使用方向專屬站段")
+const tkwDownPresentation = searchResultPresentation(tkwEap, "DOWN")
+const homDownPresentation = searchResultPresentation(homEap, "DOWN")
+check(tkwDownPresentation.oppositeTrack === "UP" && tkwDownPresentation.oppositeSegment?.id === "14"
+  && homDownPresentation.oppositeTrack === "UP" && homDownPresentation.oppositeSegment?.id === "15",
+"跨段 EAP 下行回退 metadata 指向正確 UP 站段")
+check(searchResultChainageText(tkwEap, "DOWN") === "100.602 km"
+  && searchResultChainageText(tkwEap, "UP") === "100.591 km"
+  && searchResultChainageText(cioPair, "DOWN") === "89.027 km"
+  && searchResultChainageText(cioPair, "UP") === "89.038 km"
+  && searchResultChainageText(ep724, "DOWN") === "97.333–97.335 km",
+"chainage metadata 跟隨方向並正規化範圍")
+check(same(searchResultStations(vccArea9, "DOWN"), ["WKS", "MOS", "HEO", "TSH", "SHM", "CIO", "STW"]),
+"VCC 區域車站清單跟隨 DOWN 反轉")
+const bothItems = visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "BOTH")
+check(bothItems.length === 292
+  && bothItems.every((item) => searchResultDirection(item, "UP") === "UP" && searchResultDirection(item, "DOWN") === "DOWN"),
+"292 筆雙向設施跟隨所選排列方向")
+const stationPosition = new Map(stationOrder.map((code, position) => [code, position]))
+const directionErrors = []
+for (const selected of ["UP", "DOWN"]) {
+  for (const item of visibleItems) {
+    const endpoints = searchResultEndpoints(item, selected)
+    if (!endpoints) continue
+    const direction = searchResultDirection(item, selected)
+    const delta = stationPosition.get(endpoints.to) - stationPosition.get(endpoints.from)
+    if (delta !== 0 && (direction === "UP" ? delta >= 0 : delta <= 0)) {
+      directionErrors.push(`${selected}:${item.id}:${endpoints.from}->${endpoints.to}`)
+    }
+  }
+}
+check(directionErrors.length === 0,
+`全部 594 筆結果嘅顯示端點符合所選方向${directionErrors.length ? `：${directionErrors.slice(0, 5).join("、")}` : ""}`)
+const cpdDownGroups = groupCpdsBySegment(cpdDown, "DOWN")
+check(cpdDownGroups.length === 7 && cpdDownGroups.every((group) => group.direction === "DOWN")
+  && cpdDownGroups[0]?.id === "22"
+  && same(segmentEndpoints(cpdDownGroups[0]?.segment, "DOWN"), { from: "KSR", to: "TWW" }),
+"CPD DOWN 摺疊組標題沿 TUM→WKS 反轉")
+
+const visiblePartition = {
+  UP: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "UP").length,
+  DOWN: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "DOWN").length,
+  BOTH: visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "BOTH").length,
+  VCC_AREA: visibleItems.filter((item) => item.kind === "VCC_AREA").length,
+}
+check(same(visiblePartition, { UP: 158, DOWN: 136, BOTH: 292, VCC_AREA: 8 })
+  && Object.values(visiblePartition).reduce((sum, count) => sum + count, 0) === visibleItems.length,
+"594 筆可見結果完整拆分為 158 UP、136 DOWN、292 共用設施同 8 個 VCC 區域")
+
+const indexSnapshot = JSON.stringify(index)
+const stationArraysSnapshot = visibleItems.map((item) => JSON.stringify(item.data?.stations ?? item.stations))
+for (const selected of ["UP", "DOWN", "UP"]) {
+  for (const item of visibleItems) {
+    searchResultDirection(item, selected)
+    searchResultSegment(item, selected)
+    searchResultEndpoints(item, selected)
+    searchResultChainageValues(item, selected)
+    searchResultChainageText(item, selected)
+    searchResultStations(item, selected)
+  }
+}
+check(JSON.stringify(index) === indexSnapshot
+  && visibleItems.every((item, position) => JSON.stringify(item.data?.stations ?? item.stations) === stationArraysSnapshot[position]),
+"反覆切換上下行唔會改動搜尋 index、站段物件或 VCC 車站陣列")
+
+const expectedCrossSegmentEap = {
+  "eap:TKW EAP": {
+    UP: { segment: "14", endpoints: { from: "SUW", to: "TKW" }, chainage: "100.591 km" },
+    DOWN: { segment: "15", endpoints: { from: "HOM", to: "TKW" }, chainage: "100.602 km" },
+  },
+  "eap:HOM EAP": {
+    UP: { segment: "15", endpoints: { from: "TKW", to: "HOM" }, chainage: "101.617 km" },
+    DOWN: { segment: "16", endpoints: { from: "HUH", to: "HOM" }, chainage: "101.641 km" },
+  },
+}
+for (const [id, directions] of Object.entries(expectedCrossSegmentEap)) {
+  const item = index.items.find((row) => row.id === id)
+  for (const [direction, expected] of Object.entries(directions)) {
+    check(searchResultSegment(item, direction)?.id === expected.segment
+      && same(searchResultEndpoints(item, direction), expected.endpoints)
+      && searchResultChainageText(item, direction) === expected.chainage,
+      `${id} ${direction} 明確使用站段 ${expected.segment}、${expected.endpoints.from}→${expected.endpoints.to} 同 ${expected.chainage}`)
+  }
+}
+
+for (const direction of ["UP", "DOWN"]) {
+  const cpdGroups = groupCpdsBySegment(searchTechnicalIndex(index, "", "CPD", direction), direction)
+  const orderingErrors = []
+  const missingChainages = []
+  for (const group of cpdGroups) {
+    let previous = null
+    for (const item of group.items) {
+      const values = searchResultChainageValues(item, direction)
+      if (!values.length) {
+        missingChainages.push(item.id)
+        continue
+      }
+      const km = Math.min(...values)
+      if (previous != null && (direction === "UP" ? km < previous : km > previous)) {
+        orderingErrors.push(`${group.id}:${item.id}:${km}`)
+      }
+      previous = km
+    }
+  }
+  check(orderingErrors.length === 0,
+  `CPD ${direction} 全部 7 組組內 chainage 單調排列${orderingErrors.length ? `：${orderingErrors.slice(0, 5).join("、")}` : ""}`)
+  check(missingChainages.length === 0,
+  `CPD ${direction} 全部 260 筆都有有效 chainage，唔使用捏造排序值`)
+}
 
 if (failed) {
   console.error(`✗ 技術搜尋驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

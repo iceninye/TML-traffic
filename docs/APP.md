@@ -91,16 +91,18 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 ### 技術搜尋同雙軌放大圖（2026-11-27）
 
-右上角「尋找」取代原本嘅「？説明」入口，圖例同說明保留喺搜尋 sheet 頂部快捷列。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
+右上角「尋找」取代原本嘅「？説明」入口，搜尋 sheet 標題為「技術資料」。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
 
-- 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。
+- 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。結果端點、雙向項目點擊方向、CPD 組標題、VCC 車站次序同 chainage metadata 都跟實際顯示方向。
 - CPD 結果按站段摺疊，頂層顯示車站、軌道、數量同 chainage 範圍；空查詢預設收合，搜尋時自動展開。
 - 一般設施結果開單軌站段圖，自動啟動對應 marker／連線並 focus 該行。
 - 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
-- 雙軌圖頂部有上行／下行 switch，詳細資料跟 switch 切換。640px 以上維持左右獨立捲動同 SVG 連線；640px 以下直屏改為全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），直屏唔畫跨欄連線，改以 marker focus、類型 badge 同詳情卡配對。抽屜可撳或拖曳，旋轉保留狀態；667×375 矮橫屏使用緊湊頂列。
+- 所有螢幕尺寸都維持左右排版：左邊係軌圖，右邊係技術資料；640px 以上使用較闊雙欄、獨立捲動同 SVG 連線，640px 以下用緊湊右欄三段式面板（收起／單項詳情／完整清單）。右欄可撳或拖曳，旋轉保留狀態；667×375 矮橫屏使用緊湊頂列。
 - TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
 - EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
+- 「全部」或 EP 搜尋結果嘅扁平清單會按正式 EP 編號開首整合成摺疊組（例如 `EP 16-…`）；沿用現有方向／匹配分組，空查詢預設收合，搜尋自動展開，完全匹配單項直接顯示。展開後保留原方向 chainage 次序，鍵盤操作比照 CPD。
+- 「全部」混合結果入面嘅 CPD 亦按站段及現有軌道分組收合；例如顯徑—鑽石山 12 筆合成一組。CPD 專用類別維持原本 7 組做法，完全匹配單項直接顯示。
 - `tools/validate_search.mjs` 驗證 598 筆 index、594 筆主線可見結果、被排除 VCC 集合、站段解析、VCC 範圍、EP 分組、Neutral Zone 配對、格式迴歸同跨段 EAP metadata。
 - `tools/validate_sw.mjs` 驗證搜尋 critical-path 資源有納入離線 shell；lazy MapLibre 同動態更份／時間表唔納入呢個檢查。
 

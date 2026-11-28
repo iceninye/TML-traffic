@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, mainlineVccAreas, searchResultMatchTier, searchResultPresentation, searchTechnicalIndex } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, groupTechnicalSearchRows, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.0", commit: "a09a00c" }
+const BUILD = { version: "0.11.6", commit: "665d407" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -728,17 +728,9 @@ const SEARCH_CATEGORIES = [
   ["EP", "searchEp"],
   ["CPD", "searchCpd"],
   ["EAP", "searchEap"],
-  ["NZ", "searchNz"],
-  ["NR", "searchNr"],
+  ["NZ", "searchNzChip"],
+  ["NR", "searchNrChip"],
 ]
-
-function searchQuickHtml() {
-  const s = t()
-  const examples = ["EP 1/2", "HP 601", "NAC43", "VCC 6↔7"]
-  return `<div class="search-quick"><span>${s.searchExamples}</span><div class="search-examples">` +
-    examples.map((example) => `<button type="button" class="search-example" data-search-example="${example}">${example}</button>`).join("") +
-    `</div><button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button></div>`
-}
 
 function searchDirectionSwitchHtml() {
   const s = t()
@@ -772,7 +764,6 @@ function searchShellHtml() {
     `<label class="search-input-wrap"><input id="search-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
     `<div class="search-chips" role="group" aria-label="${s.searchTitle}">${chips}</div>` +
     searchDirectionSwitchHtml() +
-    searchQuickHtml() +
     `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>`
 }
 
@@ -780,7 +771,7 @@ function openSearch() {
   state.selected = null
   state.station = null
   state.segment = null
-  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0, direction: "UP", expandedCpdGroups: new Set(), collapsedCpdGroups: new Set() }
+  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0, direction: "UP", expandedCpdGroups: new Set(), collapsedCpdGroups: new Set(), expandedEpGroups: new Set(), collapsedEpGroups: new Set() }
   setFollow(false)
   openSheet(searchShellHtml(), "search")
   loadSearchIndex().then((index) => {
@@ -811,14 +802,18 @@ function searchKindLabel(kind) {
   }[kind] ?? kind
 }
 
-function searchResultButton(item, defaultDir = item.defaultDir, index = 0) {
-  const s = t()
-  const km = chainageValues(item.chainageKm).filter(Number.isFinite)
-  const kmText = km.length ? `${km[0].toFixed(3)}${km.length > 1 ? `–${km.at(-1).toFixed(3)}` : ""} km` : ""
-  const segment = item.segment
-  const where = segment ? `${network.name(segment.from, LANG)} → ${network.name(segment.to, LANG)}` : item.sublabel
+function searchResultButton(item, selectedDirection = state.search?.direction ?? item.defaultDir, index = 0) {
+  const direction = searchResultDirection(item, selectedDirection)
+  const kmText = searchResultChainageText(item, direction)
+  const endpoints = searchResultEndpoints(item, direction)
+  const stations = searchResultStations(item, direction)
+  const where = endpoints
+    ? `${network.name(endpoints.from, LANG)} → ${network.name(endpoints.to, LANG)}`
+    : item.kind === "VCC_AREA"
+      ? `${item.sublabel.split(" · ")[0]}${stations.length ? ` · ${stations.map((code) => network.name(code, LANG)).join("、")}` : ""}`
+      : item.sublabel
   const track = item.track === "BOTH" ? "UP / DOWN" : item.track
-  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" tabindex="-1" class="search-result" data-search-result="${escapeHtml(item.id)}"${defaultDir ? ` data-default-dir="${defaultDir}"` : ""}>` +
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" tabindex="-1" class="search-result" data-search-result="${escapeHtml(item.id)}"${direction ? ` data-default-dir="${direction}"` : ""}>` +
     `<span class="search-result-badge ${item.kind.toLowerCase()}">${searchKindLabel(item.kind)}</span>` +
     `<span class="search-result-main"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(where)}</span></span>` +
     `<span class="search-result-meta">${track ? `<b>${track}</b>` : ""}${kmText ? `<span>${kmText}</span>` : ""}</span></button>`
@@ -871,7 +866,7 @@ function renderEpSearchHierarchy() {
   if (search.vccArea == null) {
     const areas = mainlineVccAreas(tdSearchIndex)
     return `<h3 class="search-section-title">${s.searchVccArea}</h3><div class="search-vcc-grid">` +
-      areas.map((area) => `<button type="button" class="search-vcc-area" data-search-vcc="${area.vcc}"><strong>VCC ${area.vcc}</strong><span>${escapeHtml(area.stations.map((code) => network.name(code, LANG)).join(" · "))}</span></button>`).join("") +
+      areas.map((area) => `<button type="button" class="search-vcc-area" data-search-vcc="${area.vcc}"><strong>VCC ${area.vcc}</strong><span>${escapeHtml(searchResultStations({ data: area }, search.direction).map((code) => network.name(code, LANG)).join(" · "))}</span></button>`).join("") +
       `</div>`
   }
   const group = groups.get(search.vccArea)
@@ -914,17 +909,29 @@ function searchTrackGroupLabel(group) {
   }[group] ?? s.searchGroupOther
 }
 
-function searchCpdGroupButton(group, index, expanded) {
+function searchCpdGroupButton(group, index, expanded, groupId = group.id) {
   const s = t()
-  const segment = group.segment
-  const from = segment ? network.name(segment.from, LANG) : s.searchGroupOther
-  const to = segment ? network.name(segment.to, LANG) : ""
+  const direction = group.direction ?? state.search?.direction ?? "UP"
+  const endpoints = segmentEndpoints(group.segment, direction)
+  const from = endpoints ? network.name(endpoints.from, LANG) : s.searchGroupOther
+  const to = endpoints ? network.name(endpoints.to, LANG) : ""
   const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
   const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
   const tracks = [...new Set(group.items.map((item) => item.track))].sort().join(" / ")
-  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-cpd-group" data-cpd-group="${escapeHtml(group.id)}">` +
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-cpd-group" data-cpd-group="${escapeHtml(groupId)}">` +
     `<span class="search-result-badge cpd">${s.searchCpd}</span>` +
     `<span class="search-result-main"><strong>${s.searchCpdGroup(from, to, group.items.length)}</strong><span>${escapeHtml(tracks)}${range ? ` · ${range}` : ""}</span></span>` +
+    `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
+}
+
+function searchEpGroupButton(group, index, expanded, groupId) {
+  const s = t()
+  const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
+  const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
+  const tracks = [...new Set(group.items.map((item) => item.track))].join(" / ")
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-ep-group" data-ep-group="${escapeHtml(groupId)}">` +
+    `<span class="search-result-badge ep">${s.searchEp}</span>` +
+    `<span class="search-result-main"><strong>${escapeHtml(s.searchEpGroup(group.prefix, group.items.length))}</strong><span>${escapeHtml(tracks)}${range ? ` · ${range}` : ""}</span></span>` +
     `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
 }
 
@@ -933,29 +940,64 @@ function flatSearchResultsHtml(rows) {
   let html = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>`
   let optionIndex = 0
   if (search.category === "CPD") {
-    for (const group of groupCpdsBySegment(rows)) {
+    for (const group of groupCpdsBySegment(rows, search.direction)) {
       const expanded = search.query.trim()
         ? !search.collapsedCpdGroups.has(group.id)
         : search.expandedCpdGroups.has(group.id)
       html += searchCpdGroupButton(group, optionIndex++, expanded)
       if (expanded) {
         html += `<div class="search-cpd-items" role="group" aria-label="${escapeHtml(group.id)}">` +
-          group.items.map((item) => searchResultButton(item, item.defaultDir, optionIndex++)).join("") + `</div>`
+          group.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
       }
     }
     return html
   }
-  let lastGroup = null
+  const sections = []
   for (const item of rows) {
     const tier = searchResultMatchTier(item, search.query)
     const trackGroup = searchTrackGroup(item)
-    const group = `${tier}:${trackGroup}`
-    if (group !== lastGroup) {
-      const label = tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(trackGroup)
-      html += `<div class="search-result-group" role="presentation">${label}</div>`
-      lastGroup = group
+    const key = `${tier}:${trackGroup}`
+    let section = sections.at(-1)
+    if (!section || section.key !== key) {
+      section = { key, tier, trackGroup, items: [] }
+      sections.push(section)
     }
-    html += searchResultButton(item, item.defaultDir, optionIndex++)
+    section.items.push(item)
+  }
+  for (const section of sections) {
+    const label = section.tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(section.trackGroup)
+    html += `<div class="search-result-group" role="presentation">${label}</div>`
+    for (const unit of groupTechnicalSearchRows(section.items, search.direction)) {
+      if (unit.kind === "item") {
+        html += searchResultButton(unit.item, search.direction, optionIndex++)
+        continue
+      }
+      if (unit.items.length === 1) {
+        html += searchResultButton(unit.items[0], search.direction, optionIndex++)
+        continue
+      }
+      if (unit.kind === "epGroup") {
+        const groupId = `ep:${section.trackGroup}:${unit.id}`
+        const expanded = search.query.trim()
+          ? !search.collapsedEpGroups.has(groupId)
+          : search.expandedEpGroups.has(groupId)
+        html += searchEpGroupButton(unit, optionIndex++, expanded, groupId)
+        if (expanded) {
+          html += `<div class="search-ep-items" role="group" aria-label="${escapeHtml(`EP ${unit.prefix}-… · ${section.trackGroup}`)}">` +
+            unit.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
+        }
+        continue
+      }
+      const groupId = `cpd:${section.trackGroup}:${unit.id}`
+      const expanded = search.query.trim()
+        ? !search.collapsedCpdGroups.has(groupId)
+        : search.expandedCpdGroups.has(groupId)
+      html += searchCpdGroupButton(unit, optionIndex++, expanded, groupId)
+      if (expanded) {
+        html += `<div class="search-cpd-items" role="group" aria-label="${escapeHtml(`CPD ${unit.id} · ${section.trackGroup}`)}">` +
+          unit.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
+      }
+    }
   }
   return html
 }
@@ -1009,24 +1051,27 @@ function openSearchResult(id, defaultDir = null) {
   const dir = ["UP", "DOWN"].includes(defaultDir) ? defaultDir
     : ["UP", "DOWN"].includes(item.defaultDir) ? item.defaultDir
       : item.track === "DOWN" ? "DOWN" : "UP"
-  const code = dir === "UP" ? item.segment.from : item.segment.to
+  const segment = searchResultSegment(item, dir)
+  const endpoints = searchResultEndpoints(item, dir)
+  if (!segment || !endpoints) return
+  const code = endpoints.from
   const rawId = item.kind === "EP" ? item.data.id
     : item.kind === "NR" ? item.data.uid
       : item.kind === "VCC_BOUNDARY" ? item.data.between.join(":")
         : item.kind === "NZ" ? item.data.base : item.data.id
-  const presentation = searchResultPresentation(item)
+  const presentation = searchResultPresentation(item, dir)
   const fallback = presentation.fallbackReason ? {
     reason: presentation.fallbackReason,
     track: dir,
-    segment: item.segment,
+    segment,
     oppositeTrack: presentation.oppositeTrack,
     oppositeSegment: presentation.oppositeSegment,
     focusId: rawId,
   } : null
   openSegment(code, dir, {
     dual: presentation.mode === "dual",
-    segment: item.segment,
-    segmentId: item.segment.id,
+    segment,
+    segmentId: segment.id,
     fallback,
     focus: { kind: item.kind, id: rawId, dir, direction: item.direction, data: item.data },
   })
@@ -3310,6 +3355,7 @@ function paintSegmentInfrastructure() {
 
     const vccFrom = dir === "UP" ? records.vccTo : records.vccFrom
     const vccTo = dir === "UP" ? records.vccFrom : records.vccTo
+    const showVccLabels = isWideSegmentLayout() || dir === segment.activeDir
     for (const boundary of records.vccBoundaries) {
       const values = chainageValues(boundary.values).filter(Number.isFinite)
       if (!values.length) continue
@@ -3327,9 +3373,11 @@ function paintSegmentInfrastructure() {
       })
       trackLayer.append(
         line,
-        make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
-        make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
-        make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+        ...(showVccLabels ? [
+          make("text", { x: left, y: y - 7, class: "segment-vcc-label" }, `VCC ${vccFrom ?? boundary.between[0]}`),
+          make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
+          make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
+        ] : []),
       )
     }
 
@@ -4177,6 +4225,7 @@ function wireControls() {
     state.search.query = event.target.value
     state.search.activeIndex = 0
     state.search.collapsedCpdGroups.clear()
+    state.search.collapsedEpGroups.clear()
     if (state.search.query.trim()) state.search.vccArea = null
     renderSearchResults()
   })
@@ -4214,19 +4263,8 @@ function wireControls() {
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
-    else if (state.sheetKind === "search" && event.target.closest("[data-open-help]")) openHelp()
     else if (state.sheetKind === "search" && event.target.closest("[data-search-retry]")) openSearch()
-    else if (state.sheetKind === "search" && event.target.closest("[data-search-example]")) {
-      const input = document.getElementById("search-input")
-      state.search.query = event.target.closest("[data-search-example]").dataset.searchExample
-      state.search.category = "ALL"
-      state.search.vccArea = null
-      state.search.activeIndex = 0
-      state.search.collapsedCpdGroups.clear()
-      if (input) input.value = state.search.query
-      renderSearchResults()
-      input?.focus({ preventScroll: true })
-    } else if (state.sheetKind === "search" && event.target.closest("[data-search-direction]")) {
+    else if (state.sheetKind === "search" && event.target.closest("[data-search-direction]")) {
       const button = event.target.closest("[data-search-direction]")
       state.search.direction = button.dataset.searchDirection === "DOWN" ? "DOWN" : "UP"
       state.search.activeIndex = 0
@@ -4246,12 +4284,27 @@ function wireControls() {
       state.search.activeIndex = Number(button.id.replace("search-option-", ""))
       renderSearchResults()
       document.getElementById("search-input")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-ep-group]")) {
+      const button = event.target.closest("[data-ep-group]")
+      const id = button.dataset.epGroup
+      const expanded = button.getAttribute("aria-expanded") === "true"
+      if (expanded) {
+        state.search.expandedEpGroups.delete(id)
+        state.search.collapsedEpGroups.add(id)
+      } else {
+        state.search.expandedEpGroups.add(id)
+        state.search.collapsedEpGroups.delete(id)
+      }
+      state.search.activeIndex = Number(button.id.replace("search-option-", ""))
+      renderSearchResults()
+      document.getElementById("search-input")?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
       const button = event.target.closest("[data-search-category]")
       state.search.category = button.dataset.searchCategory
       state.search.vccArea = null
       state.search.activeIndex = 0
       state.search.collapsedCpdGroups.clear()
+      state.search.collapsedEpGroups.clear()
       renderSearchResults()
       document.querySelector(`[data-search-category="${button.dataset.searchCategory}"]`)?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-vcc]")) {

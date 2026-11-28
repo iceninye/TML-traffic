@@ -3,6 +3,44 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.6 — 2026-11-28 (`665d407`, test branch)
+- 「全部」混合搜尋結果入面嘅 CPD 按站段及現有軌道分組收合，例如顯徑—鑽石山 12 筆整合為一組；空查詢收合、搜尋展開、完全匹配單項直接顯示。
+- CPD 專用類別維持 7 組做法；混合結果初始由 370 個選項減至 119 個（94 個普通項目＋16 個 EP 組＋9 個 CPD 組）。
+- 混合 CPD／EP 分組保留全部 260 筆 CPD、240 筆 EP 同 94 筆非摺疊項目，方向切換保留展開狀態。
+- 搜尋 validator 增至 90 項，加入混合 CPD 站段分組、完整性、不可變性及單項匹配迴歸。
+- Shell cache renamed `v108`。
+
+## v0.11.5 — 2026-11-28 (`ae811ac`, test branch)
+- 技術資料類別按鈕 `Neutral Zone`／`Niche Room` 縮寫為 `NZ`／`NR`。
+- 扁平 EP 搜尋結果按正式編號開首整合成摺疊組，例如 `EP 16-…`；沿用 UP／DOWN 分組，空查詢收合、搜尋展開、完全匹配單項直接顯示。
+- EP 摺疊支援展開／收合、方向狀態保留、鍵盤導航及 `aria-expanded`；展開後 240 筆 EP 完整保留且按方向 chainage 排列。
+- 搜尋 validator 增至 85 項，加入 EP 前綴分組數量、完整性、不可變性及單項匹配迴歸。
+- Shell cache renamed `v107`。
+
+## v0.11.4 — 2026-11-28 (`9eddcff`, test branch)
+- 搜尋 sheet 標題改為「技術資料」，說明改為「Entry Point、CPD、EAP、中性區、Niche Room 或車站。」。
+- 移除搜尋 sheet 快捷範例同「圖例同說明」入口，並清理相關 UI 處理同樣式。
+- 搜尋按鈕嘅 accessible name 同 title 同步改為「技術資料」。
+- Shell cache renamed `v106`。
+
+## v0.11.3 — 2026-11-28 (`9f552b2`, test branch)
+- 窄屏雙軌 VCC 界線只喺目前所選軌道顯示 label，避免 360px 兩組文字重疊；寬屏仍保留雙軌 label。
+- CPD 摺疊組內改為先按行車方向 chainage 排列，軌道優先次序只作同里程 tie-break；修正 AUS—NAC（站段 19）組內跳序。
+- 修正窄屏詳情卡關閉掣負 margin 造成嘅輕微橫向溢出。
+- 搜尋 validator 增至 79 項，加入 594 筆結果完整分類、反覆切換不可變性、TKW／HOM EAP 四組方向組合，以及雙向 CPD 組內單調性檢查。
+- Shell cache renamed `v105`。
+
+## v0.11.2 — 2026-11-28 (`2deabb7`, test branch)
+- 修正技術搜尋方向顯示：DOWN 設施統一反轉端點，雙向設施跟隨所選 UP／DOWN，唔再顯示 WKS→TUM canonical 方向充當下行。
+- 搜尋結果、CPD 摺疊組標題、VCC 車站清單及 chainage metadata 全部方向感知；TKW／HOM EAP 下行改用正確方向專屬站段。
+- 搜尋 validator 增至 69 項，加入全線 594 筆結果嘅方向端點、雙向點擊方向、跨段 EAP、CPD 分組及 chainage 迴歸。
+- Shell cache renamed `v104`。
+
+## v0.11.1 — 2026-11-28 (`c45ab9d`, test branch)
+- 所有站段放大圖統一左右排版：左邊軌圖、右邊技術資料，唔再喺直屏使用上下排版。
+- 640px 以下改用緊湊右欄三段式面板（收起／單項詳情／完整清單），保留按鈕／拖曳、marker focus 同旋轉狀態；寬屏維持独立捲動同 SVG 連線。
+- Shell cache renamed `v103`。
+
 ## v0.11.0 — 2026-11-27 (`a09a00c`, test branch)
 - 雙軌技術圖改為響應式介面：640px 以下直屏使用全闊路線圖加三段式底部抽屜（收起／單項詳情／完整清單），640px 以上維持左右獨立捲動。
 - 直屏關閉跨欄 SVG 連線，改以 marker focus、設施類型 badge 同單項詳情卡配對；詳情卡支援上一項／下一項、展開全部同收起。

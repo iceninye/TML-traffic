@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.8 — 2026-11-28 (`pending`, test branch)
+## v0.11.8 — 2026-11-28 (`0f685ad`, test branch)
 - 窄屏由搜尋聚焦技術設施時直接展開完整清單，唔再收埋喺 Peek 詳情卡；自動捲到所選項目。
 - EP、CPD、Niche Room、EAP、Neutral Zone 同 VCC 交界統一由軌圖 marker 繪一條直線到實際清單按鈕，唔再使用直角繞線。
 - 保留 EP／Niche Room／EAP 各自連線 switch；寬屏額外支援聚焦 CPD、Neutral Zone 同 VCC 交界連線。

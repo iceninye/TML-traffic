@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.13 — 2026-11-28 (`pending`, test branch)
+## v0.11.13 — 2026-11-28 (`372b389`, test branch)
 - 由搜尋結果開站段圖後，按 `X` 會返回上一頁搜尋結果，而唔再直接返回主頁；再由搜尋 `X` 才回主頁。
 - 保留搜尋查詢、類別／VCC 區域、UP／DOWN、摺疊狀態、結果 active 項目同實際 sheet 捲動位置；開站段圖時捲到頂部。
 - 真實 393×852 WebKit touch 驗證返回流程、24 項 EP 5 下行結果、active 項目同 180px 捲動位置，截圖確認。

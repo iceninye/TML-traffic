@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.7 — 2026-11-28 (pending stamp, test branch)
+- 640px 以下搜尋聚焦 EP 時新增單條位置連線：Peek 連到可見詳情卡，Expanded 連到實際 EP 按鈕，Collapsed 隱藏。
+- 窄屏連線沿用綠色（WKS）／黃色（TUM）方向配色及 EP 連線 switch；寬屏原本全部 EP 連線行為不變。
+- 連線改用沿軌圖右緣嘅直角路徑，避免 360px 斜線穿過技術 label；360px 實測零溢出。
+- Shell cache renamed `v109`。
+
 ## v0.11.6 — 2026-11-28 (`665d407`, test branch)
 - 「全部」混合搜尋結果入面嘅 CPD 按站段及現有軌道分組收合，例如顯徑—鑽石山 12 筆整合為一組；空查詢收合、搜尋展開、完全匹配單項直接顯示。
 - CPD 專用類別維持 7 組做法；混合結果初始由 370 個選項減至 119 個（94 個普通項目＋16 個 EP 組＋9 個 CPD 組）。

@@ -3469,11 +3469,6 @@ function paintSegmentConnectors() {
   const svg = document.getElementById("segment-connectors")
   if (!svg || state.sheetKind !== "segment" || !segment) return
   svg.replaceChildren()
-  if (!isWideSegmentLayout()) {
-    svg.hidden = true
-    return
-  }
-  svg.hidden = false
   const layout = document.querySelector(".segment-layout")
   const info = document.getElementById("segment-info")
   if (!layout || !info) return
@@ -3482,6 +3477,47 @@ function paintSegmentConnectors() {
   if (!layoutRect.width || !layoutRect.height) return
   svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
 
+  if (!isWideSegmentLayout()) {
+    // Peek has no visible technical-list button, so target the detail card.
+    // Route the single focused EP line along the pane edge to avoid labels.
+    svg.hidden = true
+    const focus = segment.focus
+    if (segment.epConnectors === false || focus?.kind !== "EP" || segment.drawer === "collapsed") return
+    const direction = focus.direction === "TUM" ? "TUM" : "WKS"
+    const itemId = `${direction}:${focus.id}`
+    const control = document.querySelector(`.segment-ep-control[data-track="${segment.activeDir}"][data-route-id="${CSS.escape(itemId)}"]`)
+    const dot = control?.querySelector(".segment-ep-dot")
+    const target = segment.drawer === "peek"
+      ? document.querySelector(".segment-drawer-peek .segment-focus-detail")
+      : info.querySelector(`.ep-dot[data-route-id="${CSS.escape(focus.id)}"][data-ep-dir="${direction}"]`)
+    if (!dot || !target) return
+    const dotRect = dot.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const targetY = targetRect.top + targetRect.height / 2
+    if (!dotRect.width || !targetRect.width || targetY < infoRect.top || targetY > infoRect.bottom) return
+    const routeRect = document.querySelector(".segment-route")?.getBoundingClientRect()
+    if (!routeRect) return
+    const x1 = dotRect.right + 4 - layoutRect.left
+    const elbowX = Math.min(routeRect.right + 2, targetRect.left - 5) - layoutRect.left
+    const x2 = targetRect.left - 4 - layoutRect.left
+    if (x2 <= x1 || elbowX < x1 || x2 <= elbowX) return
+    const y1 = dotRect.top + dotRect.height / 2 - layoutRect.top
+    const y2 = targetY - layoutRect.top
+    svg.append(make("path", {
+      d: `M ${x1} ${y1} H ${elbowX} V ${y2} H ${x2}`,
+      class: "segment-ep-connector",
+      stroke: direction === "WKS" ? "#58c77a" : "#f5c451",
+      "stroke-opacity": 0.82,
+      "vector-effect": "non-scaling-stroke",
+      "data-route-kind": "EP",
+      "data-route-id": itemId,
+      "data-ep-direction": direction,
+    }))
+    svg.hidden = false
+    return
+  }
+
+  svg.hidden = false
   const appendConnector = (dot, button, color, kind, id, direction = null) => {
     const dotRect = dot.getBoundingClientRect()
     const buttonRect = button.getBoundingClientRect()

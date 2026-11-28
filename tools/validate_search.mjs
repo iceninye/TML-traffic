@@ -8,10 +8,16 @@ import {
   groupCpdsBySegment,
   mainlineVccAreas,
   pairNeutralZones,
+  searchResultChainageText,
+  searchResultDirection,
+  searchResultEndpoints,
   searchResultMatchTier,
   searchResultMode,
   searchResultPresentation,
+  searchResultSegment,
+  searchResultStations,
   searchTechnicalIndex,
+  segmentEndpoints,
 } from "../lib/td-search.js"
 
 let failed = 0
@@ -192,7 +198,65 @@ check(cpdGroups.length === 7 && cpdGroups.reduce((sum, group) => sum + group.ite
   && cpdGroups.every((group) => group.items.every((item) => item.segment?.id === group.id)),
 "CPD 按路段分成 7 組，完整收錄 260 筆")
 check(Math.max(...cpdGroups.map((group) => group.items.length)) === 103,
-"最大 CPD 路段組為 103 筆")
+  "最大 CPD 路段組為 103 筆")
+
+const ep436 = index.items.find((item) => item.id === "ep:4-36")
+const vcc89 = index.items.find((item) => item.id === "vcc-boundary:8:9")
+const cpdHik001 = index.items.find((item) => item.id === "cpd:HIK001")
+const ep724 = index.items.find((item) => item.id === "ep:7-24")
+const vccArea9 = index.items.find((item) => item.id === "vcc-area:9")
+check(searchResultDirection(ep436, "UP") === "DOWN"
+  && same(searchResultEndpoints(ep436, "DOWN"), { from: "TUM", to: "SIH" }),
+"EP 4-36 下行顯示屯門→兆康")
+check(searchResultDirection(cpdNac43, "DOWN") === "DOWN"
+  && same(searchResultEndpoints(cpdNac43, "DOWN"), { from: "MEF", to: "NAC" }),
+"共用 CPD 跟隨所選 DOWN 方向")
+check(same(searchResultEndpoints(vcc89, "DOWN"), { from: "CKT", to: "STW" })
+  && same(searchResultEndpoints(cioPair, "DOWN"), { from: "STW", to: "CIO" })
+  && same(searchResultEndpoints(cpdHik001, "DOWN"), { from: "DIH", to: "HIK" }),
+"VCC／Neutral Zone／CPD 下行端點全部反轉")
+check(searchResultSegment(tkwEap, "DOWN")?.id === "15"
+  && same(searchResultEndpoints(tkwEap, "DOWN"), { from: "HOM", to: "TKW" })
+  && searchResultSegment(homEap, "DOWN")?.id === "16"
+  && same(searchResultEndpoints(homEap, "DOWN"), { from: "HUH", to: "HOM" }),
+"TKW／HOM EAP 下行使用方向專屬站段")
+const tkwDownPresentation = searchResultPresentation(tkwEap, "DOWN")
+const homDownPresentation = searchResultPresentation(homEap, "DOWN")
+check(tkwDownPresentation.oppositeTrack === "UP" && tkwDownPresentation.oppositeSegment?.id === "14"
+  && homDownPresentation.oppositeTrack === "UP" && homDownPresentation.oppositeSegment?.id === "15",
+"跨段 EAP 下行回退 metadata 指向正確 UP 站段")
+check(searchResultChainageText(tkwEap, "DOWN") === "100.602 km"
+  && searchResultChainageText(tkwEap, "UP") === "100.591 km"
+  && searchResultChainageText(cioPair, "DOWN") === "89.027 km"
+  && searchResultChainageText(cioPair, "UP") === "89.038 km"
+  && searchResultChainageText(ep724, "DOWN") === "97.333–97.335 km",
+"chainage metadata 跟隨方向並正規化範圍")
+check(same(searchResultStations(vccArea9, "DOWN"), ["WKS", "MOS", "HEO", "TSH", "SHM", "CIO", "STW"]),
+"VCC 區域車站清單跟隨 DOWN 反轉")
+const bothItems = visibleItems.filter((item) => item.kind !== "VCC_AREA" && item.track === "BOTH")
+check(bothItems.length === 292
+  && bothItems.every((item) => searchResultDirection(item, "UP") === "UP" && searchResultDirection(item, "DOWN") === "DOWN"),
+"292 筆雙向設施跟隨所選排列方向")
+const stationPosition = new Map(stationOrder.map((code, position) => [code, position]))
+const directionErrors = []
+for (const selected of ["UP", "DOWN"]) {
+  for (const item of visibleItems) {
+    const endpoints = searchResultEndpoints(item, selected)
+    if (!endpoints) continue
+    const direction = searchResultDirection(item, selected)
+    const delta = stationPosition.get(endpoints.to) - stationPosition.get(endpoints.from)
+    if (delta !== 0 && (direction === "UP" ? delta >= 0 : delta <= 0)) {
+      directionErrors.push(`${selected}:${item.id}:${endpoints.from}->${endpoints.to}`)
+    }
+  }
+}
+check(directionErrors.length === 0,
+`全部 594 筆結果嘅顯示端點符合所選方向${directionErrors.length ? `：${directionErrors.slice(0, 5).join("、")}` : ""}`)
+const cpdDownGroups = groupCpdsBySegment(cpdDown, "DOWN")
+check(cpdDownGroups.length === 7 && cpdDownGroups.every((group) => group.direction === "DOWN")
+  && cpdDownGroups[0]?.id === "22"
+  && same(segmentEndpoints(cpdDownGroups[0]?.segment, "DOWN"), { from: "KSR", to: "TWW" }),
+"CPD DOWN 摺疊組標題沿 TUM→WKS 反轉")
 
 if (failed) {
   console.error(`✗ 技術搜尋驗證失敗：${failed} 個檢查未通過，${passed} 個通過`)

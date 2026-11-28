@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, mainlineVccAreas, searchResultMatchTier, searchResultPresentation, searchTechnicalIndex } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.1", commit: "c45ab9d" }
+const BUILD = { version: "0.11.2", commit: "c45ab9d" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -811,14 +811,18 @@ function searchKindLabel(kind) {
   }[kind] ?? kind
 }
 
-function searchResultButton(item, defaultDir = item.defaultDir, index = 0) {
-  const s = t()
-  const km = chainageValues(item.chainageKm).filter(Number.isFinite)
-  const kmText = km.length ? `${km[0].toFixed(3)}${km.length > 1 ? `–${km.at(-1).toFixed(3)}` : ""} km` : ""
-  const segment = item.segment
-  const where = segment ? `${network.name(segment.from, LANG)} → ${network.name(segment.to, LANG)}` : item.sublabel
+function searchResultButton(item, selectedDirection = state.search?.direction ?? item.defaultDir, index = 0) {
+  const direction = searchResultDirection(item, selectedDirection)
+  const kmText = searchResultChainageText(item, direction)
+  const endpoints = searchResultEndpoints(item, direction)
+  const stations = searchResultStations(item, direction)
+  const where = endpoints
+    ? `${network.name(endpoints.from, LANG)} → ${network.name(endpoints.to, LANG)}`
+    : item.kind === "VCC_AREA"
+      ? `${item.sublabel.split(" · ")[0]}${stations.length ? ` · ${stations.map((code) => network.name(code, LANG)).join("、")}` : ""}`
+      : item.sublabel
   const track = item.track === "BOTH" ? "UP / DOWN" : item.track
-  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" tabindex="-1" class="search-result" data-search-result="${escapeHtml(item.id)}"${defaultDir ? ` data-default-dir="${defaultDir}"` : ""}>` +
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" tabindex="-1" class="search-result" data-search-result="${escapeHtml(item.id)}"${direction ? ` data-default-dir="${direction}"` : ""}>` +
     `<span class="search-result-badge ${item.kind.toLowerCase()}">${searchKindLabel(item.kind)}</span>` +
     `<span class="search-result-main"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(where)}</span></span>` +
     `<span class="search-result-meta">${track ? `<b>${track}</b>` : ""}${kmText ? `<span>${kmText}</span>` : ""}</span></button>`
@@ -871,7 +875,7 @@ function renderEpSearchHierarchy() {
   if (search.vccArea == null) {
     const areas = mainlineVccAreas(tdSearchIndex)
     return `<h3 class="search-section-title">${s.searchVccArea}</h3><div class="search-vcc-grid">` +
-      areas.map((area) => `<button type="button" class="search-vcc-area" data-search-vcc="${area.vcc}"><strong>VCC ${area.vcc}</strong><span>${escapeHtml(area.stations.map((code) => network.name(code, LANG)).join(" · "))}</span></button>`).join("") +
+      areas.map((area) => `<button type="button" class="search-vcc-area" data-search-vcc="${area.vcc}"><strong>VCC ${area.vcc}</strong><span>${escapeHtml(searchResultStations({ data: area }, search.direction).map((code) => network.name(code, LANG)).join(" · "))}</span></button>`).join("") +
       `</div>`
   }
   const group = groups.get(search.vccArea)
@@ -916,9 +920,10 @@ function searchTrackGroupLabel(group) {
 
 function searchCpdGroupButton(group, index, expanded) {
   const s = t()
-  const segment = group.segment
-  const from = segment ? network.name(segment.from, LANG) : s.searchGroupOther
-  const to = segment ? network.name(segment.to, LANG) : ""
+  const direction = group.direction ?? state.search?.direction ?? "UP"
+  const endpoints = segmentEndpoints(group.segment, direction)
+  const from = endpoints ? network.name(endpoints.from, LANG) : s.searchGroupOther
+  const to = endpoints ? network.name(endpoints.to, LANG) : ""
   const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
   const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
   const tracks = [...new Set(group.items.map((item) => item.track))].sort().join(" / ")
@@ -933,14 +938,14 @@ function flatSearchResultsHtml(rows) {
   let html = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>`
   let optionIndex = 0
   if (search.category === "CPD") {
-    for (const group of groupCpdsBySegment(rows)) {
+    for (const group of groupCpdsBySegment(rows, search.direction)) {
       const expanded = search.query.trim()
         ? !search.collapsedCpdGroups.has(group.id)
         : search.expandedCpdGroups.has(group.id)
       html += searchCpdGroupButton(group, optionIndex++, expanded)
       if (expanded) {
         html += `<div class="search-cpd-items" role="group" aria-label="${escapeHtml(group.id)}">` +
-          group.items.map((item) => searchResultButton(item, item.defaultDir, optionIndex++)).join("") + `</div>`
+          group.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
       }
     }
     return html
@@ -955,7 +960,7 @@ function flatSearchResultsHtml(rows) {
       html += `<div class="search-result-group" role="presentation">${label}</div>`
       lastGroup = group
     }
-    html += searchResultButton(item, item.defaultDir, optionIndex++)
+    html += searchResultButton(item, search.direction, optionIndex++)
   }
   return html
 }
@@ -1009,24 +1014,27 @@ function openSearchResult(id, defaultDir = null) {
   const dir = ["UP", "DOWN"].includes(defaultDir) ? defaultDir
     : ["UP", "DOWN"].includes(item.defaultDir) ? item.defaultDir
       : item.track === "DOWN" ? "DOWN" : "UP"
-  const code = dir === "UP" ? item.segment.from : item.segment.to
+  const segment = searchResultSegment(item, dir)
+  const endpoints = searchResultEndpoints(item, dir)
+  if (!segment || !endpoints) return
+  const code = endpoints.from
   const rawId = item.kind === "EP" ? item.data.id
     : item.kind === "NR" ? item.data.uid
       : item.kind === "VCC_BOUNDARY" ? item.data.between.join(":")
         : item.kind === "NZ" ? item.data.base : item.data.id
-  const presentation = searchResultPresentation(item)
+  const presentation = searchResultPresentation(item, dir)
   const fallback = presentation.fallbackReason ? {
     reason: presentation.fallbackReason,
     track: dir,
-    segment: item.segment,
+    segment,
     oppositeTrack: presentation.oppositeTrack,
     oppositeSegment: presentation.oppositeSegment,
     focusId: rawId,
   } : null
   openSegment(code, dir, {
     dual: presentation.mode === "dual",
-    segment: item.segment,
-    segmentId: item.segment.id,
+    segment,
+    segmentId: segment.id,
     fallback,
     focus: { kind: item.kind, id: rawId, dir, direction: item.direction, data: item.data },
   })

@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, groupEntryPointsByPrefix, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -771,7 +771,7 @@ function openSearch() {
   state.selected = null
   state.station = null
   state.segment = null
-  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0, direction: "UP", expandedCpdGroups: new Set(), collapsedCpdGroups: new Set() }
+  state.search = { query: "", category: "ALL", vccArea: null, status: "loading", error: "", activeIndex: 0, direction: "UP", expandedCpdGroups: new Set(), collapsedCpdGroups: new Set(), expandedEpGroups: new Set(), collapsedEpGroups: new Set() }
   setFollow(false)
   openSheet(searchShellHtml(), "search")
   loadSearchIndex().then((index) => {
@@ -924,6 +924,17 @@ function searchCpdGroupButton(group, index, expanded) {
     `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
 }
 
+function searchEpGroupButton(group, index, expanded, groupId) {
+  const s = t()
+  const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
+  const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
+  const tracks = [...new Set(group.items.map((item) => item.track))].join(" / ")
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-ep-group" data-ep-group="${escapeHtml(groupId)}">` +
+    `<span class="search-result-badge ep">${s.searchEp}</span>` +
+    `<span class="search-result-main"><strong>${escapeHtml(s.searchEpGroup(group.prefix, group.items.length))}</strong><span>${escapeHtml(tracks)}${range ? ` · ${range}` : ""}</span></span>` +
+    `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
+}
+
 function flatSearchResultsHtml(rows) {
   const search = state.search
   let html = `<div class="search-count" role="presentation">${t().searchResultCount(rows.length)}</div>`
@@ -941,17 +952,36 @@ function flatSearchResultsHtml(rows) {
     }
     return html
   }
-  let lastGroup = null
+  const sections = []
   for (const item of rows) {
     const tier = searchResultMatchTier(item, search.query)
     const trackGroup = searchTrackGroup(item)
-    const group = `${tier}:${trackGroup}`
-    if (group !== lastGroup) {
-      const label = tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(trackGroup)
-      html += `<div class="search-result-group" role="presentation">${label}</div>`
-      lastGroup = group
+    const key = `${tier}:${trackGroup}`
+    let section = sections.at(-1)
+    if (!section || section.key !== key) {
+      section = { key, tier, trackGroup, items: [] }
+      sections.push(section)
     }
-    html += searchResultButton(item, search.direction, optionIndex++)
+    section.items.push(item)
+  }
+  for (const section of sections) {
+    const label = section.tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(section.trackGroup)
+    html += `<div class="search-result-group" role="presentation">${label}</div>`
+    for (const unit of groupEntryPointsByPrefix(section.items)) {
+      if (unit.kind === "item" || unit.items.length === 1) {
+        html += searchResultButton(unit.kind === "item" ? unit.item : unit.items[0], search.direction, optionIndex++)
+        continue
+      }
+      const groupId = `ep:${section.trackGroup}:${unit.id}`
+      const expanded = search.query.trim()
+        ? !search.collapsedEpGroups.has(groupId)
+        : search.expandedEpGroups.has(groupId)
+      html += searchEpGroupButton(unit, optionIndex++, expanded, groupId)
+      if (expanded) {
+        html += `<div class="search-ep-items" role="group" aria-label="${escapeHtml(`EP ${unit.prefix}-… · ${section.trackGroup}`)}">` +
+          unit.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
+      }
+    }
   }
   return html
 }
@@ -4179,6 +4209,7 @@ function wireControls() {
     state.search.query = event.target.value
     state.search.activeIndex = 0
     state.search.collapsedCpdGroups.clear()
+    state.search.collapsedEpGroups.clear()
     if (state.search.query.trim()) state.search.vccArea = null
     renderSearchResults()
   })
@@ -4237,12 +4268,27 @@ function wireControls() {
       state.search.activeIndex = Number(button.id.replace("search-option-", ""))
       renderSearchResults()
       document.getElementById("search-input")?.focus({ preventScroll: true })
+    } else if (state.sheetKind === "search" && event.target.closest("[data-ep-group]")) {
+      const button = event.target.closest("[data-ep-group]")
+      const id = button.dataset.epGroup
+      const expanded = button.getAttribute("aria-expanded") === "true"
+      if (expanded) {
+        state.search.expandedEpGroups.delete(id)
+        state.search.collapsedEpGroups.add(id)
+      } else {
+        state.search.expandedEpGroups.add(id)
+        state.search.collapsedEpGroups.delete(id)
+      }
+      state.search.activeIndex = Number(button.id.replace("search-option-", ""))
+      renderSearchResults()
+      document.getElementById("search-input")?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-category]")) {
       const button = event.target.closest("[data-search-category]")
       state.search.category = button.dataset.searchCategory
       state.search.vccArea = null
       state.search.activeIndex = 0
       state.search.collapsedCpdGroups.clear()
+      state.search.collapsedEpGroups.clear()
       renderSearchResults()
       document.querySelector(`[data-search-category="${button.dataset.searchCategory}"]`)?.focus({ preventScroll: true })
     } else if (state.sheetKind === "search" && event.target.closest("[data-search-vcc]")) {

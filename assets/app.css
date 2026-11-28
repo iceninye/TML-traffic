@@ -1138,7 +1138,9 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .search-count { padding: 4px 2px; color: var(--muted); font-size: 11px; }
 .search-result-group { margin: 7px 2px 1px; padding: 5px 2px; border-bottom: 1px solid var(--edge); color: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; }
 .search-result.search-cpd-group { background: color-mix(in srgb, var(--tml-lite) 7%, var(--panel-2)); }
-.search-cpd-items { display: grid; gap: 7px; margin: 0 0 4px 12px; padding-left: 9px; border-left: 2px solid var(--edge); }
+.search-result.search-ep-group { background: color-mix(in srgb, var(--tml-lite) 7%, var(--panel-2)); }
+.search-cpd-items,
+.search-ep-items { display: grid; gap: 7px; margin: 0 0 4px 12px; padding-left: 9px; border-left: 2px solid var(--edge); }
 .search-result {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

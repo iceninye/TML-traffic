@@ -6,6 +6,7 @@ import {
   entryPointsByVccArea,
   findSegmentForChainage,
   groupCpdsBySegment,
+  groupEntryPointsByPrefix,
   mainlineVccAreas,
   pairNeutralZones,
   searchResultChainageText,
@@ -100,6 +101,32 @@ check([...epGroups.values()].reduce((sum, group) => sum + group.UP.length + grou
 check(same(epGroups.get(1)?.UP.map((item) => item.data.id).slice(0, 3), ["1-43", "1-1", "1-3"])
   && same(epGroups.get(1)?.DOWN.map((item) => item.data.id).slice(0, 3), ["1-44", "1-2", "1-5"]),
 "VCC 1 UP／DOWN EP 按 chainage 排序")
+
+const epRows = index.items.filter((item) => item.kind === "EP")
+const epUnits = groupEntryPointsByPrefix(epRows)
+check(same(epUnits.map((group) => [group.id, group.items.length]), [
+  ["16", 30], ["14", 16], ["7", 32], ["6", 32],
+  ["5", 24], ["1", 40], ["2", 28], ["4", 38],
+]), "240 筆 EP 按正式編號開首整合成 8 個摺疊組")
+const groupedEpIds = epUnits.flatMap((group) => group.items.map((item) => item.id))
+check(groupedEpIds.length === 240 && new Set(groupedEpIds).size === 240
+  && same([...groupedEpIds].sort(), epRows.map((item) => item.id).sort()),
+"EP 摺疊分組完整收錄 240 筆，無遺漏或重複")
+for (const [direction, expected] of Object.entries({
+  UP: { "16": 15, "14": 8, "7": 16, "6": 16, "5": 12, "1": 20, "2": 16, "4": 19 },
+  DOWN: { "16": 15, "14": 8, "7": 16, "6": 16, "5": 12, "1": 20, "2": 12, "4": 19 },
+})) {
+  const rows = searchTechnicalIndex(index, "", "ALL", direction).filter((item) => item.kind === "EP" && item.track === direction)
+  const groups = groupEntryPointsByPrefix(rows)
+  check(same(Object.fromEntries(groups.map((group) => [group.id, group.items.length])), expected),
+  `EP ${direction} 各前綴組數量正確，唔跨軌合併`)
+}
+const epRowsSnapshot = JSON.stringify(epRows)
+groupEntryPointsByPrefix(epRows)
+check(JSON.stringify(epRows) === epRowsSnapshot, "EP 摺疊分組唔改動原搜尋結果或陣列順序")
+const exactEp = searchTechnicalIndex(index, "EP 16-28", "EP", "UP")
+check(exactEp.length === 1 && groupEntryPointsByPrefix(exactEp)[0]?.items.length === 1,
+"完全匹配 EP 只形成單項，UI 可直接顯示而唔隱藏")
 
 const ep12 = index.items.find((item) => item.id === "ep:1-2")
 check(ep12?.track === "DOWN" && ep12.direction === "WKS" && ep12.vccArea === 1 && ep12.segment?.id === "20",

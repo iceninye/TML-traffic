@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.10", commit: "b37d58e" }
+const BUILD = { version: "0.11.11", commit: "b37d58e" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -2899,8 +2899,9 @@ function segmentFocusFromMarker(marker, segment) {
     return sequence.find((item) => item.kind === kind && String(item.id) === routeId)
   }
   const focusId = marker.dataset.focusId
-  const focusKind = marker.classList.contains("segment-neutral-zone-group") ? "NZ"
-    : marker.classList.contains("segment-vcc-line") ? "VCC_BOUNDARY" : marker.dataset.focusKind
+  const focusKind = marker.dataset.focusKind
+    ?? (marker.classList.contains("segment-neutral-zone-group") ? "NZ"
+      : marker.classList.contains("segment-vcc-line") ? "VCC_BOUNDARY" : null)
   return sequence.find((item) => item.kind === focusKind && String(item.id) === focusId)
 }
 
@@ -3151,7 +3152,8 @@ function buildSegmentDiagram(force = false) {
   stationLayer.append(...stationHits)
   const jumpIconLayer = make("g", { id: "segment-jump-icon-layer" })
   jumpIconLayer.append(...jumpIcons)
-  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), jumpIconLayer)
+  const markerHitLayer = make("g", { id: "segment-marker-hit-layer", "aria-hidden": "true" })
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), markerHitLayer, jumpIconLayer)
   const labelRoom = width - labelX - 8
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()
@@ -3301,9 +3303,11 @@ function setSegmentRouteItem(kind, id, direction) {
 function paintSegmentInfrastructure() {
   const segment = state.segment
   const layer = segment?.geometry?.svg?.querySelector("#segment-infrastructure-layer")
-  if (!segment?.geometry?.tracks || !layer) return
+  const hitLayer = segment?.geometry?.svg?.querySelector("#segment-marker-hit-layer")
+  if (!segment?.geometry?.tracks || !layer || !hitLayer) return
   const { svg, top, bottom, tracks } = segment.geometry
   layer.replaceChildren()
+  hitLayer.replaceChildren()
   const defs = make("defs")
   layer.append(defs)
   const focus = segment.focus
@@ -3357,8 +3361,14 @@ function paintSegmentInfrastructure() {
         make("title", {}, `${zone.isolator} ${rangeText}`),
         make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
         label,
-        make("rect", { x: swatchX - 14, y: center - 18, width: swatchWidth + 28, height: 36, class: "segment-marker-hit" }),
       )
+      hitLayer.append(make("rect", {
+        x: swatchX - 14, y: center - 18, width: swatchWidth + 28, height: 36,
+        class: "segment-marker-hit",
+        "data-focus-kind": "NZ",
+        "data-focus-id": base,
+        "data-track": dir,
+      }))
       trackLayer.append(group)
     }
 
@@ -3387,14 +3397,15 @@ function paintSegmentInfrastructure() {
           make("text", { x: right, y: y - 7, class: "segment-vcc-label segment-vcc-km", "text-anchor": "end" }, `${chainageText(boundary.values)} km`),
           make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
         ] : []),
-        make("line", {
-          x1: left, y1: y, x2: right, y2: y,
-          class: "segment-vcc-line segment-marker-hit",
-          "data-vcc-boundary": id,
-          "data-focus-id": id,
-          "data-track": dir,
-        }),
       )
+      hitLayer.append(make("line", {
+        x1: left, y1: y, x2: right, y2: y,
+        class: "segment-vcc-line segment-marker-hit",
+        "data-vcc-boundary": id,
+        "data-focus-kind": "VCC_BOUNDARY",
+        "data-focus-id": id,
+        "data-track": dir,
+      }))
     }
 
     const epRoute = segment.routes?.EP
@@ -3421,8 +3432,14 @@ function paintSegmentInfrastructure() {
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
           make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`),
-          make("rect", { x: x - 14, y: y - 14, width: 90, height: 28, class: "segment-marker-hit" }),
         )
+        hitLayer.append(make("rect", {
+          x: x - 14, y: y - 14, width: 90, height: 28,
+          class: "segment-marker-hit",
+          "data-route-marker": "EP",
+          "data-route-id": itemId,
+          "data-track": dir,
+        }))
         trackLayer.append(control)
       }
     }
@@ -3448,8 +3465,14 @@ function paintSegmentInfrastructure() {
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
           make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`),
-          make("rect", { x: x - 14, y: y - 14, width: 82, height: 28, class: "segment-marker-hit" }),
         )
+        hitLayer.append(make("rect", {
+          x: x - 14, y: y - 14, width: 82, height: 28,
+          class: "segment-marker-hit",
+          "data-route-marker": "NR",
+          "data-route-id": room.uid,
+          "data-track": dir,
+        }))
         trackLayer.append(control)
       }
     }
@@ -3474,18 +3497,16 @@ function paintSegmentInfrastructure() {
           "data-track": dir,
         })
         marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
-        trackLayer.append(
-          marker,
-          make("circle", {
-            cx: markerX,
-            cy: y,
-            r: 12,
-            class: "segment-marker-hit",
-            "data-route-marker": kind,
-            "data-route-id": point.id,
-            "data-track": dir,
-          }),
-        )
+        trackLayer.append(marker)
+        hitLayer.append(make("circle", {
+          cx: markerX,
+          cy: y,
+          r: 12,
+          class: "segment-marker-hit",
+          "data-route-marker": kind,
+          "data-route-id": point.id,
+          "data-track": dir,
+        }))
       }
     }
     layer.append(trackLayer)
@@ -3566,7 +3587,7 @@ function paintSegmentConnectors() {
       y2: targetY - layoutRect.top,
       class: `segment-${focus.kind.toLowerCase()}-connector`,
       stroke: segmentFocusColor(segment),
-      "stroke-opacity": 0.82,
+      "stroke-opacity": 0.95,
       "vector-effect": "non-scaling-stroke",
       "data-route-kind": focus.kind,
       "data-route-id": itemId,
@@ -3592,7 +3613,7 @@ function paintSegmentConnectors() {
       y2: buttonY - layoutRect.top,
       class: `segment-${kind.toLowerCase()}-connector`,
       stroke: color,
-      "stroke-opacity": 0.72,
+      "stroke-opacity": 0.9,
       "vector-effect": "non-scaling-stroke",
       "data-route-kind": kind,
       "data-route-id": id,

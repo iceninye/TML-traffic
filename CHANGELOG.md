@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.11 — 2026-11-28 (`pending`, test branch)
+- 修正列車節點透明觸控圈遮住 EP／CPD／NR／EAP／NZ／VCC marker 嘅問題；設施觸控層獨立放到列車層之上，撳 marker 唔會誤開列車卡。
+- 連線加粗至 2px 並提高不透明度，手機寬度下更容易辨識。
+- 使用真實 393×852 WebKit viewport 同 touch 事件驗證六類設施；全部由搜尋結果及路線 marker 正確顯示一條直線。
+- Shell cache renamed `v113`。
+
 ## v0.11.10 — 2026-11-28 (`b37d58e`, test branch)
 - 修正路線 EP／Niche Room 文字 label 唔屬於 marker 點擊範圍嘅問題；而家撳 label 或圓點都會選取設施、捲到清單並顯示直線。
 - 加大 EP／NR label、CPD／EAP 圓點、Neutral Zone 同 VCC 交界觸控範圍，減少 iPhone 需要重複撳先成功。

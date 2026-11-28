@@ -99,7 +99,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 - 搜尋支援全形字、大小寫、空格及 `[/／↔\-–—]` 分隔符；EP 不接受無分隔符數字拆解，避免 `1-12` 同 `11-2` 日後撞位。扁平結果可用 ↑／↓ 選取、Enter 開啟，Esc 先清空再關閉；IME 組字期間不會誤跳轉。
 - VCC 交界、雙向 Neutral Zone、共用 CPD 同雙向 EAP 開雙軌圖；UP 橙線喺左、DOWN 藍線喺右，屯門方向喺上。
 - 所有螢幕尺寸都維持左右排版：左邊係軌圖，右邊係技術資料；640px 以上使用較闊雙欄、獨立捲動同 SVG 連線，640px 以下技術資料固定展開，只保留靜態標題／總數，唔再提供收合或展開。667×375 矮橫屏使用緊湊頂列。
-- 路線 marker 同搜尋結果一致：點擊 EP／Niche Room 嘅圓點或文字 label、CPD／EAP 圓點、Neutral Zone 或 VCC 交界會選取設施、自動捲到清單項目，並由 marker 以直線連到實際按鈕；點擊另一軌 marker 會先切換 UP／DOWN。EP／Niche Room／EAP 連線 switch 仍可控制。
+- 路線 marker 同搜尋結果一致：點擊 EP／Niche Room 嘅圓點或文字 label、CPD／EAP 圓點、Neutral Zone 或 VCC 交界會選取設施、自動捲到清單項目，並由 marker 以 2px 直線連到實際按鈕；設施觸控層位於列車層之上，避免列車透明觸控圈遮住 marker。點擊另一軌 marker 會先切換 UP／DOWN。EP／Niche Room／EAP 連線 switch 仍可控制。
 - TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
 - EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
 - 「全部」或 EP 搜尋結果嘅扁平清單會按正式 EP 編號開首整合成摺疊組（例如 `EP 16-…`）；沿用現有方向／匹配分組，空查詢預設收合，搜尋自動展開，完全匹配單項直接顯示。展開後保留原方向 chainage 次序，鍵盤操作比照 CPD。

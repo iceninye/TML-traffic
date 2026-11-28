@@ -3,6 +3,49 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.13 — 2026-11-28 (`372b389`, test branch)
+- 由搜尋結果開站段圖後，按 `X` 會返回上一頁搜尋結果，而唔再直接返回主頁；再由搜尋 `X` 才回主頁。
+- 保留搜尋查詢、類別／VCC 區域、UP／DOWN、摺疊狀態、結果 active 項目同實際 sheet 捲動位置；開站段圖時捲到頂部。
+- 真實 393×852 WebKit touch 驗證返回流程、24 項 EP 5 下行結果、active 項目同 180px 捲動位置，截圖確認。
+- Shell cache renamed `v115`。
+
+## v0.11.12 — 2026-11-28 (`9a8e1a0`, test branch)
+- 恢復右邊 EP／CPD／Niche Room／EAP 掣切換至「全部」時嘅全部連線：窄屏依家跟隨已顯示 marker 逐項連到右邊按鈕，唔再要求 `focus`。
+- 單項模式仍只連所選項目；關掉連線 switch 或全部 marker 收起時隱藏連線。
+- 真實 393×852 WebKit touch 驗證：EP 全部模式 4 條、CPD 8 條、NR 1 條、EAP 3 條，截圖確認直線可見。
+- Shell cache renamed `v114`。
+
+## v0.11.11 — 2026-11-28 (`1491192`, test branch)
+- 修正列車節點透明觸控圈遮住 EP／CPD／NR／EAP／NZ／VCC marker 嘅問題；設施觸控層獨立放到列車層之上，撳 marker 唔會誤開列車卡。
+- 連線加粗至 2px 並提高不透明度，手機寬度下更容易辨識。
+- 使用真實 393×852 WebKit viewport 同 touch 事件驗證六類設施；全部由搜尋結果及路線 marker 正確顯示一條直線。
+- Shell cache renamed `v113`。
+
+## v0.11.10 — 2026-11-28 (`b37d58e`, test branch)
+- 修正路線 EP／Niche Room 文字 label 唔屬於 marker 點擊範圍嘅問題；而家撳 label 或圓點都會選取設施、捲到清單並顯示直線。
+- 加大 EP／NR label、CPD／EAP 圓點、Neutral Zone 同 VCC 交界觸控範圍，減少 iPhone 需要重複撳先成功。
+- 連線起點保留最少可見長度，修正 VCC 交界貼近右欄時因 `x2 <= x1` 被省略。
+- 聚焦後同步及下一 frame 重繪連線，並觀察技術面板尺寸變化，減少捲動或佈局更新後漏線。
+- Shell cache renamed `v112`。
+
+## v0.11.9 — 2026-11-28 (`2d2d07e`, test branch)
+- 技術資料面板固定展開，移除收合／展開掣同三態抽屜；窄屏保留靜態標題同設施總數。
+- 路線 EP、CPD、Niche Room、EAP、Neutral Zone 同 VCC 交界 marker 改為可點擊，行為與搜尋結果一致：選取設施、自動捲到清單項目並顯示直線連線。
+- 點擊另一軌 marker 會自動切換 UP／DOWN；補上 CPD／EAP／NZ／VCC 嘅透明加大觸控範圍。
+- Shell cache renamed `v111`。
+
+## v0.11.8 — 2026-11-28 (`0f685ad`, test branch)
+- 窄屏由搜尋聚焦技術設施時直接展開完整清單，唔再收埋喺 Peek 詳情卡；自動捲到所選項目。
+- EP、CPD、Niche Room、EAP、Neutral Zone 同 VCC 交界統一由軌圖 marker 繪一條直線到實際清單按鈕，唔再使用直角繞線。
+- 保留 EP／Niche Room／EAP 各自連線 switch；寬屏額外支援聚焦 CPD、Neutral Zone 同 VCC 交界連線。
+- Shell cache renamed `v110`。
+
+## v0.11.7 — 2026-11-28 (`0208f5d`, test branch)
+- 640px 以下搜尋聚焦 EP 時新增單條位置連線：Peek 連到可見詳情卡，Expanded 連到實際 EP 按鈕，Collapsed 隱藏。
+- 窄屏連線沿用綠色（WKS）／黃色（TUM）方向配色及 EP 連線 switch；寬屏原本全部 EP 連線行為不變。
+- 連線改用沿軌圖右緣嘅直角路徑，避免 360px 斜線穿過技術 label；360px 實測零溢出。
+- Shell cache renamed `v109`。
+
 ## v0.11.6 — 2026-11-28 (`665d407`, test branch)
 - 「全部」混合搜尋結果入面嘅 CPD 按站段及現有軌道分組收合，例如顯徑—鑽石山 12 筆整合為一組；空查詢收合、搜尋展開、完全匹配單項直接顯示。
 - CPD 專用類別維持 7 組做法；混合結果初始由 370 個選項減至 119 個（94 個普通項目＋16 個 EP 組＋9 個 CPD 組）。

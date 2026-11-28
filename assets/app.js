@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.6", commit: "665d407" }
+const BUILD = { version: "0.11.13", commit: "372b389" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -131,6 +131,7 @@ const state = {
   station: null,
   segment: null,
   search: null,
+  searchReturn: null,
 }
 
 let network = null
@@ -1068,6 +1069,11 @@ function openSearchResult(id, defaultDir = null) {
     oppositeSegment: presentation.oppositeSegment,
     focusId: rawId,
   } : null
+  state.searchReturn = {
+    search: state.search,
+    scrollTop: els.sheet.scrollTop,
+    activeIndex: state.search.activeIndex,
+  }
   openSegment(code, dir, {
     dual: presentation.mode === "dual",
     segment,
@@ -2236,6 +2242,25 @@ function closeSheet() {
   const wasOpen = els.sheet.dataset.open === "1"
   const returnTo = sheetTrigger
   resetSheetDrag()
+  if (wasOpen && state.sheetKind === "segment" && state.searchReturn?.search) {
+    const snapshot = state.searchReturn
+    state.search = snapshot.search
+    state.searchReturn = null
+    state.selected = null
+    state.station = null
+    state.segment = null
+    delete els.sheet.dataset.mode
+    delete els.sheet.dataset.drawer
+    delete els.sheet.dataset.segmentLayout
+    openSheet(searchShellHtml(), "search")
+    renderSearchResults()
+    requestAnimationFrame(() => {
+      els.sheet.scrollTop = snapshot.scrollTop
+      if (snapshot.activeIndex >= 0) setSearchActive(snapshot.activeIndex)
+      document.getElementById("search-input")?.focus({ preventScroll: true })
+    })
+    return
+  }
   els.sheet.dataset.open = "0"
   els.sheetBackdrop.dataset.open = "0"
   delete els.sheet.dataset.kind
@@ -2251,6 +2276,7 @@ function closeSheet() {
   state.station = null
   state.segment = null
   state.search = null
+  state.searchReturn = null
   sheetTrigger = null
   setFollow(false)
   if (wasOpen) setTimeout(() => returnTo?.isConnected && returnTo.focus({ preventScroll: true }), 0)
@@ -2450,12 +2476,10 @@ function segmentDirectionSwitchHtml() {
 
 function segmentDrawerShellHtml() {
   const s = t()
-  return `<div class="segment-drawer" id="segment-drawer" data-drawer="collapsed">` +
-    `<button type="button" class="segment-drawer-handle" data-segment-drawer="toggle" aria-expanded="false" aria-controls="segment-drawer-body">` +
-    `<span class="segment-drawer-grip" aria-hidden="true"></span><span data-drawer-summary>${s.tdLoading}</span><b data-drawer-action>${s.searchExpand} ▲</b></button>` +
+  const segment = state.segment
+  return `<div class="segment-drawer" id="segment-drawer" data-drawer="expanded">` +
+    `<div class="segment-drawer-head"><span>${s.segmentTechnical}</span><b data-drawer-summary>(${segmentRecordCount(segment)})</b></div>` +
     `<div class="segment-drawer-body" id="segment-drawer-body">` +
-    `<div class="segment-drawer-pane segment-drawer-collapsed" data-drawer-pane="collapsed" hidden></div>` +
-    `<div class="segment-drawer-pane segment-drawer-peek" data-drawer-pane="peek" hidden>${s.tdLoading}</div>` +
     `<div class="segment-drawer-pane segment-drawer-expanded" data-drawer-pane="expanded" tabindex="-1">${s.tdLoading}</div>` +
     `</div></div>`
 }
@@ -2511,7 +2535,7 @@ function openSegment(code, dir, options = {}) {
     segmentId: options.segmentId ?? options.segment?.id ?? null,
     focus: options.focus ?? null,
     fallback: options.fallback ?? null,
-    drawer: options.focus ? "peek" : "collapsed",
+    drawer: "expanded",
     focusSequence: null,
     focusIndex: -1,
     recordsByDir: null,
@@ -2532,6 +2556,7 @@ function openSegment(code, dir, options = {}) {
   }
   setFollow(false)
   openSheet(segmentShellHtml(code, dest, dir), "segment")
+  els.sheet.scrollTop = 0
   els.sheet.dataset.mode = dual ? "dual" : "single"
   els.sheet.dataset.drawer = state.segment.drawer
   syncSegmentDrawer()
@@ -2556,6 +2581,7 @@ function openSegment(code, dir, options = {}) {
     })
     observer.observe(svg)
     if (layout) observer.observe(layout)
+    if (infoPane) observer.observe(infoPane)
   }
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
@@ -2816,60 +2842,39 @@ function syncSegmentDrawer() {
   const segment = state.segment
   if (!segment || state.sheetKind !== "segment") return
   const wide = isWideSegmentLayout()
-  const drawer = segment.drawer
-  const visible = wide ? "expanded" : drawer
-  els.sheet.dataset.drawer = drawer
+  segment.drawer = "expanded"
+  els.sheet.dataset.drawer = "expanded"
   els.sheet.dataset.segmentLayout = wide ? "wide" : "narrow"
-  const handle = document.querySelector(".segment-drawer-handle")
   const body = document.getElementById("segment-drawer-body")
   if (body) {
-    body.hidden = !wide && drawer === "collapsed"
-    body.toggleAttribute("inert", body.hidden)
+    body.hidden = false
+    body.removeAttribute("inert")
   }
-  if (handle) {
-    handle.hidden = wide
-    handle.setAttribute("aria-expanded", String(drawer !== "collapsed"))
-    const action = handle.querySelector("[data-drawer-action]")
-    if (action) action.textContent = drawer === "expanded" ? `${t().searchCollapse} ▼` : `${t().searchExpand} ▲`
-    const summary = handle.querySelector("[data-drawer-summary]")
-    if (summary) summary.textContent = `${t().segmentTechnical} (${segmentRecordCount(segment)})`
-  }
+  const summary = document.querySelector("[data-drawer-summary]")
+  if (summary) summary.textContent = `(${segmentRecordCount(segment)})`
   document.querySelectorAll("[data-drawer-pane]").forEach((pane) => {
-    pane.hidden = pane.dataset.drawerPane !== visible
+    pane.hidden = pane.dataset.drawerPane !== "expanded"
     pane.toggleAttribute("inert", pane.hidden)
   })
 }
 
-function setSegmentDrawer(mode) {
-  const segment = state.segment
-  if (!segment || !["collapsed", "peek", "expanded"].includes(mode)) return
-  segment.drawer = mode
+function setSegmentDrawer() {
+  if (!state.segment) return
+  state.segment.drawer = "expanded"
   syncSegmentDrawer()
   paintSegmentConnectors()
-  setTimeout(() => {
-    if (state.segment !== segment || state.sheetKind !== "segment") return
-    if (isWideSegmentLayout()) return
-    if (mode === "peek") {
-      scrollSegmentMarkerIntoView(segment)
-      document.querySelector(".segment-focus-detail")?.focus({ preventScroll: true })
-    } else if (mode === "collapsed") {
-      document.querySelector(".segment-drawer-handle")?.focus({ preventScroll: true })
-    } else {
-      document.querySelector(".segment-drawer-expanded")?.focus({ preventScroll: true })
-    }
-  }, 0)
 }
 
-function selectSegmentFocus(item, mode = "peek") {
+function selectSegmentFocus(item) {
   const segment = state.segment
   if (!segment || !item) return
   segment.focus = { kind: item.kind, id: item.id, dir: segment.activeDir, direction: item.direction, data: item.data }
   applySegmentFocus(segment)
-  segment.drawer = mode
+  segment.drawer = "expanded"
   paintSegmentInfo()
   paintSegmentInfrastructure()
   syncSegmentTrains()
-  setSegmentDrawer(mode)
+  focusSegmentItem(segment)
 }
 
 function moveSegmentFocus(delta) {
@@ -2886,8 +2891,8 @@ function scrollSegmentMarkerIntoView(segment) {
   const route = document.querySelector(".segment-route")
   if (!focus || !route) return
   const routeId = focus.kind === "EP" ? `${focus.direction}:${focus.id}` : focus.id
-  const marker = document.querySelector(`[data-route-marker="${focus.kind}"][data-route-id="${CSS.escape(routeId)}"]`)
-    ?? document.querySelector(`[data-focus-id="${CSS.escape(focus.id)}"]`)
+  const marker = document.querySelector(`[data-route-marker="${focus.kind}"][data-route-id="${CSS.escape(routeId)}"][data-track="${segment.activeDir}"]:not(.segment-marker-hit)`)
+    ?? document.querySelector(`[data-focus-id="${CSS.escape(focus.id)}"][data-track="${segment.activeDir}"]:not(.segment-marker-hit)`)
   if (!marker) return
   const mr = marker.getBoundingClientRect()
   const rr = route.getBoundingClientRect()
@@ -2907,6 +2912,33 @@ function segmentFocusFromRow(row, segment) {
     return sequence.find((item) => item.kind === "EP" && item.id === id && item.direction === direction)
   }
   return null
+}
+
+function segmentFocusFromMarker(marker, segment) {
+  const sequence = segment.focusSequence ?? segmentFocusSequence(segment)
+  const kind = marker.dataset.routeMarker
+  if (kind) {
+    const routeId = marker.dataset.routeId ?? ""
+    if (kind === "EP") {
+      const [direction, id] = routeId.split(":")
+      return sequence.find((item) => item.kind === "EP" && String(item.id) === id && item.direction === direction)
+    }
+    return sequence.find((item) => item.kind === kind && String(item.id) === routeId)
+  }
+  const focusId = marker.dataset.focusId
+  const focusKind = marker.dataset.focusKind
+    ?? (marker.classList.contains("segment-neutral-zone-group") ? "NZ"
+      : marker.classList.contains("segment-vcc-line") ? "VCC_BOUNDARY" : null)
+  return sequence.find((item) => item.kind === focusKind && String(item.id) === focusId)
+}
+
+function activateSegmentMarker(marker) {
+  const segment = state.segment
+  if (!segment) return
+  const track = marker.dataset.track
+  if (["UP", "DOWN"].includes(track) && track !== segment.activeDir) setSegmentDirection(track)
+  const item = segmentFocusFromMarker(marker, segment)
+  if (item) selectSegmentFocus(item)
 }
 
 function segmentInfoHtml(segment) {
@@ -3147,7 +3179,8 @@ function buildSegmentDiagram(force = false) {
   stationLayer.append(...stationHits)
   const jumpIconLayer = make("g", { id: "segment-jump-icon-layer" })
   jumpIconLayer.append(...jumpIcons)
-  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), jumpIconLayer)
+  const markerHitLayer = make("g", { id: "segment-marker-hit-layer", "aria-hidden": "true" })
+  svg.append(base, make("g", { id: "segment-infrastructure-layer" }), stationLayer, make("g", { id: "segment-train-layer" }), markerHitLayer, jumpIconLayer)
   const labelRoom = width - labelX - 8
   for (const label of svg.querySelectorAll(".segment-station-label")) {
     const measured = label.getComputedTextLength()
@@ -3186,27 +3219,32 @@ function applySegmentFocus(segment) {
 
 function focusSegmentItem(segment) {
   if (!segment?.focus) return
-  if (!isWideSegmentLayout()) {
-    setSegmentDrawer("peek")
-    return
-  }
   const token = segment.openToken
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
-    const info = document.getElementById("segment-info")
-    if (!info) return
-    const focus = segment.focus
-    let target = null
-    if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
-      target = [...info.querySelectorAll("[data-route-kind]")].find((button) =>
-        button.dataset.routeKind === focus.kind && button.dataset.routeId === focus.id
-        && (focus.kind !== "EP" || button.dataset.epDir === focus.direction))
-    } else {
-      target = info.querySelector(`[data-focus-kind="${focus.kind}"][data-focus-id="${CSS.escape(focus.id)}"]`)
-    }
+    const target = segmentFocusTarget(segment)
     if (!target) return
-    target.scrollIntoView({ block: "center", behavior: "auto" })
+    if (!isWideSegmentLayout()) {
+      scrollSegmentMarkerIntoView(segment)
+      if (segment.drawer === "expanded") {
+        const pane = document.querySelector(".segment-drawer-expanded")
+        if (pane) {
+          const paneRect = pane.getBoundingClientRect()
+          const targetRect = target.getBoundingClientRect()
+          if (targetRect.top < paneRect.top + 8 || targetRect.bottom > paneRect.bottom - 8) {
+            pane.scrollTop += targetRect.top + targetRect.height / 2 - paneRect.top - paneRect.height / 2
+          }
+        }
+      }
+    } else {
+      target.scrollIntoView({ block: "center", behavior: "auto" })
+    }
     if (target.matches("button")) target.focus({ preventScroll: true })
+    paintSegmentConnectors()
+    requestAnimationFrame(() => {
+      if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
+      paintSegmentConnectors()
+    })
   })
 }
 
@@ -3229,7 +3267,6 @@ function setSegmentDirection(dir) {
     else {
       segment.focus = null
       segment.focusIndex = -1
-      if (segment.drawer === "peek") segment.drawer = "collapsed"
     }
   }
   buildSegmentDiagram(true)
@@ -3293,9 +3330,11 @@ function setSegmentRouteItem(kind, id, direction) {
 function paintSegmentInfrastructure() {
   const segment = state.segment
   const layer = segment?.geometry?.svg?.querySelector("#segment-infrastructure-layer")
-  if (!segment?.geometry?.tracks || !layer) return
+  const hitLayer = segment?.geometry?.svg?.querySelector("#segment-marker-hit-layer")
+  if (!segment?.geometry?.tracks || !layer || !hitLayer) return
   const { svg, top, bottom, tracks } = segment.geometry
   layer.replaceChildren()
+  hitLayer.replaceChildren()
   const defs = make("defs")
   layer.append(defs)
   const focus = segment.focus
@@ -3350,6 +3389,13 @@ function paintSegmentInfrastructure() {
         make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
         label,
       )
+      hitLayer.append(make("rect", {
+        x: swatchX - 14, y: center - 18, width: swatchWidth + 28, height: 36,
+        class: "segment-marker-hit",
+        "data-focus-kind": "NZ",
+        "data-focus-id": base,
+        "data-track": dir,
+      }))
       trackLayer.append(group)
     }
 
@@ -3379,6 +3425,14 @@ function paintSegmentInfrastructure() {
           make("text", { x: left, y: y + 16, class: "segment-vcc-label" }, `VCC ${vccTo ?? boundary.between[1]}`),
         ] : []),
       )
+      hitLayer.append(make("line", {
+        x1: left, y1: y, x2: right, y2: y,
+        class: "segment-vcc-line segment-marker-hit",
+        "data-vcc-boundary": id,
+        "data-focus-kind": "VCC_BOUNDARY",
+        "data-focus-id": id,
+        "data-track": dir,
+      }))
     }
 
     const epRoute = segment.routes?.EP
@@ -3404,9 +3458,16 @@ function paintSegmentInfrastructure() {
         control.append(
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+          make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`),
         )
+        hitLayer.append(make("rect", {
+          x: x - 14, y: y - 14, width: 90, height: 28,
+          class: "segment-marker-hit",
+          "data-route-marker": "EP",
+          "data-route-id": itemId,
+          "data-track": dir,
+        }))
         trackLayer.append(control)
-        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
       }
     }
 
@@ -3430,9 +3491,16 @@ function paintSegmentInfrastructure() {
           make("title", {}, `${room.name} · ${chainageText(room.chainageKm)} km`),
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
+          make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`),
         )
+        hitLayer.append(make("rect", {
+          x: x - 14, y: y - 14, width: 82, height: 28,
+          class: "segment-marker-hit",
+          "data-route-marker": "NR",
+          "data-route-id": room.uid,
+          "data-track": dir,
+        }))
         trackLayer.append(control)
-        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`))
       }
     }
 
@@ -3457,6 +3525,15 @@ function paintSegmentInfrastructure() {
         })
         marker.append(make("title", {}, `${point.id} · ${chainageText(point.chainageKm)} km`))
         trackLayer.append(marker)
+        hitLayer.append(make("circle", {
+          cx: markerX,
+          cy: y,
+          r: 12,
+          class: "segment-marker-hit",
+          "data-route-marker": kind,
+          "data-route-id": point.id,
+          "data-track": dir,
+        }))
       }
     }
     layer.append(trackLayer)
@@ -3464,16 +3541,46 @@ function paintSegmentInfrastructure() {
   paintSegmentConnectors()
 }
 
+function segmentFocusMarker(segment) {
+  const focus = segment?.focus
+  if (!focus) return null
+  const track = segment.activeDir
+  const id = CSS.escape(focus.id)
+  if (focus.kind === "EP") {
+    const direction = focus.direction === "TUM" ? "TUM" : "WKS"
+    return document.querySelector(`.segment-ep-control[data-track="${track}"][data-route-id="${CSS.escape(`${direction}:${focus.id}`)}"] .segment-ep-dot`)
+  }
+  if (focus.kind === "NR") return document.querySelector(`.segment-nr-control[data-track="${track}"][data-route-id="${id}"] .segment-nr-dot`)
+  if (focus.kind === "CPD" || focus.kind === "EAP") {
+    return document.querySelector(`.segment-${focus.kind.toLowerCase()}-dot[data-track="${track}"][data-route-id="${id}"]`)
+  }
+  return document.querySelector(`.segment-route [data-focus-id="${id}"][data-track="${track}"]:not(.segment-marker-hit)`)
+}
+
+function segmentFocusTarget(segment) {
+  const focus = segment?.focus
+  const info = document.getElementById("segment-info")
+  if (!focus || !info) return null
+  const id = CSS.escape(focus.id)
+  if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
+    const direction = focus.kind === "EP" ? `[data-ep-dir="${focus.direction === "TUM" ? "TUM" : "WKS"}"]` : ""
+    return info.querySelector(`[data-route-kind="${focus.kind}"][data-route-id="${id}"]${direction}`)
+  }
+  return info.querySelector(`[data-focus-kind="${focus.kind}"][data-focus-id="${id}"]`)
+}
+
+function segmentFocusColor(segment) {
+  const focus = segment?.focus
+  if (focus?.kind === "EP") return focus.direction === "TUM" ? "#f5c451" : "#58c77a"
+  return { NR: "#d65db1", CPD: "#67c7ff", EAP: "#ff7a59", NZ: "#c48bff", VCC_BOUNDARY: "#ef6b6b" }[focus?.kind] ?? "#c48bff"
+}
+
 function paintSegmentConnectors() {
   const segment = state.segment
   const svg = document.getElementById("segment-connectors")
   if (!svg || state.sheetKind !== "segment" || !segment) return
   svg.replaceChildren()
-  if (!isWideSegmentLayout()) {
-    svg.hidden = true
-    return
-  }
-  svg.hidden = false
+  svg.hidden = true
   const layout = document.querySelector(".segment-layout")
   const info = document.getElementById("segment-info")
   if (!layout || !info) return
@@ -3481,14 +3588,17 @@ function paintSegmentConnectors() {
   const infoRect = info.getBoundingClientRect()
   if (!layoutRect.width || !layoutRect.height) return
   svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
+  const wide = isWideSegmentLayout()
+  const targetGap = wide ? 6 : 4
+  const markerGap = wide ? 6 : 3
 
   const appendConnector = (dot, button, color, kind, id, direction = null) => {
     const dotRect = dot.getBoundingClientRect()
     const buttonRect = button.getBoundingClientRect()
     const buttonY = buttonRect.top + buttonRect.height / 2
-    if (buttonY < infoRect.top || buttonY > infoRect.bottom) return
-    const x1 = dotRect.right + 6 - layoutRect.left
-    const x2 = buttonRect.left - 6 - layoutRect.left
+    if (!dotRect.width || !buttonRect.width || buttonY < infoRect.top || buttonY > infoRect.bottom) return
+    const x2 = buttonRect.left - targetGap - layoutRect.left
+    const x1 = Math.min(dotRect.right + markerGap - layoutRect.left, x2 - 8)
     if (x2 <= x1) return
     svg.append(make("line", {
       x1,
@@ -3497,12 +3607,13 @@ function paintSegmentConnectors() {
       y2: buttonY - layoutRect.top,
       class: `segment-${kind.toLowerCase()}-connector`,
       stroke: color,
-      "stroke-opacity": 0.72,
+      "stroke-opacity": 0.92,
       "vector-effect": "non-scaling-stroke",
       "data-route-kind": kind,
       "data-route-id": id,
       ...(direction ? { "data-ep-direction": direction } : {}),
     }))
+    svg.hidden = false
   }
 
   if (segment.epConnectors !== false) {
@@ -3543,6 +3654,22 @@ function paintSegmentConnectors() {
       const button = eapButtons.get(id)
       if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
     }
+  }
+
+  const cpdButtons = new Map([...info.querySelectorAll(".cpd-dot")].map((button) => [
+    button.dataset.routeId,
+    button,
+  ]))
+  for (const dot of document.querySelectorAll(`.segment-cpd-dot[data-track="${segment.activeDir}"][data-route-id]`)) {
+    const id = dot.dataset.routeId
+    const button = cpdButtons.get(id)
+    if (button) appendConnector(dot, button, "#67c7ff", "CPD", id)
+  }
+
+  if (["NZ", "VCC_BOUNDARY"].includes(segment.focus?.kind)) {
+    const marker = segmentFocusMarker(segment)
+    const target = segmentFocusTarget(segment)
+    if (marker && target) appendConnector(marker, target, segmentFocusColor(segment), segment.focus.kind, segment.focus.id)
   }
 }
 
@@ -4165,20 +4292,12 @@ function wireControls() {
   let segmentResizeTimer = 0
   window.addEventListener("resize", () => {
     if (state.sheetKind !== "segment") return
-    const active = document.activeElement
-    const focusWasExpanded = Boolean(active?.closest?.('[data-drawer-pane="expanded"]'))
-    const focusWasPeek = Boolean(active?.closest?.('[data-drawer-pane="peek"]'))
     window.clearTimeout(segmentResizeTimer)
     segmentResizeTimer = window.setTimeout(() => {
       if (state.sheetKind !== "segment") return
       syncSegmentDrawer()
       buildSegmentDiagram(true)
       paintSegmentConnectors()
-      if (focusWasExpanded && !isWideSegmentLayout()) {
-        const target = state.segment.drawer === "peek" ? document.querySelector(".segment-focus-detail") : document.querySelector(".segment-drawer-handle")
-        target?.focus({ preventScroll: true })
-      }
-      if (focusWasPeek && isWideSegmentLayout()) document.querySelector("[data-segment-direction]")?.focus({ preventScroll: true })
     }, 80)
   })
   els.viewSeg.addEventListener("click", (event) => {
@@ -4318,14 +4437,6 @@ function wireControls() {
       openSegment(state.station, event.target.closest("[data-segment-dir]").dataset.segmentDir)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-focus-step]")) {
       moveSegmentFocus(Number(event.target.closest("[data-segment-focus-step]").dataset.segmentFocusStep))
-    } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-drawer]")) {
-      const control = event.target.closest("[data-segment-drawer]")
-      const requested = control.dataset.segmentDrawer
-      if (requested === "toggle" && Date.now() < suppressDrawerClickUntil) return
-      const mode = requested === "toggle"
-        ? (state.segment.drawer === "expanded" ? "collapsed" : "expanded")
-        : requested === "expand" ? "expanded" : requested === "collapse" ? "collapsed" : requested
-      setSegmentDrawer(mode)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-direction]")) {
       setSegmentDirection(event.target.closest("[data-segment-direction]").dataset.segmentDirection)
     } else if (state.sheetKind === "segment" && event.target.closest("[data-segment-opposite]")) {
@@ -4371,12 +4482,12 @@ function wireControls() {
     } else if (state.sheetKind === "segment" && event.target.closest("[data-route-kind]")) {
       const button = event.target.closest("[data-route-kind]")
       setSegmentRouteItem(button.dataset.routeKind, button.dataset.routeId, button.dataset.epDir)
+    } else if (state.sheetKind === "segment" && event.target.closest(".segment-route [data-route-marker], .segment-route [data-focus-id]")) {
+      activateSegmentMarker(event.target.closest("[data-route-marker], [data-focus-id]"))
     } else if (state.sheetKind === "segment" && event.target.closest(".td-row")) {
       const row = event.target.closest(".td-row")
       const item = segmentFocusFromRow(row, state.segment)
       if (item) selectSegmentFocus(item)
-    } else if (state.sheetKind === "segment" && event.target.matches('[data-drawer-pane="expanded"]')) {
-      setSegmentDrawer("collapsed")
     } else if (event.target.closest(".duty-open")) {
       const open = event.target.closest(".duty-open")
       openDutyCard(open.dataset.sheet, open.dataset.duty)

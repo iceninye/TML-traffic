@@ -3,6 +3,12 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.12 — 2026-11-28 (`pending`, test branch)
+- 恢復右邊 EP／CPD／Niche Room／EAP 掣切換至「全部」時嘅全部連線：窄屏依家跟隨已顯示 marker 逐項連到右邊按鈕，唔再要求 `focus`。
+- 單項模式仍只連所選項目；關掉連線 switch 或全部 marker 收起時隱藏連線。
+- 真實 393×852 WebKit touch 驗證：EP 全部模式 4 條、CPD 8 條、NR 1 條、EAP 3 條，截圖確認直線可見。
+- Shell cache renamed `v114`。
+
 ## v0.11.11 — 2026-11-28 (`1491192`, test branch)
 - 修正列車節點透明觸控圈遮住 EP／CPD／NR／EAP／NZ／VCC marker 嘅問題；設施觸控層獨立放到列車層之上，撳 marker 唔會誤開列車卡。
 - 連線加粗至 2px 並提高不透明度，手機寬度下更容易辨識。

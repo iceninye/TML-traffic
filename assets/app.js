@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.11", commit: "1491192" }
+const BUILD = { version: "0.11.12", commit: "1491192" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -3553,6 +3553,7 @@ function paintSegmentConnectors() {
   const svg = document.getElementById("segment-connectors")
   if (!svg || state.sheetKind !== "segment" || !segment) return
   svg.replaceChildren()
+  svg.hidden = true
   const layout = document.querySelector(".segment-layout")
   const info = document.getElementById("segment-info")
   if (!layout || !info) return
@@ -3560,51 +3561,17 @@ function paintSegmentConnectors() {
   const infoRect = info.getBoundingClientRect()
   if (!layoutRect.width || !layoutRect.height) return
   svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
+  const wide = isWideSegmentLayout()
+  const targetGap = wide ? 6 : 4
+  const markerGap = wide ? 6 : 3
 
-  if (!isWideSegmentLayout()) {
-    svg.hidden = true
-    const focus = segment.focus
-    if (!focus || segment.drawer !== "expanded") return
-    if (focus.kind === "EP" && segment.epConnectors === false) return
-    if (focus.kind === "NR" && segment.nicheRoomConnectors === false) return
-    if (focus.kind === "EAP" && segment.eapConnectors === false) return
-    const marker = segmentFocusMarker(segment)
-    const target = segmentFocusTarget(segment)
-    if (!marker || !target) return
-    const markerRect = marker.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    const targetY = targetRect.top + targetRect.height / 2
-    if (!markerRect.width || !targetRect.width || targetY < infoRect.top || targetY > infoRect.bottom) return
-    const x2 = targetRect.left - 4 - layoutRect.left
-    const x1 = Math.min(markerRect.right + 3 - layoutRect.left, x2 - 8)
-    if (x2 <= x1) return
-    const direction = focus.kind === "EP" ? (focus.direction === "TUM" ? "TUM" : "WKS") : null
-    const itemId = direction ? `${direction}:${focus.id}` : focus.id
-    svg.append(make("line", {
-      x1,
-      y1: markerRect.top + markerRect.height / 2 - layoutRect.top,
-      x2,
-      y2: targetY - layoutRect.top,
-      class: `segment-${focus.kind.toLowerCase()}-connector`,
-      stroke: segmentFocusColor(segment),
-      "stroke-opacity": 0.95,
-      "vector-effect": "non-scaling-stroke",
-      "data-route-kind": focus.kind,
-      "data-route-id": itemId,
-      ...(direction ? { "data-ep-direction": direction } : {}),
-    }))
-    svg.hidden = false
-    return
-  }
-
-  svg.hidden = false
   const appendConnector = (dot, button, color, kind, id, direction = null) => {
     const dotRect = dot.getBoundingClientRect()
     const buttonRect = button.getBoundingClientRect()
     const buttonY = buttonRect.top + buttonRect.height / 2
-    if (buttonY < infoRect.top || buttonY > infoRect.bottom) return
-    const x2 = buttonRect.left - 6 - layoutRect.left
-    const x1 = Math.min(dotRect.right + 6 - layoutRect.left, x2 - 8)
+    if (!dotRect.width || !buttonRect.width || buttonY < infoRect.top || buttonY > infoRect.bottom) return
+    const x2 = buttonRect.left - targetGap - layoutRect.left
+    const x1 = Math.min(dotRect.right + markerGap - layoutRect.left, x2 - 8)
     if (x2 <= x1) return
     svg.append(make("line", {
       x1,
@@ -3613,12 +3580,13 @@ function paintSegmentConnectors() {
       y2: buttonY - layoutRect.top,
       class: `segment-${kind.toLowerCase()}-connector`,
       stroke: color,
-      "stroke-opacity": 0.9,
+      "stroke-opacity": 0.92,
       "vector-effect": "non-scaling-stroke",
       "data-route-kind": kind,
       "data-route-id": id,
       ...(direction ? { "data-ep-direction": direction } : {}),
     }))
+    svg.hidden = false
   }
 
   if (segment.epConnectors !== false) {
@@ -3661,7 +3629,17 @@ function paintSegmentConnectors() {
     }
   }
 
-  if (["CPD", "NZ", "VCC_BOUNDARY"].includes(segment.focus?.kind)) {
+  const cpdButtons = new Map([...info.querySelectorAll(".cpd-dot")].map((button) => [
+    button.dataset.routeId,
+    button,
+  ]))
+  for (const dot of document.querySelectorAll(`.segment-cpd-dot[data-track="${segment.activeDir}"][data-route-id]`)) {
+    const id = dot.dataset.routeId
+    const button = cpdButtons.get(id)
+    if (button) appendConnector(dot, button, "#67c7ff", "CPD", id)
+  }
+
+  if (["NZ", "VCC_BOUNDARY"].includes(segment.focus?.kind)) {
     const marker = segmentFocusMarker(segment)
     const target = segmentFocusTarget(segment)
     if (marker && target) appendConnector(marker, target, segmentFocusColor(segment), segment.focus.kind, segment.focus.id)

@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.7 — 2026-11-28 (pending stamp, test branch)
+## v0.11.7 — 2026-11-28 (`0208f5d`, test branch)
 - 640px 以下搜尋聚焦 EP 時新增單條位置連線：Peek 連到可見詳情卡，Expanded 連到實際 EP 按鈕，Collapsed 隱藏。
 - 窄屏連線沿用綠色（WKS）／黃色（TUM）方向配色及 EP 連線 switch；寬屏原本全部 EP 連線行為不變。
 - 連線改用沿軌圖右緣嘅直角路徑，避免 360px 斜線穿過技術 label；360px 實測零溢出。

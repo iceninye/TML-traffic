@@ -1254,6 +1254,11 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .segment-head .segment-dir-switch { position: static; flex: none; margin: 0; padding: 3px; }
 .segment-info { min-height: 0; overflow: hidden; padding: 0; }
 .segment-drawer { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.segment-drawer-head { display: none; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 6px 8px; border-bottom: 1px solid var(--edge); color: var(--muted); font-size: 11px; font-weight: 650; }
+.segment-drawer-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+.segment-marker-hit { fill: transparent; stroke: transparent; pointer-events: all; cursor: pointer; }
+.segment-vcc-line.segment-marker-hit { stroke-width: 16; stroke-dasharray: none; filter: none; pointer-events: stroke; }
+.segment-ep-control, .segment-nr-control, .segment-neutral-zone-group, .segment-vcc-line, .segment-cpd-dot, .segment-eap-dot { cursor: pointer; }
 .segment-drawer-handle { display: none; }
 .segment-drawer-handle[hidden] { display: none; }
 .segment-drawer-body { position: relative; display: flex; flex: 1 1 0; min-height: 0; }
@@ -1306,6 +1311,7 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
   .segment-diagram { min-height: 0; }
   .segment-info { overflow: hidden; }
   .segment-drawer { height: 100%; min-height: 0; border-left: 1px solid var(--edge); background: var(--panel); }
+  .segment-drawer-head { display: flex; }
   .segment-drawer-body { flex: 1 1 0; min-height: 0; }
   .segment-drawer-handle {
     display: grid;

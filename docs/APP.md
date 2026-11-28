@@ -91,7 +91,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 
 ### 技術搜尋同雙軌放大圖（2026-11-27）
 
-右上角「尋找」取代原本嘅「？説明」入口，圖例同說明保留喺搜尋 sheet 頂部快捷列。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
+右上角「尋找」取代原本嘅「？説明」入口，搜尋 sheet 標題為「技術資料」。搜尋 index 由 `lib/td-search.js` 喺前端建立，收錄 VCC 區域／交界、EP、CPD、EAP、Neutral Zone 同 Niche Room；支援編號、車站代號／中文名及 source page 查詢。
 
 - 類別 chip 嘅 `aria-pressed` 會同步；結果可用 UP／DOWN switch 沿行車方向排列，UP 為 WKS→TUM，DOWN 為 TUM→WKS。結果端點、雙向項目點擊方向、CPD 組標題、VCC 車站次序同 chainage metadata 都跟實際顯示方向。
 - CPD 結果按站段摺疊，頂層顯示車站、軌道、數量同 chainage 範圍；空查詢預設收合，搜尋時自動展開。

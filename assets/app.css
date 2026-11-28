@@ -1134,11 +1134,6 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .search-direction > span { margin-right: 2px; }
 .search-direction button { min-height: 32px; padding: 4px 10px; border: 1px solid var(--edge); border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 11.5px; }
 .search-direction button[aria-pressed="true"] { border-color: var(--tml-lite); background: color-mix(in srgb, var(--tml-lite) 16%, var(--panel-2)); color: var(--text); font-weight: 700; }
-.search-quick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin: -2px 0 12px; color: var(--muted); font-size: 11px; }
-.search-examples { display: flex; flex-wrap: wrap; gap: 5px; }
-.search-example { min-height: 30px; padding: 4px 8px; border: 1px dashed var(--edge); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; }
-.search-example:hover { border-color: var(--tml-lite); color: var(--text); }
-.search-quick .search-help { margin: 0 0 0 auto; padding: 4px 0; }
 .search-results { display: grid; gap: 7px; }
 .search-count { padding: 4px 2px; color: var(--muted); font-size: 11px; }
 .search-result-group { margin: 7px 2px 1px; padding: 5px 2px; border-bottom: 1px solid var(--edge); color: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; }
@@ -1204,7 +1199,6 @@ button.train-chip { padding: 0; cursor: pointer; font: inherit; font-size: 13px;
 .search-ep-code.green { color: #58c77a; border-color: color-mix(in srgb, #58c77a 45%, var(--edge)); }
 .search-ep-code.yellow { color: #f5c451; border-color: color-mix(in srgb, #f5c451 45%, var(--edge)); }
 .search-ep-line > span { color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.search-help { display: block; margin: 14px auto 0; padding: 8px 12px; color: var(--muted); font-size: 12px; text-decoration: underline; }
 
 /* Dual-direction technical segment */
 .sheet[data-kind="segment"][data-mode="dual"] .segment-layout {

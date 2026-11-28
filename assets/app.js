@@ -732,14 +732,6 @@ const SEARCH_CATEGORIES = [
   ["NR", "searchNr"],
 ]
 
-function searchQuickHtml() {
-  const s = t()
-  const examples = ["EP 1/2", "HP 601", "NAC43", "VCC 6↔7"]
-  return `<div class="search-quick"><span>${s.searchExamples}</span><div class="search-examples">` +
-    examples.map((example) => `<button type="button" class="search-example" data-search-example="${example}">${example}</button>`).join("") +
-    `</div><button type="button" class="search-help" data-open-help>${s.searchOpenHelp}</button></div>`
-}
-
 function searchDirectionSwitchHtml() {
   const s = t()
   const direction = state.search?.direction === "DOWN" ? "DOWN" : "UP"
@@ -772,7 +764,6 @@ function searchShellHtml() {
     `<label class="search-input-wrap"><input id="search-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="${s.searchPlaceholder}" value="${escapeHtml(search.query)}" aria-label="${s.searchTitle}"></label>` +
     `<div class="search-chips" role="group" aria-label="${s.searchTitle}">${chips}</div>` +
     searchDirectionSwitchHtml() +
-    searchQuickHtml() +
     `<div class="search-results" id="search-results" aria-live="polite">${s.searchLoading}</div>`
 }
 
@@ -4225,19 +4216,8 @@ function wireControls() {
   els.sheet.addEventListener("click", (event) => {
     if (state.sheetKind === "duty") handleDutyClick(event)
     else if (event.target.closest(".sheet-close")) closeSheet()
-    else if (state.sheetKind === "search" && event.target.closest("[data-open-help]")) openHelp()
     else if (state.sheetKind === "search" && event.target.closest("[data-search-retry]")) openSearch()
-    else if (state.sheetKind === "search" && event.target.closest("[data-search-example]")) {
-      const input = document.getElementById("search-input")
-      state.search.query = event.target.closest("[data-search-example]").dataset.searchExample
-      state.search.category = "ALL"
-      state.search.vccArea = null
-      state.search.activeIndex = 0
-      state.search.collapsedCpdGroups.clear()
-      if (input) input.value = state.search.query
-      renderSearchResults()
-      input?.focus({ preventScroll: true })
-    } else if (state.sheetKind === "search" && event.target.closest("[data-search-direction]")) {
+    else if (state.sheetKind === "search" && event.target.closest("[data-search-direction]")) {
       const button = event.target.closest("[data-search-direction]")
       state.search.direction = button.dataset.searchDirection === "DOWN" ? "DOWN" : "UP"
       state.search.activeIndex = 0

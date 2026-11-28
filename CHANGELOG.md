@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.10 — 2026-11-28 (`pending`, test branch)
+- 修正路線 EP／Niche Room 文字 label 唔屬於 marker 點擊範圍嘅問題；而家撳 label 或圓點都會選取設施、捲到清單並顯示直線。
+- 加大 EP／NR label、CPD／EAP 圓點、Neutral Zone 同 VCC 交界觸控範圍，減少 iPhone 需要重複撳先成功。
+- 連線起點保留最少可見長度，修正 VCC 交界貼近右欄時因 `x2 <= x1` 被省略。
+- 聚焦後同步及下一 frame 重繪連線，並觀察技術面板尺寸變化，減少捲動或佈局更新後漏線。
+- Shell cache renamed `v112`。
+
 ## v0.11.9 — 2026-11-28 (`2d2d07e`, test branch)
 - 技術資料面板固定展開，移除收合／展開掣同三態抽屜；窄屏保留靜態標題同設施總數。
 - 路線 EP、CPD、Niche Room、EAP、Neutral Zone 同 VCC 交界 marker 改為可點擊，行為與搜尋結果一致：選取設施、自動捲到清單項目並顯示直線連線。

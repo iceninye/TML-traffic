@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.9", commit: "2d2d07e" }
+const BUILD = { version: "0.11.10", commit: "2d2d07e" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -2554,6 +2554,7 @@ function openSegment(code, dir, options = {}) {
     })
     observer.observe(svg)
     if (layout) observer.observe(layout)
+    if (infoPane) observer.observe(infoPane)
   }
   loadTdData().then(({ segments, technical }) => {
     const current = state.segment
@@ -3190,7 +3191,7 @@ function applySegmentFocus(segment) {
 function focusSegmentItem(segment) {
   if (!segment?.focus) return
   const token = segment.openToken
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
     const target = segmentFocusTarget(segment)
     if (!target) return
@@ -3211,7 +3212,11 @@ function focusSegmentItem(segment) {
     }
     if (target.matches("button")) target.focus({ preventScroll: true })
     paintSegmentConnectors()
-  }, 0)
+    requestAnimationFrame(() => {
+      if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
+      paintSegmentConnectors()
+    })
+  })
 }
 
 function setSegmentDirection(dir) {
@@ -3352,7 +3357,7 @@ function paintSegmentInfrastructure() {
         make("title", {}, `${zone.isolator} ${rangeText}`),
         make("rect", { x: swatchX, y: center - swatchHeight / 2, width: swatchWidth, height: swatchHeight, class: "segment-neutral-zone", fill: `url(#${gradientId})` }),
         label,
-        make("rect", { x: swatchX - 6, y: center - 12, width: swatchWidth + 12, height: 24, class: "segment-marker-hit" }),
+        make("rect", { x: swatchX - 14, y: center - 18, width: swatchWidth + 28, height: 36, class: "segment-marker-hit" }),
       )
       trackLayer.append(group)
     }
@@ -3415,9 +3420,10 @@ function paintSegmentInfrastructure() {
         control.append(
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: `segment-ep-dot ${epDir === "WKS" ? "green" : "yellow"}` }),
+          make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`),
+          make("rect", { x: x - 14, y: y - 14, width: 90, height: 28, class: "segment-marker-hit" }),
         )
         trackLayer.append(control)
-        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-ep-code${overlapsVcc ? " overlap" : ""}` }, `EP ${code}`))
       }
     }
 
@@ -3441,9 +3447,10 @@ function paintSegmentInfrastructure() {
           make("title", {}, `${room.name} · ${chainageText(room.chainageKm)} km`),
           make("circle", { cx: x, cy: y, r: 7, fill: "transparent" }),
           make("circle", { cx: x, cy: y, r: 3, class: "segment-nr-dot" }),
+          make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`),
+          make("rect", { x: x - 14, y: y - 14, width: 82, height: 28, class: "segment-marker-hit" }),
         )
         trackLayer.append(control)
-        trackLayer.append(make("text", { x: x + 12, y: y + 3, class: `segment-nr-code${overlapsVcc ? " overlap" : ""}` }, `NR ${room.id}`))
       }
     }
 
@@ -3472,7 +3479,7 @@ function paintSegmentInfrastructure() {
           make("circle", {
             cx: markerX,
             cy: y,
-            r: 7,
+            r: 12,
             class: "segment-marker-hit",
             "data-route-marker": kind,
             "data-route-id": point.id,
@@ -3547,8 +3554,8 @@ function paintSegmentConnectors() {
     const targetRect = target.getBoundingClientRect()
     const targetY = targetRect.top + targetRect.height / 2
     if (!markerRect.width || !targetRect.width || targetY < infoRect.top || targetY > infoRect.bottom) return
-    const x1 = markerRect.right + 3 - layoutRect.left
     const x2 = targetRect.left - 4 - layoutRect.left
+    const x1 = Math.min(markerRect.right + 3 - layoutRect.left, x2 - 8)
     if (x2 <= x1) return
     const direction = focus.kind === "EP" ? (focus.direction === "TUM" ? "TUM" : "WKS") : null
     const itemId = direction ? `${direction}:${focus.id}` : focus.id
@@ -3575,8 +3582,8 @@ function paintSegmentConnectors() {
     const buttonRect = button.getBoundingClientRect()
     const buttonY = buttonRect.top + buttonRect.height / 2
     if (buttonY < infoRect.top || buttonY > infoRect.bottom) return
-    const x1 = dotRect.right + 6 - layoutRect.left
     const x2 = buttonRect.left - 6 - layoutRect.left
+    const x1 = Math.min(dotRect.right + 6 - layoutRect.left, x2 - 8)
     if (x2 <= x1) return
     svg.append(make("line", {
       x1,

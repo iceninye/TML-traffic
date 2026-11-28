@@ -3,6 +3,13 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
+## v0.11.6 — 2026-11-28 (pending stamp, test branch)
+- 「全部」混合搜尋結果入面嘅 CPD 按站段及現有軌道分組收合，例如顯徑—鑽石山 12 筆整合為一組；空查詢收合、搜尋展開、完全匹配單項直接顯示。
+- CPD 專用類別維持 7 組做法；混合結果初始由 370 個選項減至 119 個（94 個普通項目＋16 個 EP 組＋9 個 CPD 組）。
+- 混合 CPD／EP 分組保留全部 260 筆 CPD、240 筆 EP 同 94 筆非摺疊項目，方向切換保留展開狀態。
+- 搜尋 validator 增至 90 項，加入混合 CPD 站段分組、完整性、不可變性及單項匹配迴歸。
+- Shell cache renamed `v108`。
+
 ## v0.11.5 — 2026-11-28 (`ae811ac`, test branch)
 - 技術資料類別按鈕 `Neutral Zone`／`Niche Room` 縮寫為 `NZ`／`NR`。
 - 扁平 EP 搜尋結果按正式編號開首整合成摺疊組，例如 `EP 16-…`；沿用 UP／DOWN 分組，空查詢收合、搜尋展開、完全匹配單項直接顯示。

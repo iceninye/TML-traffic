@@ -102,6 +102,7 @@ import { advanceRuns, cumulative, mergeRuns, placeRun, runsFromTrains } from "..
 - TKW／HOM EAP 上下行落在相鄰站段時安全回落單軌，頁面會顯示原因及「前往對向」按鈕；來回跳轉保留同一 EAP focus。
 - EP 分類先選主線 VCC 區域，再按實際 UP／DOWN 軌分組；每組以黃／綠區分往屯門／往烏溪沙方向。
 - 「全部」或 EP 搜尋結果嘅扁平清單會按正式 EP 編號開首整合成摺疊組（例如 `EP 16-…`）；沿用現有方向／匹配分組，空查詢預設收合，搜尋自動展開，完全匹配單項直接顯示。展開後保留原方向 chainage 次序，鍵盤操作比照 CPD。
+- 「全部」混合結果入面嘅 CPD 亦按站段及現有軌道分組收合；例如顯徑—鑽石山 12 筆合成一組。CPD 專用類別維持原本 7 組做法，完全匹配單項直接顯示。
 - `tools/validate_search.mjs` 驗證 598 筆 index、594 筆主線可見結果、被排除 VCC 集合、站段解析、VCC 範圍、EP 分組、Neutral Zone 配對、格式迴歸同跨段 EAP metadata。
 - `tools/validate_sw.mjs` 驗證搜尋 critical-path 資源有納入離線 shell；lazy MapLibre 同動態更份／時間表唔納入呢個檢查。
 

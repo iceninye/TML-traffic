@@ -25,7 +25,7 @@ import { createProxyFetch } from "../lib/mtr-proxy.js"
 import { STRINGS } from "./strings.js"
 import { clockSpan, escapeHtml, readPref, writePref } from "./helpers.js"
 import { chainageValues, formatEp, recordsForRange, travelRange } from "../lib/td-infrastructure.js"
-import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, groupEntryPointsByPrefix, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
+import { buildTechnicalSearchIndex, entryPointsByVccArea, groupCpdsBySegment, groupTechnicalSearchRows, mainlineVccAreas, searchResultChainageText, searchResultDirection, searchResultEndpoints, searchResultMatchTier, searchResultPresentation, searchResultSegment, searchResultStations, searchTechnicalIndex, segmentEndpoints } from "../lib/td-search.js"
 import { applyOverlays, calendarDay, createTimetables, pendingNotices, entriesForDate, headwayAt, hopTimesAround, matchReadings, measuredHeadways, scheduledHeadway, pickFirstEntry, serviceDate, serviceDayStart, serviceSeconds } from "../lib/tml-timetable.js"
 
 // Chinese only: the English switch went in v0.7.4.
@@ -909,7 +909,7 @@ function searchTrackGroupLabel(group) {
   }[group] ?? s.searchGroupOther
 }
 
-function searchCpdGroupButton(group, index, expanded) {
+function searchCpdGroupButton(group, index, expanded, groupId = group.id) {
   const s = t()
   const direction = group.direction ?? state.search?.direction ?? "UP"
   const endpoints = segmentEndpoints(group.segment, direction)
@@ -918,7 +918,7 @@ function searchCpdGroupButton(group, index, expanded) {
   const values = group.items.flatMap((item) => chainageValues(item.chainageKm)).filter(Number.isFinite)
   const range = values.length ? `${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)} km` : ""
   const tracks = [...new Set(group.items.map((item) => item.track))].sort().join(" / ")
-  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-cpd-group" data-cpd-group="${escapeHtml(group.id)}">` +
+  return `<button type="button" id="search-option-${index}" role="option" aria-selected="false" aria-expanded="${expanded}" tabindex="-1" class="search-result search-cpd-group" data-cpd-group="${escapeHtml(groupId)}">` +
     `<span class="search-result-badge cpd">${s.searchCpd}</span>` +
     `<span class="search-result-main"><strong>${s.searchCpdGroup(from, to, group.items.length)}</strong><span>${escapeHtml(tracks)}${range ? ` · ${range}` : ""}</span></span>` +
     `<span class="search-result-meta"><b>${expanded ? s.searchCollapse : s.searchExpand}</b></span></button>`
@@ -967,18 +967,34 @@ function flatSearchResultsHtml(rows) {
   for (const section of sections) {
     const label = section.tier === 0 ? t().searchGroupExact : searchTrackGroupLabel(section.trackGroup)
     html += `<div class="search-result-group" role="presentation">${label}</div>`
-    for (const unit of groupEntryPointsByPrefix(section.items)) {
-      if (unit.kind === "item" || unit.items.length === 1) {
-        html += searchResultButton(unit.kind === "item" ? unit.item : unit.items[0], search.direction, optionIndex++)
+    for (const unit of groupTechnicalSearchRows(section.items, search.direction)) {
+      if (unit.kind === "item") {
+        html += searchResultButton(unit.item, search.direction, optionIndex++)
         continue
       }
-      const groupId = `ep:${section.trackGroup}:${unit.id}`
+      if (unit.items.length === 1) {
+        html += searchResultButton(unit.items[0], search.direction, optionIndex++)
+        continue
+      }
+      if (unit.kind === "epGroup") {
+        const groupId = `ep:${section.trackGroup}:${unit.id}`
+        const expanded = search.query.trim()
+          ? !search.collapsedEpGroups.has(groupId)
+          : search.expandedEpGroups.has(groupId)
+        html += searchEpGroupButton(unit, optionIndex++, expanded, groupId)
+        if (expanded) {
+          html += `<div class="search-ep-items" role="group" aria-label="${escapeHtml(`EP ${unit.prefix}-… · ${section.trackGroup}`)}">` +
+            unit.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
+        }
+        continue
+      }
+      const groupId = `cpd:${section.trackGroup}:${unit.id}`
       const expanded = search.query.trim()
-        ? !search.collapsedEpGroups.has(groupId)
-        : search.expandedEpGroups.has(groupId)
-      html += searchEpGroupButton(unit, optionIndex++, expanded, groupId)
+        ? !search.collapsedCpdGroups.has(groupId)
+        : search.expandedCpdGroups.has(groupId)
+      html += searchCpdGroupButton(unit, optionIndex++, expanded, groupId)
       if (expanded) {
-        html += `<div class="search-ep-items" role="group" aria-label="${escapeHtml(`EP ${unit.prefix}-… · ${section.trackGroup}`)}">` +
+        html += `<div class="search-cpd-items" role="group" aria-label="${escapeHtml(`CPD ${unit.id} · ${section.trackGroup}`)}">` +
           unit.items.map((item) => searchResultButton(item, search.direction, optionIndex++)).join("") + `</div>`
       }
     }

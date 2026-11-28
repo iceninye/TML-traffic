@@ -7,6 +7,7 @@ import {
   findSegmentForChainage,
   groupCpdsBySegment,
   groupEntryPointsByPrefix,
+  groupTechnicalSearchRows,
   mainlineVccAreas,
   pairNeutralZones,
   searchResultChainageText,
@@ -227,6 +228,27 @@ check(cpdGroups.length === 7 && cpdGroups.reduce((sum, group) => sum + group.ite
 "CPD 按路段分成 7 組，完整收錄 260 筆")
 check(Math.max(...cpdGroups.map((group) => group.items.length)) === 103,
   "最大 CPD 路段組為 103 筆")
+
+const mixedUnits = groupTechnicalSearchRows(visibleItems, "UP")
+const mixedCpdGroups = mixedUnits.filter((unit) => unit.kind === "cpdGroup")
+const mixedEpGroups = mixedUnits.filter((unit) => unit.kind === "epGroup")
+check(same(Object.fromEntries(mixedCpdGroups.map((group) => [group.id, group.items.length])), {
+  "11": 12, "12": 4, "18": 4, "19": 43, "20": 43, "21": 51, "22": 103,
+}), "混合搜尋結果入面嘅 CPD 按 7 個站段整合")
+const mixedCpdIds = mixedCpdGroups.flatMap((group) => group.items.map((item) => item.id))
+check(mixedCpdIds.length === 260 && new Set(mixedCpdIds).size === 260
+  && same([...mixedCpdIds].sort(), visibleItems.filter((item) => item.kind === "CPD").map((item) => item.id).sort()),
+"混合結果 CPD 摺疊完整收錄 260 筆，無遺漏或重複")
+check(mixedEpGroups.length === 8
+  && mixedEpGroups.reduce((sum, group) => sum + group.items.length, 0) === 240
+  && mixedUnits.filter((unit) => unit.kind === "item").length === 94,
+"加入 CPD 整合後同時保留 8 組 EP 同 94 筆非摺疊項目")
+const mixedSnapshot = JSON.stringify(visibleItems)
+groupTechnicalSearchRows(visibleItems, "DOWN")
+check(JSON.stringify(visibleItems) === mixedSnapshot, "混合 CPD／EP 分組唔改動原始搜尋結果")
+const exactCpd = searchTechnicalIndex(index, "HIK001", "CPD", "UP")
+check(exactCpd.length === 1 && groupTechnicalSearchRows(exactCpd, "UP")[0]?.items.length === 1,
+"完全匹配 CPD 只形成單項，UI 可直接顯示")
 
 const ep436 = index.items.find((item) => item.id === "ep:4-36")
 const vcc89 = index.items.find((item) => item.id === "vcc-boundary:8:9")

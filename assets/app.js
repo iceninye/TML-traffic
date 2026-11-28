@@ -728,8 +728,8 @@ const SEARCH_CATEGORIES = [
   ["EP", "searchEp"],
   ["CPD", "searchCpd"],
   ["EAP", "searchEap"],
-  ["NZ", "searchNz"],
-  ["NR", "searchNr"],
+  ["NZ", "searchNzChip"],
+  ["NR", "searchNrChip"],
 ]
 
 function searchDirectionSwitchHtml() {

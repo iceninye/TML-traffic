@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.5 — 2026-11-28 (pending stamp, test branch)
+## v0.11.5 — 2026-11-28 (`1e81fd8`, test branch)
 - 技術資料類別按鈕 `Neutral Zone`／`Niche Room` 縮寫為 `NZ`／`NR`。
 - 扁平 EP 搜尋結果按正式編號開首整合成摺疊組，例如 `EP 16-…`；沿用 UP／DOWN 分組，空查詢收合、搜尋展開、完全匹配單項直接顯示。
 - EP 摺疊支援展開／收合、方向狀態保留、鍵盤導航及 `aria-expanded`；展開後 240 筆 EP 完整保留且按方向 chainage 排列。

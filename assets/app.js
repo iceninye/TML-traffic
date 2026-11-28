@@ -60,7 +60,7 @@ const MAX_TTNT = 3
 // Only trains at least this far behind the timetable get a delay tag.
 const LATE_SHOW_SEC = 60
 const LATE_ALARM_SEC = 180
-const BUILD = { version: "0.11.7", commit: "0208f5d" }
+const BUILD = { version: "0.11.8", commit: "0208f5d" }
 
 const COLORS = { UP: "var(--up)", DOWN: "var(--down)" }
 // Raw values for MapLibre, which cannot read CSS variables.
@@ -2511,7 +2511,7 @@ function openSegment(code, dir, options = {}) {
     segmentId: options.segmentId ?? options.segment?.id ?? null,
     focus: options.focus ?? null,
     fallback: options.fallback ?? null,
-    drawer: options.focus ? "peek" : "collapsed",
+    drawer: options.focus ? (isWideSegmentLayout() ? "peek" : "expanded") : "collapsed",
     focusSequence: null,
     focusIndex: -1,
     recordsByDir: null,
@@ -2860,7 +2860,7 @@ function setSegmentDrawer(mode) {
   }, 0)
 }
 
-function selectSegmentFocus(item, mode = "peek") {
+function selectSegmentFocus(item, mode = isWideSegmentLayout() ? "peek" : "expanded") {
   const segment = state.segment
   if (!segment || !item) return
   segment.focus = { kind: item.kind, id: item.id, dir: segment.activeDir, direction: item.direction, data: item.data }
@@ -2870,6 +2870,7 @@ function selectSegmentFocus(item, mode = "peek") {
   paintSegmentInfrastructure()
   syncSegmentTrains()
   setSegmentDrawer(mode)
+  focusSegmentItem(segment)
 }
 
 function moveSegmentFocus(delta) {
@@ -2886,8 +2887,8 @@ function scrollSegmentMarkerIntoView(segment) {
   const route = document.querySelector(".segment-route")
   if (!focus || !route) return
   const routeId = focus.kind === "EP" ? `${focus.direction}:${focus.id}` : focus.id
-  const marker = document.querySelector(`[data-route-marker="${focus.kind}"][data-route-id="${CSS.escape(routeId)}"]`)
-    ?? document.querySelector(`[data-focus-id="${CSS.escape(focus.id)}"]`)
+  const marker = document.querySelector(`[data-route-marker="${focus.kind}"][data-route-id="${CSS.escape(routeId)}"][data-track="${segment.activeDir}"]`)
+    ?? document.querySelector(`[data-focus-id="${CSS.escape(focus.id)}"][data-track="${segment.activeDir}"]`)
   if (!marker) return
   const mr = marker.getBoundingClientRect()
   const rr = route.getBoundingClientRect()
@@ -3186,28 +3187,29 @@ function applySegmentFocus(segment) {
 
 function focusSegmentItem(segment) {
   if (!segment?.focus) return
-  if (!isWideSegmentLayout()) {
-    setSegmentDrawer("peek")
-    return
-  }
   const token = segment.openToken
   setTimeout(() => {
     if (state.sheetKind !== "segment" || state.segment !== segment || segment.openToken !== token) return
-    const info = document.getElementById("segment-info")
-    if (!info) return
-    const focus = segment.focus
-    let target = null
-    if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
-      target = [...info.querySelectorAll("[data-route-kind]")].find((button) =>
-        button.dataset.routeKind === focus.kind && button.dataset.routeId === focus.id
-        && (focus.kind !== "EP" || button.dataset.epDir === focus.direction))
-    } else {
-      target = info.querySelector(`[data-focus-kind="${focus.kind}"][data-focus-id="${CSS.escape(focus.id)}"]`)
-    }
+    const target = segmentFocusTarget(segment)
     if (!target) return
-    target.scrollIntoView({ block: "center", behavior: "auto" })
+    if (!isWideSegmentLayout()) {
+      scrollSegmentMarkerIntoView(segment)
+      if (segment.drawer === "expanded") {
+        const pane = document.querySelector(".segment-drawer-expanded")
+        if (pane) {
+          const paneRect = pane.getBoundingClientRect()
+          const targetRect = target.getBoundingClientRect()
+          if (targetRect.top < paneRect.top + 8 || targetRect.bottom > paneRect.bottom - 8) {
+            pane.scrollTop += targetRect.top + targetRect.height / 2 - paneRect.top - paneRect.height / 2
+          }
+        }
+      }
+    } else {
+      target.scrollIntoView({ block: "center", behavior: "auto" })
+    }
     if (target.matches("button")) target.focus({ preventScroll: true })
-  })
+    paintSegmentConnectors()
+  }, 0)
 }
 
 function setSegmentDirection(dir) {
@@ -3464,6 +3466,40 @@ function paintSegmentInfrastructure() {
   paintSegmentConnectors()
 }
 
+function segmentFocusMarker(segment) {
+  const focus = segment?.focus
+  if (!focus) return null
+  const track = segment.activeDir
+  const id = CSS.escape(focus.id)
+  if (focus.kind === "EP") {
+    const direction = focus.direction === "TUM" ? "TUM" : "WKS"
+    return document.querySelector(`.segment-ep-control[data-track="${track}"][data-route-id="${CSS.escape(`${direction}:${focus.id}`)}"] .segment-ep-dot`)
+  }
+  if (focus.kind === "NR") return document.querySelector(`.segment-nr-control[data-track="${track}"][data-route-id="${id}"] .segment-nr-dot`)
+  if (focus.kind === "CPD" || focus.kind === "EAP") {
+    return document.querySelector(`.segment-${focus.kind.toLowerCase()}-dot[data-track="${track}"][data-route-id="${id}"]`)
+  }
+  return document.querySelector(`.segment-route [data-focus-id="${id}"][data-track="${track}"]`)
+}
+
+function segmentFocusTarget(segment) {
+  const focus = segment?.focus
+  const info = document.getElementById("segment-info")
+  if (!focus || !info) return null
+  const id = CSS.escape(focus.id)
+  if (["EP", "NR", "CPD", "EAP"].includes(focus.kind)) {
+    const direction = focus.kind === "EP" ? `[data-ep-dir="${focus.direction === "TUM" ? "TUM" : "WKS"}"]` : ""
+    return info.querySelector(`[data-route-kind="${focus.kind}"][data-route-id="${id}"]${direction}`)
+  }
+  return info.querySelector(`[data-focus-kind="${focus.kind}"][data-focus-id="${id}"]`)
+}
+
+function segmentFocusColor(segment) {
+  const focus = segment?.focus
+  if (focus?.kind === "EP") return focus.direction === "TUM" ? "#f5c451" : "#58c77a"
+  return { NR: "#d65db1", CPD: "#67c7ff", EAP: "#ff7a59", NZ: "#c48bff", VCC_BOUNDARY: "#ef6b6b" }[focus?.kind] ?? "#c48bff"
+}
+
 function paintSegmentConnectors() {
   const segment = state.segment
   const svg = document.getElementById("segment-connectors")
@@ -3478,40 +3514,36 @@ function paintSegmentConnectors() {
   svg.setAttribute("viewBox", `0 0 ${layoutRect.width} ${layoutRect.height}`)
 
   if (!isWideSegmentLayout()) {
-    // Peek has no visible technical-list button, so target the detail card.
-    // Route the single focused EP line along the pane edge to avoid labels.
     svg.hidden = true
     const focus = segment.focus
-    if (segment.epConnectors === false || focus?.kind !== "EP" || segment.drawer === "collapsed") return
-    const direction = focus.direction === "TUM" ? "TUM" : "WKS"
-    const itemId = `${direction}:${focus.id}`
-    const control = document.querySelector(`.segment-ep-control[data-track="${segment.activeDir}"][data-route-id="${CSS.escape(itemId)}"]`)
-    const dot = control?.querySelector(".segment-ep-dot")
-    const target = segment.drawer === "peek"
-      ? document.querySelector(".segment-drawer-peek .segment-focus-detail")
-      : info.querySelector(`.ep-dot[data-route-id="${CSS.escape(focus.id)}"][data-ep-dir="${direction}"]`)
-    if (!dot || !target) return
-    const dotRect = dot.getBoundingClientRect()
+    if (!focus || segment.drawer !== "expanded") return
+    if (focus.kind === "EP" && segment.epConnectors === false) return
+    if (focus.kind === "NR" && segment.nicheRoomConnectors === false) return
+    if (focus.kind === "EAP" && segment.eapConnectors === false) return
+    const marker = segmentFocusMarker(segment)
+    const target = segmentFocusTarget(segment)
+    if (!marker || !target) return
+    const markerRect = marker.getBoundingClientRect()
     const targetRect = target.getBoundingClientRect()
     const targetY = targetRect.top + targetRect.height / 2
-    if (!dotRect.width || !targetRect.width || targetY < infoRect.top || targetY > infoRect.bottom) return
-    const routeRect = document.querySelector(".segment-route")?.getBoundingClientRect()
-    if (!routeRect) return
-    const x1 = dotRect.right + 4 - layoutRect.left
-    const elbowX = Math.min(routeRect.right + 2, targetRect.left - 5) - layoutRect.left
+    if (!markerRect.width || !targetRect.width || targetY < infoRect.top || targetY > infoRect.bottom) return
+    const x1 = markerRect.right + 3 - layoutRect.left
     const x2 = targetRect.left - 4 - layoutRect.left
-    if (x2 <= x1 || elbowX < x1 || x2 <= elbowX) return
-    const y1 = dotRect.top + dotRect.height / 2 - layoutRect.top
-    const y2 = targetY - layoutRect.top
-    svg.append(make("path", {
-      d: `M ${x1} ${y1} H ${elbowX} V ${y2} H ${x2}`,
-      class: "segment-ep-connector",
-      stroke: direction === "WKS" ? "#58c77a" : "#f5c451",
+    if (x2 <= x1) return
+    const direction = focus.kind === "EP" ? (focus.direction === "TUM" ? "TUM" : "WKS") : null
+    const itemId = direction ? `${direction}:${focus.id}` : focus.id
+    svg.append(make("line", {
+      x1,
+      y1: markerRect.top + markerRect.height / 2 - layoutRect.top,
+      x2,
+      y2: targetY - layoutRect.top,
+      class: `segment-${focus.kind.toLowerCase()}-connector`,
+      stroke: segmentFocusColor(segment),
       "stroke-opacity": 0.82,
       "vector-effect": "non-scaling-stroke",
-      "data-route-kind": "EP",
+      "data-route-kind": focus.kind,
       "data-route-id": itemId,
-      "data-ep-direction": direction,
+      ...(direction ? { "data-ep-direction": direction } : {}),
     }))
     svg.hidden = false
     return
@@ -3579,6 +3611,12 @@ function paintSegmentConnectors() {
       const button = eapButtons.get(id)
       if (button) appendConnector(dot, button, "#ff7a59", "EAP", id)
     }
+  }
+
+  if (["CPD", "NZ", "VCC_BOUNDARY"].includes(segment.focus?.kind)) {
+    const marker = segmentFocusMarker(segment)
+    const target = segmentFocusTarget(segment)
+    if (marker && target) appendConnector(marker, target, segmentFocusColor(segment), segment.focus.kind, segment.focus.id)
   }
 }
 

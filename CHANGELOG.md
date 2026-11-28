@@ -3,7 +3,7 @@
 All notable changes to the Tuen Ma Line live diagram. Commit hashes are the
 release commits stamped in the page footer.
 
-## v0.11.10 — 2026-11-28 (`pending`, test branch)
+## v0.11.10 — 2026-11-28 (`b37d58e`, test branch)
 - 修正路線 EP／Niche Room 文字 label 唔屬於 marker 點擊範圍嘅問題；而家撳 label 或圓點都會選取設施、捲到清單並顯示直線。
 - 加大 EP／NR label、CPD／EAP 圓點、Neutral Zone 同 VCC 交界觸控範圍，減少 iPhone 需要重複撳先成功。
 - 連線起點保留最少可見長度，修正 VCC 交界貼近右欄時因 `x2 <= x1` 被省略。
